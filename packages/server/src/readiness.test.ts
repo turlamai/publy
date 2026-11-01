@@ -101,6 +101,50 @@ test("POST /v1/ws-ticket issues a ticket bound to the caller", async () => {
   assert.equal(denied.statusCode, 401);
 });
 
+// --- fail-closed recovery when disk state is damaged --------------------------
+
+test("corrupt persisted recovery state blocks startup without discarding evidence", () => {
+  for (const [filename, expected] of [
+    ["jobs.json", "PUBLY_JOBS_STATE_INVALID"],
+    ["idempotency.json", "PUBLY_IDEMPOTENCY_STATE_INVALID"],
+  ]) {
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-state-corrupt-"));
+    // A simulated interrupted write may include private draft metadata.
+    const corrupt = '{"privateDraftToken":"never-echo-this-marker",';
+    try {
+      const stateFile = path.join(testDir, filename);
+      fs.writeFileSync(stateFile, corrupt);
+      assert.throws(
+        () => buildApp({ ...config, dataDir: testDir }),
+        (err: unknown) => err instanceof Error &&
+          err.message === expected &&
+          !err.message.includes("never-echo-this-marker"),
+        `${filename}: corrupt state must never be treated as an empty store`,
+      );
+      assert.equal(fs.readFileSync(stateFile, "utf8"), corrupt,
+        "failed startup must preserve original file for manual recovery");
+      assert.equal(fs.existsSync(path.join(testDir, "publy.db")), false,
+        "state validation should run before opening the SQLite store");
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("non-object persisted state also blocks startup", () => {
+  for (const filename of ["jobs.json", "idempotency.json"]) {
+    for (const value of ["null", "[]", "false"]) {
+      const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-state-shape-"));
+      try {
+        fs.writeFileSync(path.join(testDir, filename), value);
+        assert.throws(() => buildApp({ ...config, dataDir: testDir }), /PUBLY_(JOBS|IDEMPOTENCY)_STATE_INVALID/);
+      } finally {
+        fs.rmSync(testDir, { recursive: true, force: true });
+      }
+    }
+  }
+});
+
 // --- publish-result query (the lost-response reconciliation path) ----------------
 
 test("publish-result returns confirmed for a fresh record, unknown otherwise", async () => {
