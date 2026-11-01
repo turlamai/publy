@@ -1685,10 +1685,24 @@ export default class PublyPlugin extends Plugin {
       headers: { "content-type": "application/json", "x-api-key": this.settings.apiKey },
       body: JSON.stringify(payload),
     });
-    const body = res.json as PublishResponse;
+    const body = res.json as PublishResponse | null;
     if (res.status >= 400) {
-      const msg = `${body.code ?? res.status}: ${body.message ?? ""}`;
+      const msg = `${body?.code ?? res.status}: ${body?.message ?? ""}`;
       throw Object.assign(new Error(msg), { httpStatus: res.status });
+    }
+    // A 2xx transport response alone is NOT evidence that WeChat accepted a
+    // draft. In particular, an empty JSON body must leave the request outcome
+    // unknown, with the original idempotency key available for reconciliation.
+    // A scheduled admission has a jobId; a delivered draft has a mediaId.
+    const validResult = body && typeof body === "object" &&
+      (body.scheduled === true
+        ? typeof payload.publishAt === "string" && typeof body.jobId === "string" && body.jobId.trim().length > 0
+        : typeof body.mediaId === "string" && body.mediaId.trim().length > 0) &&
+      (body.account === undefined || body.account === payload.account) &&
+      (body.title === undefined || body.title === payload.title) &&
+      (body.requestId === undefined || body.requestId === payload.idempotencyKey);
+    if (res.status < 200 || res.status >= 300 || !validResult) {
+      throw new Error("Unverified draft acknowledgement; query the original request before retrying");
     }
     return body;
   }
@@ -1735,7 +1749,9 @@ export default class PublyPlugin extends Plugin {
         return;
       }
       const info = res.json as PublishResultInfo;
-      if (info.status === "confirmed") {
+      // A claimed confirmation without a draft ID is not a confirmed draft.
+      // Preserve the original request for further reconciliation.
+      if (info?.status === "confirmed" && typeof info.mediaId === "string" && info.mediaId.trim().length > 0) {
         this.lastAttempt = null;
         view?.setPublishResult("ok", t("queryConfirmed", { title: info.title ?? a.title, account: info.account ?? a.account }));
         new Notice(t("queryConfirmed", { title: info.title ?? a.title, account: info.account ?? a.account }), 8000);
