@@ -1237,13 +1237,13 @@ export function createProgram(): Command {
         console.log("cancelled");
       }
     });
-  // interrupted jobs never auto-rerun after a crash (#8); the owner retries
-  // explicitly — the original idempotency key rides along, so a lost run that
-  // actually delivered reconciles instead of duplicating
+  // Interrupted jobs are not safe to re-send: the server may only
+  // reconcile a matching confirmed local delivery. A 409 result means no
+  // draft was re-submitted; consult WeChat drafts before taking action.
   jobsCmd
     .command("retry")
     .argument("<id>")
-    .description("re-admit an interrupted/failed job (idempotency-checked)")
+    .description("reconcile confirmed interrupted jobs or retry proven pre-publish failures; never blindly re-send")
     .option("--json", "machine-readable retry outcome (changes server state)")
     .action(async (id: string, opts: { json?: boolean }) => {
       let config: CliConfig;
