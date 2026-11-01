@@ -9,7 +9,14 @@ import { pathToFileURL } from "node:url";
 export function resolveAsset(name: string, searchDirs: string[]): string | null {
   for (const dir of searchDirs) {
     const candidate = path.join(dir, name);
-    if (fs.existsSync(candidate)) return candidate;
+    // A vault folder (or a symlink to one) is not an image attachment.
+    // existsSync alone would incorrectly mark ![[folder]] as resolved, hiding
+    // the missing-asset warning and passing a directory to later renderers.
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch {
+      // Missing/unreadable candidates can still be found in other media dirs.
+    }
     // Obsidian resolves bare names anywhere in the vault; we approximate with a
     // recursive scan of the media dirs (bounded, media dirs are flat in practice).
     const found = findRecursive(dir, name, 0);
