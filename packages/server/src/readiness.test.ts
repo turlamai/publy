@@ -123,7 +123,7 @@ test("corrupt persisted recovery state blocks startup without discarding evidenc
       );
       assert.equal(fs.readFileSync(stateFile, "utf8"), corrupt,
         "failed startup must preserve original file for manual recovery");
-      assert.equal(fs.existsSync(path.join(testDir, "publy.db")), false,
+      assert.equal(fs.existsSync(path.join(testDir, "users.db")), false,
         "state validation should run before opening the SQLite store");
     } finally {
       fs.rmSync(testDir, { recursive: true, force: true });
