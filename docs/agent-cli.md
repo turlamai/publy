@@ -21,6 +21,7 @@ publy preview "/path/to/article.md" --json --out "/tmp/publy-review.html"
 publy render "/path/to/article.md" --json
 publy theme ls --json
 publy account list --json
+publy account add Work --theme claude --json  # explicit local mutation; user approval required
 publy quota --json
 publy jobs list --json
 publy history --json
@@ -31,6 +32,8 @@ side effects and returns a **versioned** manifest. Each command declares
 `json` support and whether it reads, writes local output, may access the
 network or performs a draft-creating/mutating action. **Do not guess** that
 every command supports `--json`: `theme preview` and some legacy commands are still human-oriented.
+`account add <name> --json [--app-id <id>] [--author <name>] [--theme <id>]` returns a single `account-add` object, with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or config file contents. Omitted options preserve existing account fields. The command changes only local configuration and requires explicit user approval.
+
 `config set <key> <value> --json` returns a single `config-set` object (`CONFIG_SAVED`, `CONFIG_KEY_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`) without ever echoing values, including API keys or credential-bearing URLs. This is a local mutation and requires the operator's approval.
 `jobs cancel --json` and `jobs retry --json` now return structured results,
 but are **mutating operations requiring explicit user approval**. If their
