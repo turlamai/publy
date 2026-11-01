@@ -285,6 +285,9 @@ export function buildApp(config: ServerConfig) {
   async function runJob(job: StoredJob): Promise<void> {
     job.status = "running";
     saveJobs();
+    // Once the remote publish pipeline starts, an error might mean WeChat
+    // accepted the draft but its response was lost. No automatic re-send.
+    let publishAttempted = false;
     const body = job.body;
     const caller: Caller = job.userId ? { admin: false, user: store.findUserById(job.userId)! } : { admin: true };
     const cred = resolveAccount(body.account, caller);
@@ -315,6 +318,7 @@ export function buildApp(config: ServerConfig) {
           return;
         }
       }
+      publishAttempted = true;
       const result = await publishToWechat(body, cred, tokens, materials);
       job.status = "done";
       job.result = result;
@@ -328,14 +332,23 @@ export function buildApp(config: ServerConfig) {
       notifyWebhook(body.account, "publish", { title: body.title, mediaId: result.mediaId, jobId: job.id, scheduled: true });
     } catch (err) {
       job.attempts += 1;
-      job.error = (err as Error).message;
-      audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
-      if (job.attempts >= JOB_MAX_ATTEMPTS) {
-        job.status = "failed";
-        notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+      if (publishAttempted) {
+        // The failure could be after draft/add committed remotely (including a
+        // failed local state write). A server-side key cannot query an unknown
+        // WeChat draft; automatically retrying could create duplicates.
+        job.status = "interrupted";
+        job.error = "draft outcome unknown after publish attempt; inspect WeChat drafts before explicit retry";
+        audit({ event: "scheduled-outcome-unknown", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts });
       } else {
-        job.status = "pending";
-        job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        job.error = redactSecrets((err as Error).message);
+        audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
+        if (job.attempts >= JOB_MAX_ATTEMPTS) {
+          job.status = "failed";
+          notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+        } else {
+          job.status = "pending";
+          job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        }
       }
     }
     saveJobs();
