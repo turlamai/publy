@@ -47,3 +47,35 @@ test("TokenManager rejects missing or malformed success tokens without caching t
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("TokenManager refreshes malformed tokens left in an older disk cache", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-legacy-token-"));
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return Response.json({ access_token: "synthetic-recovered", expires_in: 7200 });
+  }) as typeof fetch;
+  try {
+    // undefined is omitted by JSON.stringify, reproducing an old poisoned cache.
+    for (const accessToken of [undefined, "", "   ", 42]) {
+      fs.writeFileSync(path.join(dir, "token.json"), JSON.stringify({
+        "synthetic-app": { accessToken, expireAt: Date.now() / 1000 + 7200 },
+      }));
+      const manager = new TokenManager(dir);
+      assert.equal(await manager.get("synthetic-app", "synthetic-secret"), "synthetic-recovered");
+      assert.equal(
+        JSON.parse(fs.readFileSync(path.join(dir, "token.json"), "utf8"))["synthetic-app"].accessToken,
+        "synthetic-recovered",
+      );
+    }
+    assert.equal(calls, 4, "each malformed persisted token must be refreshed");
+    // Valid disk entries must remain usable offline without another request.
+    const valid = new TokenManager(dir);
+    assert.equal(await valid.get("synthetic-app", "synthetic-secret"), "synthetic-recovered");
+    assert.equal(calls, 4);
+  } finally {
+    globalThis.fetch = originalFetch;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
