@@ -313,25 +313,87 @@ test("jobs left running by a crash boot as interrupted and never auto-run", asyn
     const still = (await app2.inject({ method: "GET", url: "/v1/jobs", headers: H("admin-key") })).json().jobs.find((x: { id: string }) => x.id === "recon-1");
     assert.equal(still.status, "interrupted");
 
-    // explicit retry re-admits; the offline failure path (unknown account)
-    // lands it back in pending with a backed-off next attempt, so the owner
-    // can still cancel before any real fire
+    // A crash could have happened *after* WeChat accepted a draft. Manual
+    // retry cannot assume that the remote request did not land.
     const retry = await app2.inject({ method: "POST", url: "/v1/jobs/recon-1/retry", headers: HP("admin-key") });
-    assert.equal(retry.json().ok, true);
-    assert.equal(retry.json().job.status, "pending");
+    assert.equal(retry.statusCode, 409);
+    assert.equal(retry.json().code, "DRAFT_OUTCOME_UNKNOWN");
+    assert.equal(retry.json().jobId, "recon-1");
     await new Promise((r) => setTimeout(r, 150));
-    const retried = (await app2.inject({ method: "GET", url: "/v1/jobs", headers: H("admin-key") })).json().jobs.find((x: { id: string }) => x.id === "recon-1");
-    assert.equal(retried.status, "pending");
-    assert.equal(retried.attempts, 1);
-    const cancel = await app2.inject({ method: "DELETE", url: "/v1/jobs/recon-1", headers: HP("admin-key") });
-    assert.equal(cancel.json().ok, true);
-
-    // retry refuses terminal states
-    const again = await app2.inject({ method: "POST", url: "/v1/jobs/recon-1/retry", headers: HP("admin-key") });
-    assert.equal(again.statusCode, 400);
-    assert.equal(again.json().code, "NOT_RETRYABLE");
+    const blocked = (await app2.inject({ method: "GET", url: "/v1/jobs", headers: H("admin-key") })).json().jobs.find((x: { id: string }) => x.id === "recon-1");
+    assert.equal(blocked.status, "interrupted");
+    assert.equal(blocked.attempts, 1, "manual retry may not dispatch an unknown-outcome draft");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(reconciliationDir, "jobs.json"), "utf8"))["recon-1"].status, "interrupted");
   } finally {
     await app2.close();
+  }
+});
+
+test("manual retry reconciles a matching delivered draft locally without network or quota", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-manual-reconcile-"));
+  const body = { account: "TestAcct", type: "article" as const, title: "already delivered", html: "<p>same bytes</p>" };
+  const key = "manual-reconcile-key";
+  const record = {
+    mediaId: "CONFIRMED-REMOTE-DRAFT", at: Date.now(), account: body.account,
+    title: body.title, type: body.type, userId: null, requestFingerprint: draftIdempotencyKey(body),
+  };
+  const id = "manual-reconcile-1";
+  fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({
+    [id]: { id, runAt: Date.now() - 1000, body, idempotencyKey: key, userId: null,
+      status: "interrupted", attempts: 2, nextAttemptAt: Date.now() - 1000 },
+  }));
+  fs.writeFileSync(path.join(dir, "idempotency.json"), JSON.stringify({ [key]: record }));
+  const local = buildApp({ ...config, dataDir: dir, jobPollMs: 20 });
+  try {
+    await local.ready();
+    const res = await local.inject({ method: "POST", url: `/v1/jobs/${id}/retry`, headers: HP("admin-key") });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().ok, true);
+    assert.equal(res.json().deduped, true);
+    assert.equal(res.json().job.status, "done");
+    assert.equal(res.json().job.mediaId, record.mediaId);
+    assert.equal(res.json().job.attempts, 2, "local reconciliation should not count as a new publish attempt");
+    const persisted = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8"))[id];
+    assert.equal(persisted.status, "done");
+    assert.equal(persisted.result.mediaId, record.mediaId);
+    const repeated = await local.inject({ method: "POST", url: `/v1/jobs/${id}/retry`, headers: HP("admin-key") });
+    assert.equal(repeated.statusCode, 400);
+    assert.equal(repeated.json().code, "NOT_RETRYABLE");
+  } finally {
+    await local.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual retry does not resend a mismatched or expired local delivery record", async () => {
+  for (const [suffix, record] of [
+    ["different-body", { mediaId: "DIFFERENT", at: Date.now(),
+      account: "TestAcct", title: "other", type: "article", userId: null }],
+    ["expired", { mediaId: "OLD", at: Date.now() - 60 * 60 * 1000,
+      account: "TestAcct", title: "original", type: "article", userId: null }],
+  ] as const) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-retry-mismatch-"));
+    const id = "manual-block-" + suffix;
+    const body = { account: "TestAcct", type: "article" as const, title: "original", html: "<p>x</p>" };
+    fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({ [id]:
+      { id, runAt: Date.now() - 1000, body, idempotencyKey: "shared-key",
+        userId: null, status: "interrupted", attempts: 1, nextAttemptAt: Date.now() - 1000 },
+    }));
+    fs.writeFileSync(path.join(dir, "idempotency.json"), JSON.stringify({ "shared-key": record }));
+    const local = buildApp({ ...config, dataDir: dir, jobPollMs: 20 });
+    try {
+      await local.ready();
+      const res = await local.inject({ method: "POST", url: `/v1/jobs/${id}/retry`, headers: HP("admin-key") });
+      assert.equal(res.statusCode, 409);
+      assert.equal(res.json().code, suffix === "expired" ? "DRAFT_OUTCOME_UNKNOWN" : "IDEMPOTENCY_CONFLICT");
+      await new Promise((r) => setTimeout(r, 60));
+      const persisted = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8"))[id];
+      assert.equal(persisted.status, "interrupted");
+      assert.equal(persisted.attempts, 1);
+    } finally {
+      await local.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
 });
 
