@@ -9,6 +9,29 @@ import { fileURLToPath } from "node:url";
 
 let fontDirOverride: string | null = null;
 
+// Obsidian Community Directory installs only main.js, manifest.json and
+// styles.css. Bundled builds can inject the two licensed subset font buffers
+// into the renderer without reading extra files or accessing the network.
+let embeddedSubsets: { regular: Buffer; bold: Buffer } | null = null;
+
+export function setEmbeddedFontSubsets(fonts: { regular: Uint8Array; bold: Uint8Array } | null): void {
+  embeddedSubsets = fonts
+    ? { regular: Buffer.from(fonts.regular), bold: Buffer.from(fonts.bold) }
+    : null;
+}
+
+function embeddedSatoriFonts(specs: FontSpec[]) {
+  if (!embeddedSubsets) return null;
+  const subset = embeddedSubsets;
+  return specs.map((spec) => ({
+    name: spec.family,
+    data: spec.weight === 700 ? subset.bold : subset.regular,
+    weight: spec.weight,
+    style: "normal" as const,
+  }));
+}
+
+
 /** Sandbox environments (Obsidian plugin) inject their bundled font dir here. */
 export function setFontDir(dir: string): void {
   fontDirOverride = dir;
@@ -113,6 +136,8 @@ export function bundledSubsetDir(): string | null {
 }
 
 export function loadSatoriFontsWithFallback(specs: FontSpec[]): Promise<{ name: string; data: Buffer; weight: 400 | 700; style: "normal" | "italic" }[]> {
+  const embedded = embeddedSatoriFonts(specs);
+  if (embedded) return Promise.resolve(embedded);
   const subsetDir = bundledSubsetDir();
   if (subsetDir) {
     return Promise.all(
@@ -138,6 +163,8 @@ export function loadSatoriFontsWithFallback(specs: FontSpec[]): Promise<{ name: 
 export async function loadSatoriFontsOffline(
   specs: FontSpec[],
 ): Promise<{ name: string; data: Buffer; weight: 400 | 700; style: "normal" | "italic" }[]> {
+  const embedded = embeddedSatoriFonts(specs);
+  if (embedded) return embedded;
   const dir = bundledSubsetDir();
   if (!dir) throw new Error("Bundled card fonts unavailable for offline preview");
   return Promise.all(specs.map(async (spec) => {
