@@ -397,6 +397,65 @@ test("manual retry does not resend a mismatched or expired local delivery record
   }
 });
 
+test("manual retry permits only provenance-verified pre-publish failures", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-failed-retry-"));
+  const body = { account: "MissingAcct", type: "article" as const, title: "never submitted", html: "<p>x</p>" };
+  const oldId = "legacy-failed", safeId = "local-preflight-failed";
+  const job = (id: string, safeToRetry?: boolean) => ({
+    id, body, runAt: Date.now() - 1000, userId: null, status: "failed",
+    attempts: 3, nextAttemptAt: Date.now() - 1000,
+    ...(safeToRetry === undefined ? {} : { safeToRetry }),
+  });
+  fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({
+    [oldId]: job(oldId), [safeId]: job(safeId, true),
+  }));
+  // Slow poll ensures no retry is ever delivered during this isolated test.
+  const local = buildApp({ ...config, dataDir: dir, jobPollMs: 60_000 });
+  try {
+    await local.ready();
+    const unsafe = await local.inject({ method: "POST", url: `/v1/jobs/${oldId}/retry`, headers: HP("admin-key") });
+    assert.equal(unsafe.statusCode, 409);
+    assert.equal(unsafe.json().code, "DRAFT_OUTCOME_UNKNOWN");
+    const permitted = await local.inject({ method: "POST", url: `/v1/jobs/${safeId}/retry`, headers: HP("admin-key") });
+    assert.equal(permitted.statusCode, 200);
+    assert.equal(permitted.json().job.status, "pending");
+    assert.equal(permitted.json().job.attempts, 0);
+    const jobs = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8"));
+    assert.equal(jobs[oldId].status, "failed", "legacy failed job must not be re-admitted");
+    assert.equal(jobs[safeId].status, "pending");
+  } finally {
+    await local.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("manual reconciliation refuses legacy delivery records without a content fingerprint", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-unverified-identity-"));
+  const id = "legacy-identity", key = "legacy-key";
+  const body = { account: "TestAcct", type: "article" as const, title: "same title", html: "<p>changed contents</p>" };
+  fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({
+    [id]: { id, body, runAt: Date.now() - 1000, userId: null,
+      status: "interrupted", attempts: 1, nextAttemptAt: Date.now() - 1000,
+      idempotencyKey: key },
+  }));
+  fs.writeFileSync(path.join(dir, "idempotency.json"), JSON.stringify({
+    [key]: { mediaId: "OLD-DRAFT", at: Date.now(), account: body.account, title: body.title,
+      type: body.type, userId: null }, // no requestFingerprint in legacy data
+  }));
+  const local = buildApp({ ...config, dataDir: dir, jobPollMs: 20 });
+  try {
+    await local.ready();
+    const res = await local.inject({ method: "POST", url: `/v1/jobs/${id}/retry`, headers: HP("admin-key") });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.json().code, "IDEMPOTENCY_CONFLICT");
+    const persisted = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8"))[id];
+    assert.equal(persisted.status, "interrupted");
+  } finally {
+    await local.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- job runner reconciles against the idempotency record ---------------------------
 
 const runnerDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-runner-test-"));
