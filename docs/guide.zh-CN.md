@@ -242,7 +242,7 @@ cd /opt/publy && git pull && pnpm install --frozen-lockfile && pnpm -r build && 
 publy history            # 服务器审计日志（谁、何时、发了什么、mediaId）
 publy jobs list          # 定时任务
 publy jobs cancel <id>   # 取消未执行的定时任务
-publy jobs retry <id>    # 显式重试中断/失败的任务（幂等对账，不会重复建草稿）
+publy jobs retry <id>    # 仅在确认远端结果后操作；结果未知时禁止盲目重试（服务端保护仍在 PR #57 审核）
 ```
 
 **服务端冲突保护：** 如果客户端将同一个请求键用于不同公众号、
@@ -259,10 +259,10 @@ publy jobs retry <id>    # 显式重试中断/失败的任务（幂等对账，�
 真正端到端恰好一次：微信公众号已建草稿而本地服务未落盘的故障仍可能导致
 结果未知，必须查询原请求、人工核对草稿，而不是盲目重新发布。
 
-超时恢复：发布命令网络中断时退出码 5，并打印本次的幂等键。先查再重试，不要直接重发：
+超时恢复：发布命令网络中断或收到无有效确认的 HTTP 200 时，结果为 UNKNOWN，并保留幂等键。先查询并人工核对公众号草稿箱；UNKNOWN 不代表可以安全重试。CLI 不会自动通过 SSH 隧道再次投递，确需隧道应先手动运行 `publy tunnel`，再评估新提交：
 
 ```bash
-publy publish-result <幂等键>   # confirmed = 草稿已建；unknown = 可原样重试
+publy publish-result <幂等键>   # confirmed 且有 mediaId = 已确认；unknown = 必须人工核对，不可自动重投
 ```
 
 ## 故障排查
@@ -275,7 +275,7 @@ publy publish-result <幂等键>   # confirmed = 草稿已建；unknown = 可原
 | 退出码 5 + `WECHAT_40001` | AppSecret 不对或被重置，改服务器端 server.json |
 | 退出码 5 + `WECHAT_45166` | 图片消息内容超微信长度限制，精简 |
 | 连接拒绝 | 服务端 `systemctl status publy-server`，检查安全组/防火墙端口放行 |
-| 退出码 5 + outcome UNKNOWN | 网络中断，草稿可能已建：先 `publy publish-result <键>` 查询，再决定原样重试 |
+| 退出码 5 + outcome UNKNOWN | 草稿可能已建：先 `publy publish-result <键>` 查询并人工核对公众号草稿箱；无本地记录不等于未送达，禁止直接重投 |
 | 卡片出现乱码方块 | 生僻字/emoji 超出内置 GB2312 子集：`--font-file` 指定全量字体（首次自动下载） |
 
 ## 设计边界（为什么没有这些）
