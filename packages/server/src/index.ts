@@ -278,12 +278,18 @@ export function buildApp(config: ServerConfig) {
   for (const job of Object.values(jobs)) {
     if (job.status === "running") {
       job.status = "interrupted";
-      job.error = "interrupted by restart — draft outcome unknown; retry explicitly (idempotency-checked)";
+      job.error = "interrupted by restart — draft outcome unknown; inspect WeChat drafts before any further action";
       reconciled += 1;
     }
   }
-  if (reconciled > 0) audit({ event: "jobs-reconciled", interrupted: reconciled });
   const saveJobs = () => fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), { mode: 0o600 });
+  if (reconciled > 0) {
+    // Persist the fail-closed recovery decision immediately. Otherwise a
+    // second crash leaves jobs.json saying "running" despite the in-memory
+    // state being "interrupted", and the state does not survive restart.
+    saveJobs();
+    audit({ event: "jobs-reconciled", interrupted: reconciled });
+  }
 
   async function runJob(job: StoredJob): Promise<void> {
     job.status = "running";
