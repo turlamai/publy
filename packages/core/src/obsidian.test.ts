@@ -89,7 +89,7 @@ test("Obsidian code examples remain literal and do not create false missing-medi
     const pre = preprocessObsidian(source, [dir]);
     assert.deepEqual(pre.missing, []);
     assert.deepEqual(pre.assets, [file, file]);
-    assert.match(pre.body, /Outside !\\[实际图片\\]\\(/);
+    assert.ok(pre.body.includes("Outside ![实际图片]("));
     assert.match(pre.body, /alias/);
     for (const literal of [
       "`![[missing-inline.png]]`",
@@ -110,7 +110,7 @@ test("escaped and unmatched backticks do not hide real Obsidian embeds", () => {
   withMediaDir((dir) => {
     const file = path.join(dir, "real.png");
     fs.writeFileSync(file, "synthetic-image");
-    const source = String.raw`\\` ![[real.png]] and unmatched ` ![[real.png]]`;
+    const source = "\\` ![[real.png]] and unmatched ` ![[real.png]]";
     const pre = preprocessObsidian(source, [dir]);
     assert.deepEqual(pre.missing, []);
     assert.deepEqual(pre.assets, [file, file]);
