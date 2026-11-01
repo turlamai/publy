@@ -27,7 +27,7 @@ interface TokenCache {
 
 /** File-backed token cache with in-flight dedupe (600 s buffer before expiry). */
 export class TokenManager {
-  private cache: TokenCache = {};
+  private cache: TokenCache = Object.create(null) as TokenCache;
   private inflight = new Map<string, Promise<string>>();
   private file: string;
 
@@ -39,7 +39,9 @@ export class TokenManager {
       // A parseable JSON value is not necessarily a token dictionary.
       // Null/array/primitive legacy files must not break credential recovery.
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        this.cache = parsed as TokenCache;
+        // Keep a prototype-free dictionary: app IDs must never resolve to
+        // inherited keys such as constructor or mutate __proto__ on save.
+        Object.assign(this.cache, parsed);
       }
     } catch {
       /* first run or unreadable cache: refresh from the API */
