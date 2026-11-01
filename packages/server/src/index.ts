@@ -177,6 +177,41 @@ function jobInfo(j: StoredJob): JobInfo {
 /** resolved caller: admin, or a user row */
 type Caller = { admin: true } | { admin: false; user: UserRow };
 
+interface IdempotencyRecord {
+  mediaId: string;
+  at: number;
+  account: string;
+  title: string;
+  type: string;
+  /** owning user (null = admin) — records are not visible across callers */
+  userId: string | null;
+  /** verified request body hash; absent only in pre-v2 persisted records */
+  requestFingerprint?: string;
+}
+
+/** Persistent recovery state must fail closed: missing on first run is fine,
+ * but malformed/unreadable existing files are NOT an empty queue/history.
+ * Continuing would conceal scheduled jobs or allow repeated WeChat drafts. */
+function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY"): Record<string, T> {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    // Never echo raw data, filenames or parser excerpts: state may hold credentials.
+    throw new Error(`PUBLY_${kind}_STATE_READ_FAILED`);
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("state must be an object");
+    }
+    return parsed as Record<string, T>;
+  } catch {
+    throw new Error(`PUBLY_${kind}_STATE_INVALID`);
+  }
+}
+
 export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
@@ -187,6 +222,10 @@ export function buildApp(config: ServerConfig) {
   const app = Fastify({ bodyLimit: 30 * 1024 * 1024 });
   const dataDir = config.dataDir ?? path.join(os.homedir(), ".publy", "server-data");
   fs.mkdirSync(dataDir, { recursive: true });
+  // Inspect both files BEFORE opening SQLite or starting the scheduler. If
+  // either state file is corrupt, startup stops without rewriting it.
+  const persistedJobs = readPersistedMap<StoredJob>(path.join(dataDir, "jobs.json"), "JOBS");
+  const persistedIdempotency = readPersistedMap<IdempotencyRecord>(path.join(dataDir, "idempotency.json"), "IDEMPOTENCY");
 
   // every unhandled error leaves this server redacted: fetch/undici messages
   // can embed full URLs with tokens/secrets (#7 — secrets stay out of logs)
@@ -261,12 +300,7 @@ export function buildApp(config: ServerConfig) {
   // --- scheduled jobs --------------------------------------------------------
 
   const jobsFile = path.join(dataDir, "jobs.json");
-  let jobs: Record<string, StoredJob> = {};
-  try {
-    jobs = JSON.parse(fs.readFileSync(jobsFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const jobs: Record<string, StoredJob> = persistedJobs;
   // crash-mid-run reconciliation (#8): a job found "running" at boot has an
   // unknown draft outcome — the process must not silently re-issue a second
   // publish. Surface it as interrupted; retry is an explicit endpoint that
@@ -353,25 +387,8 @@ export function buildApp(config: ServerConfig) {
 
   // --- idempotency ------------------------------------------------------------
 
-  interface IdempotencyRecord {
-    mediaId: string;
-    at: number;
-    account: string;
-    title: string;
-    type: string;
-    /** owning user (null = admin) — records are not visible across callers */
-    userId: string | null;
-    /** verified request body hash; absent only in pre-v2 persisted records */
-    requestFingerprint?: string;
-  }
-
   const idempotencyFile = path.join(dataDir, "idempotency.json");
-  let idempotency: Record<string, IdempotencyRecord> = {};
-  try {
-    idempotency = JSON.parse(fs.readFileSync(idempotencyFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const idempotency: Record<string, IdempotencyRecord> = persistedIdempotency;
   const saveIdempotency = () => fs.writeFileSync(idempotencyFile, JSON.stringify(idempotency), { mode: 0o600 });
 
   const idempotencyFresh = (key: string): IdempotencyRecord | null => {
