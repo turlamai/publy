@@ -106,6 +106,8 @@ await esbuild.build({
   sourcemap: false,
   external: ["obsidian", "electron", "@resvg/resvg-js", "@resvg/resvg-wasm", "harfbuzzjs"],
   plugins: [wasmExternals],
-  loader: { ".css": "text" },
+  // Binary loader inlines CJK subset font bytes into main.js. Obsidian's
+  // Community Directory installs only the official three files.
+  loader: { ".css": "text", ".otf": "binary" },
   logLevel: "info",
 });
