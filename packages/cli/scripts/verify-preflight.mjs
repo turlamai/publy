@@ -191,7 +191,7 @@ try {
   const invalidAccount = addAccount("  ");
   assert.equal(invalidAccount.status, 1);
   assert.equal(JSON.parse(invalidAccount.stdout).code, "ACCOUNT_NAME_INVALID");
-  assert.equal(fs.readFileSync(accountConfig, "utf8"), JSON.stringify(storedAccount, null, 2) + "\\n");
+  assert.equal(fs.readFileSync(accountConfig, "utf8"), JSON.stringify(storedAccount, null, 2) + "\n");
   const malformedAccountConfig = path.join(dir, "malformed-account-add.json");
   const secretConfigMarker = "hidden-account-config-token";
   fs.writeFileSync(malformedAccountConfig, '{"api_key":"' + secretConfigMarker + '", invalid}');
