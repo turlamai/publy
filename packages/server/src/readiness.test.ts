@@ -145,6 +145,41 @@ test("non-object persisted state also blocks startup", () => {
   }
 });
 
+test("syntactically valid but damaged recovery entries also fail closed", () => {
+  const goodJob = {
+    id: "recover-1", runAt: Date.now() + 60_000,
+    body: { account: "TestAcct", type: "article", title: "recovery fixture" },
+    userId: null, status: "pending", attempts: 0, nextAttemptAt: Date.now() + 60_000,
+  };
+  const goodRecord = {
+    mediaId: "ALREADY_DELIVERED", at: Date.now(),
+    account: "TestAcct", title: "recovery fixture", type: "article", userId: null,
+  };
+  const cases: Array<[string, Record<string, unknown>, string]> = [
+    ["jobs.json", { "recover-1": null }, "PUBLY_JOBS_STATE_INVALID"],
+    ["jobs.json", { "recover-1": { ...goodJob, body: null } }, "PUBLY_JOBS_STATE_INVALID"],
+    ["jobs.json", { "recover-1": { ...goodJob, id: "different-id" } }, "PUBLY_JOBS_STATE_INVALID"],
+    ["jobs.json", { "recover-1": { ...goodJob, attempts: "0" } }, "PUBLY_JOBS_STATE_INVALID"],
+    ["idempotency.json", { "retry-key": null }, "PUBLY_IDEMPOTENCY_STATE_INVALID"],
+    ["idempotency.json", { "retry-key": { ...goodRecord, mediaId: "" } }, "PUBLY_IDEMPOTENCY_STATE_INVALID"],
+    ["idempotency.json", { "retry-key": { ...goodRecord, at: "not-a-time" } }, "PUBLY_IDEMPOTENCY_STATE_INVALID"],
+  ];
+  for (const [filename, payload, expected] of cases) {
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-state-entry-"));
+    try {
+      const file = path.join(testDir, filename);
+      const contents = JSON.stringify(payload);
+      fs.writeFileSync(file, contents);
+      assert.throws(() => buildApp({ ...config, dataDir: testDir }),
+        (err: unknown) => err instanceof Error && err.message === expected);
+      assert.equal(fs.readFileSync(file, "utf8"), contents);
+      assert.equal(fs.existsSync(path.join(testDir, "users.db")), false);
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  }
+});
+
 // --- publish-result query (the lost-response reconciliation path) ----------------
 
 test("publish-result returns confirmed for a fresh record, unknown otherwise", async () => {
