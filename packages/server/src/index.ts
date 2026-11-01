@@ -153,6 +153,9 @@ interface StoredJob {
   status: JobStatus;
   attempts: number;
   nextAttemptAt: number;
+  /** Only pre-publish failures may be retried. Legacy failed jobs without
+   * this marker must not be assumed safe: they may be older remote failures. */
+  safeToRetry?: boolean;
   /** admission idempotency: same key never enqueues two jobs, and a retry of
    *  an interrupted run reconciles against the same record before re-sending */
   idempotencyKey?: string;
@@ -285,6 +288,7 @@ export function buildApp(config: ServerConfig) {
   async function runJob(job: StoredJob): Promise<void> {
     job.status = "running";
     saveJobs();
+    job.safeToRetry = false;
     // Once the remote publish pipeline starts, an error might mean WeChat
     // accepted the draft but its response was lost. No automatic re-send.
     let publishAttempted = false;
@@ -337,9 +341,11 @@ export function buildApp(config: ServerConfig) {
         // failed local state write). A server-side key cannot query an unknown
         // WeChat draft; automatically retrying could create duplicates.
         job.status = "interrupted";
-        job.error = "draft outcome unknown after publish attempt; inspect WeChat drafts before explicit retry";
+        job.safeToRetry = false;
+        job.error = "draft outcome unknown after publish attempt; inspect WeChat drafts before any further action";
         audit({ event: "scheduled-outcome-unknown", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts });
       } else {
+        job.safeToRetry = true;
         job.error = redactSecrets((err as Error).message);
         audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
         if (job.attempts >= JOB_MAX_ATTEMPTS) {
@@ -792,7 +798,12 @@ export function buildApp(config: ServerConfig) {
           jobId: job.id,
         });
       }
-      if (!sameDraftIdentity(hit, job.body, job.userId)) {
+      // A pre-v2 idempotency record with no fingerprint is insufficient
+      // evidence of byte-identical content; do not trust a title match.
+      if (!hit.requestFingerprint ||
+          hit.requestFingerprint !== draftIdempotencyKey(job.body) ||
+          !hit.mediaId ||
+          !sameDraftIdentity(hit, job.body, job.userId)) {
         return reply.code(409).send({
           code: "IDEMPOTENCY_CONFLICT",
           message: "Recorded draft identity does not match this job; no retry attempted.",
@@ -811,6 +822,15 @@ export function buildApp(config: ServerConfig) {
       saveJobs();
       audit({ event: "job-reconciled", jobId: job.id, account: job.body.account, title: job.body.title });
       return { ok: true, job: jobInfo(job), deduped: true };
+    }
+    if (job.safeToRetry !== true) {
+      // Older failures did not record whether draft/add was attempted.
+      // Treat missing provenance as unknown rather than risking a duplicate.
+      return reply.code(409).send({
+        code: "DRAFT_OUTCOME_UNKNOWN",
+        message: "Cannot prove that this failed job stopped before WeChat draft submission; no retry attempted.",
+        jobId: job.id,
+      });
     }
     job.status = "pending";
     job.attempts = 0;
