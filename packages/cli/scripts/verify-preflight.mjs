@@ -716,13 +716,30 @@ try {
   // None may leak the server response body or lose requestId on uncertainty.
   const responseServerScript = path.join(dir, "agent-response-stub.mjs");
   const responsePortFile = path.join(dir, "agent-response-port.txt");
+  const responseCountFile = path.join(dir, "agent-response-count.txt");
+  fs.writeFileSync(responseCountFile, "");
   const privateServerMarker = "remote-secret-never-log";
   fs.writeFileSync(responseServerScript, `
 import fs from "node:fs";
 import http from "node:http";
 const server = http.createServer((_req, res) => {
   const key = _req.headers["x-api-key"];
+  if (_req.method === "POST") fs.appendFileSync(process.argv[3], String(key) + "\\n");
   res.setHeader("Content-Type", "application/json");
+  if (_req.url.startsWith("/v1/publish-result/")) {
+    if (key === "confirmed-no-media") {
+      res.end(JSON.stringify({ status: "confirmed", ok: true, mediaId: null, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "unknown-override") {
+      res.end(JSON.stringify({ status: "unknown", ok: true, schemaVersion: 999, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "confirmed-valid") {
+      res.end(JSON.stringify({ status: "confirmed", mediaId: "SYNTHETIC_MEDIA_1", account: "fixture", title: "local test" })); return;
+    }
+  }
+  if (key === "empty-success") { res.writeHead(200); res.end("{}"); return; }
+  if (key === "invalid-media") { res.writeHead(200); res.end('{"mediaId":123}'); return; }
+  if (key === "invalid-job") { res.writeHead(200); res.end('{"jobId":{"id":"bad"}}'); return; }
   if (key === "bad-response") {
     res.writeHead(200); res.end('{"mediaId":'); return;
   }
@@ -740,7 +757,7 @@ server.listen(0, "127.0.0.1", () => {
 });
 `);
   const responseServer = spawn(process.execPath,
-    [responseServerScript, responsePortFile],
+    [responseServerScript, responsePortFile, responseCountFile],
     { stdio: "ignore", windowsHide: true });
   try {
     const clock = new Int32Array(new SharedArrayBuffer(4));
@@ -757,6 +774,9 @@ server.listen(0, "127.0.0.1", () => {
     }));
     for (const [key, expectedStatus, expectedCode] of [
       ["bad-response", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["empty-success", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-media", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-job", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["denied-response", "rejected", "BAD_ARGUMENT"],
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
@@ -774,6 +794,50 @@ server.listen(0, "127.0.0.1", () => {
       assert.ok(!runReply.stdout.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes("SyntaxError:"));
+    }
+
+    // A working loopback listener stands in for the SSH tunnel: no SSH process
+    // or remote service is involved. One ambiguous POST must stay one POST.
+    const tunnelConfig = path.join(dir, "response-server-with-tunnel.json");
+    fs.writeFileSync(tunnelConfig, JSON.stringify({
+      server: "http://127.0.0.1:" + responsePort,
+      api_key: "bad-response", default_account: "fixture",
+      accounts: [{ name: "fixture" }],
+      tunnel: { ssh_target: "unused-local-test", local_port: Number(responsePort),
+        remote_port: 8081, server: "http://127.0.0.1:" + responsePort },
+    }));
+    const postCount = () => fs.readFileSync(responseCountFile, "utf8")
+      .split("\n").filter((key) => key === "bad-response").length;
+    const beforeTunnel = postCount();
+    const ambiguousTunnel = spawnSync(process.execPath,
+      [entrypoint, "publish", goodPath, "--json", "--account", "fixture"],
+      { encoding: "utf8", timeout: 25000,
+        env: { ...process.env, PUBLY_CONFIG: tunnelConfig } });
+    assert.equal(ambiguousTunnel.status, 5, ambiguousTunnel.stderr);
+    assert.equal(JSON.parse(ambiguousTunnel.stdout).status, "unknown");
+    assert.equal(postCount() - beforeTunnel, 1,
+      "an ambiguous draft response must not be replayed through a tunnel");
+
+    // A claimed confirmation without mediaId is unknown; a server response
+    // cannot override our agent JSON contract or leak unrelated fields.
+    for (const [key, expectedStatus, expectedOk, expectedExit] of [
+      ["confirmed-no-media", "unknown", false, 4],
+      ["unknown-override", "unknown", false, 4],
+      ["confirmed-valid", "confirmed", true, 0],
+    ]) {
+      const queried = spawnSync(process.execPath,
+        [entrypoint, "publish-result", "synthetic-key", "--json", "--api-key", key],
+        { encoding: "utf8", timeout: 25000,
+          env: { ...process.env, PUBLY_CONFIG: responseConfig } });
+      assert.equal(queried.status, expectedExit, key + " " + queried.stderr);
+      const report = JSON.parse(queried.stdout);
+      assert.equal(report.schemaVersion, 1);
+      assert.equal(report.kind, "publish-result");
+      assert.equal(report.ok, expectedOk);
+      assert.equal(report.status, expectedStatus);
+      assert.ok(!queried.stdout.includes(privateServerMarker));
+      assert.ok(!queried.stderr.includes(privateServerMarker));
+      assert.ok(!("secret" in report));
     }
   } finally {
     responseServer.kill();
