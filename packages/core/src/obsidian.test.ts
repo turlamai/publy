@@ -27,6 +27,21 @@ test("embed resolves against media dir and keeps alt", () => {
   });
 });
 
+test("Obsidian embed never resolves a directory as an image attachment", () => {
+  withMediaDir((dir) => {
+    fs.mkdirSync(path.join(dir, "assets"));
+    fs.writeFileSync(path.join(dir, "real.png"), "synthetic-image");
+    const source = "![[assets]]\\n\\n![[real.png]]";
+    const result = preprocessObsidian(source, [dir]);
+    assert.deepEqual(result.missing, ["assets"]);
+    assert.deepEqual(result.assets, [path.join(dir, "real.png")]);
+    assert.match(result.body, /!\\[assets\\]\\(assets\\)/);
+    const rendered = renderMarkdown(source, { baseDir: dir });
+    assert.deepEqual(rendered.attachments.map((a) => a.path), [path.join(dir, "real.png")]);
+    assert.ok(rendered.warnings.some((warning) => warning.includes("Assets not found: assets")));
+  });
+});
+
 test("embed without alt falls back to file base name", () => {
   withMediaDir((dir) => {
     fs.writeFileSync(path.join(dir, "pic.png"), "x");
