@@ -109,3 +109,29 @@ test("TokenManager repairs malformed top-level token caches without using live c
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("TokenManager preserves prototype-like app IDs across disk recovery", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-token-prototype-"));
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return Response.json({ access_token: `synthetic-token-${calls}`, expires_in: 7200 });
+  }) as typeof fetch;
+  try {
+    for (const appId of ["__proto__", "constructor", "toString"]) {
+      const manager = new TokenManager(dir);
+      const expected = `synthetic-token-${calls + 1}`;
+      assert.equal(await manager.get(appId, "synthetic-secret"), expected);
+      const persisted = JSON.parse(fs.readFileSync(path.join(dir, "token.json"), "utf8"));
+      assert.equal(Object.hasOwn(persisted, appId), true, `${appId} must be persisted as an own key`);
+      assert.equal(persisted[appId].accessToken, expected);
+      const restored = new TokenManager(dir);
+      assert.equal(await restored.get(appId, "synthetic-secret"), expected);
+    }
+    assert.equal(calls, 3, "restored entries must not trigger additional token requests");
+  } finally {
+    globalThis.fetch = originalFetch;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
