@@ -84,7 +84,7 @@ browser action. `check` itself does not fetch remote resources.
 2. **Review:** One accurate WeChat preview, usable typography, phone-width
    toggle, themes and a clear **asset checklist** (present, missing, remote,
    unsupported, duplicated basenames) with actionable fixes.
-3. **Choose:** Separate **Copy formatted HTML** (with image limitations) from
+3. **Choose:** Separate **Copy formatted HTML** (text-only, with no unresolved media/formula attachments; it refuses to overwrite the clipboard if a required asset is missing) from
    **Save to selected account's draft box**. Show account, title, cover and
    operation before the remote action. Never silently broadcast/send.
 4. **Resolve:** Confirmed draft, duplicate suppressed, queued, pending/unknown,
