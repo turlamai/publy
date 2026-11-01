@@ -79,3 +79,33 @@ test("TokenManager refreshes malformed tokens left in an older disk cache", asyn
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+
+test("TokenManager repairs malformed top-level token caches without using live credentials", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-token-cache-root-"));
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return Response.json({ access_token: "synthetic-repaired", expires_in: 7200 });
+  }) as typeof fetch;
+  try {
+    // JSON.parse accepts these values, but none is a usable token dictionary.
+    // An array also silently drops named keys when JSON.stringify persists it.
+    for (const invalidRoot of ["null", "[]", '"old-format"', "42", "true"]) {
+      fs.writeFileSync(path.join(dir, "token.json"), invalidRoot);
+      const manager = new TokenManager(dir);
+      assert.equal(await manager.get("synthetic-app", "synthetic-secret"), "synthetic-repaired");
+      const repaired = JSON.parse(fs.readFileSync(path.join(dir, "token.json"), "utf8"));
+      assert.equal(Array.isArray(repaired), false);
+      assert.equal(repaired["synthetic-app"].accessToken, "synthetic-repaired");
+    }
+    assert.equal(calls, 5, "each malformed root must refresh exactly once");
+    const recovered = new TokenManager(dir);
+    assert.equal(await recovered.get("synthetic-app", "synthetic-secret"), "synthetic-repaired");
+    assert.equal(calls, 5, "repaired cache must be reusable without another request");
+  } finally {
+    globalThis.fetch = originalFetch;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
