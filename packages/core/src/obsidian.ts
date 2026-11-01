@@ -51,7 +51,7 @@ function rewriteOutsideMarkdownCode(source: string, rewrite: (text: string) => s
     let opener: RegExpExecArray | null;
     const escaped = (index: number): boolean => {
       let count = 0;
-      for (let i = index - 1; i >= 0 && text[i] === "\\\\"; i--) count++;
+      for (let i = index - 1; i >= 0 && text[i] === "\\"; i--) count++;
       return count % 2 !== 0;
     };
     while ((opener = ticks.exec(text)) !== null) {
@@ -127,21 +127,21 @@ export function preprocessObsidian(
 
   const rewrite = (text: string): string => {
     const embedded = text.replace(embedPattern, (_m, nameRaw: string, rest?: string) => {
-    const name = nameRaw.trim();
-    const parts = (rest ?? "").split("|").map((s) => s.trim());
-    const alt = parts[0] && !/^\d+$/.test(parts[0]) ? parts[0] : path.basename(name, path.extname(name));
-    const resolved = resolveAsset(name, searchDirs);
-    if (!resolved) {
-      missing.push(name);
-      return `![${alt}](${name})`;
-    }
-    assets.push(resolved);
-    // Markdown destinations cannot contain raw spaces, parentheses or URL delimiters.
-    // A local file URL preserves the exact path until the attachment pass.
-    const fileUrl = pathToFileURL(resolved).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
-    const safeAlt = alt.replace(/[\\[\]]/g, "\\$&");
-    return `![${safeAlt}](${fileUrl})`;
-  });
+      const name = nameRaw.trim();
+      const parts = (rest ?? "").split("|").map((s) => s.trim());
+      const alt = parts[0] && !/^\d+$/.test(parts[0]) ? parts[0] : path.basename(name, path.extname(name));
+      const resolved = resolveAsset(name, searchDirs);
+      if (!resolved) {
+        missing.push(name);
+        return `![${alt}](${name})`;
+      }
+      assets.push(resolved);
+      // Markdown destinations cannot contain raw spaces, parentheses or URL delimiters.
+      // A local file URL preserves the exact path until the attachment pass.
+      const fileUrl = pathToFileURL(resolved).href.replace(/\(/g, "%28").replace(/\)/g, "%29");
+      const safeAlt = alt.replace(/[\\[\]]/g, "\\$&");
+      return `![${safeAlt}](${fileUrl})`;
+    });
 
     return embedded.replace(linkPattern, (_m, target: string, alias?: string) => {
       return (alias ?? target).trim();
