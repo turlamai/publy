@@ -181,6 +181,48 @@ await inst.onload();
 if (!calls.includes("ribbon")) fail("ribbon not registered");
 if (!calls.some((c) => c.startsWith("command:"))) fail("commands not registered");
 
+// Clipboard preflight must never report success with unresolved attachment://
+// references or unrendered formulas. No remote account or OS clipboard touched.
+{
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const originalClipboardItem = Object.getOwnPropertyDescriptor(globalThis, "ClipboardItem");
+  const writes = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true, value: { clipboard: { write: async (items) => { writes.push(items); } } },
+  });
+  Object.defineProperty(globalThis, "ClipboardItem", {
+    configurable: true, value: class ClipboardItem { constructor(data) { this.data = data; } },
+  });
+  const imageName = "publy-clipboard-smoke-" + process.pid + ".png";
+  const imagePath = path.join(os.tmpdir(), imageName);
+  fs.writeFileSync(imagePath, Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  ));
+  const copy = async (file, source) => {
+    const filePath = "samples/" + file + ".md";
+    app.vaultContentByPath[filePath] = source;
+    await inst.copyRenderedHtml({ path: filePath, basename: file, extension: "md" });
+  };
+  try {
+    await copy("copy-plain", "# A safe note\n\nHello **world**.");
+    if (writes.length !== 1) fail("plain text-only copy should use clipboard exactly once");
+    await copy("copy-invalid-formula", String.raw`Bad formula $\frac{$ should not silently become pasted text.`);
+    if (writes.length !== 1) fail("invalid formula must not modify clipboard");
+    await copy("copy-image", "# Attachment\n\n![tiny](" + imageName + ")");
+    if (writes.length !== 1) fail("image attachments must not copy unusable attachment:// URLs");
+    await copy("copy-missing-image", "# Missing\n\n![lost](missing-publy-clipboard.png)");
+    if (writes.length !== 1) fail("missing images must not modify clipboard");
+  } finally {
+    fs.rmSync(imagePath, { force: true });
+    if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+    else delete globalThis.navigator;
+    if (originalClipboardItem) Object.defineProperty(globalThis, "ClipboardItem", originalClipboardItem);
+    else delete globalThis.ClipboardItem;
+  }
+}
+
+
 // article render into the in-app preview view
 app.workspace.activeFile = { path: "samples/article-sample.md", basename: "article-sample", extension: "md" };
 await inst.previewCurrentNote(); // smart dispatch -> article
