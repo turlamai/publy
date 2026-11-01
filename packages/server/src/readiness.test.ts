@@ -217,6 +217,69 @@ test("a reused scheduled request key cannot silently enqueue or dedupe different
   assert.equal(jobs.filter((job: { id: string }) => job.id === first.json().jobId).length, 1);
 });
 
+// --- ambiguous scheduled delivery must not automatically duplicate drafts ---------
+
+test("lost draft/add response interrupts a scheduled job without auto-resending", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-unknown-draft-"));
+  const appId = "wx_synthetic_no_network";
+  const jobId = "unknown-draft-1";
+  const key = "unknown-draft-request";
+  const due = Date.now() - 1000;
+  // Keep token retrieval offline. Every network call is intercepted; the only
+  // simulated draft/add request loses its response after possible acceptance.
+  fs.writeFileSync(path.join(dir, "token.json"), JSON.stringify({
+    [appId]: { accessToken: "synthetic-token", expireAt: Date.now() / 1000 + 7200 },
+  }));
+  fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({
+    [jobId]: {
+      id: jobId, runAt: due, nextAttemptAt: due, attempts: 0,
+      status: "pending", userId: null, idempotencyKey: key,
+      body: {
+        account: "SyntheticAcct", title: "offline ambiguous draft",
+        type: "image_post", idempotencyKey: key,
+        images: [{ name: "one.png", data: "AQ==", contentType: "image/png" }],
+      },
+    },
+  }));
+  let draftCalls = 0;
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes("/cgi-bin/material/add_material")) {
+      return Response.json({ media_id: "SYNTHETIC_IMAGE", url: "https://example.invalid/image" });
+    }
+    if (url.includes("/cgi-bin/draft/add")) {
+      draftCalls++;
+      throw new TypeError("simulated lost response after possible remote acceptance");
+    }
+    throw new Error("Unexpected network request in offline recovery test");
+  });
+  const isolated = buildApp({
+    ...config, dataDir: dir, jobPollMs: 25,
+    accounts: [{ name: "SyntheticAcct", appId, appSecret: "synthetic-not-real" }],
+  });
+  try {
+    await isolated.ready();
+    let job: { status: string; attempts: number; error?: string } | undefined;
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 30));
+      const result = await isolated.inject({ method: "GET", url: "/v1/jobs", headers: H("admin-key") });
+      job = result.json().jobs.find((j: { id: string }) => j.id === jobId);
+      if (job?.status === "interrupted") break;
+    }
+    assert.equal(job?.status, "interrupted");
+    assert.equal(job?.attempts, 1);
+    assert.match(job?.error ?? "", /outcome unknown/);
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(draftCalls, 1, "the scheduler must not reissue an ambiguous draft/add");
+    const persisted = JSON.parse(fs.readFileSync(path.join(dir, "jobs.json"), "utf8"));
+    assert.equal(persisted[jobId].status, "interrupted", "unknown outcome must survive restart");
+  } finally {
+    await isolated.close();
+    t.mock.restoreAll();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- crash reconciliation + explicit retry ----------------------------------------
 
 const reconciliationDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-recon-test-"));
