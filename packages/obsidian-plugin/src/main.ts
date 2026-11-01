@@ -1401,8 +1401,14 @@ export default class PublyPlugin extends Plugin {
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
       for (const w of rendered.warnings) console.warn("[publy] " + w);
-      if (rendered.attachments.length > 0) {
-        new Notice(t("copyHasImages"));
+      // A successful copy should be directly usable in the target editor:
+      // unavailable formulas/media and attachment:// placeholders are not.
+      // The draft workflow uploads assets and replaces placeholders safely.
+      if (rendered.warnings.some(blockingMediaWarning)) {
+        throw new Error(t("mediaNotReady"));
+      }
+      if (rendered.attachments.length > 0 || rendered.html.includes("attachment://")) {
+        throw new Error(t("copyHasImages"));
       }
       const item = new ClipboardItem({
         "text/html": new Blob([rendered.html], { type: "text/html" }),
