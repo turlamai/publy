@@ -48,7 +48,10 @@ export class TokenManager {
   async get(appId: string, appSecret: string): Promise<string> {
     const now = Date.now() / 1000;
     const hit = this.cache[appId];
-    if (hit && hit.expireAt > now + 600) return hit.accessToken;
+    // Older versions could persist an absent or malformed token after HTTP 200.
+    // Never trust disk cache shape without validating the credential itself.
+    if (hit && typeof hit.accessToken === "string" && hit.accessToken.trim() &&
+        Number.isFinite(hit.expireAt) && hit.expireAt > now + 600) return hit.accessToken;
 
     const pending = this.inflight.get(appId);
     if (pending) return pending;
