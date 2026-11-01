@@ -46,6 +46,8 @@ if (!communityOnly) {
 
 const calls = [];
 let lastSubmitted = null;
+let nextPublishResponse = null;
+let nextQueryResponse = null;
 
 class Component {
   replaceChildren(...children) { this.children = children; }
@@ -144,9 +146,25 @@ class Modal {
 }
 class TFile { path = ""; }
 const stub = { Plugin, ItemView, WorkspaceLeaf, Notice, PluginSettingTab, App, Setting, TFile, Modal, sanitizeHTMLToDom: (html) => ({ html }), requestUrl: async (req) => {
-  if (req.method === "POST" && new URL(req.url).pathname === "/v1/publish") {
+  const pathname = new URL(req.url).pathname;
+  if (req.method === "POST" && pathname === "/v1/publish") {
     lastSubmitted = JSON.parse(req.body);
     calls.push("request:publish");
+    // The synthetic server must behave like the real draft endpoint. Returning
+    // {} with HTTP 200 used to make this verifier assert a FALSE success.
+    const response = nextPublishResponse ?? {
+      mediaId: "SYNTHETIC-DRAFT-ID",
+      account: lastSubmitted.account,
+      title: lastSubmitted.title,
+      requestId: lastSubmitted.idempotencyKey,
+    };
+    nextPublishResponse = null;
+    return { json: response, status: 200 };
+  }
+  if (pathname.startsWith("/v1/publish-result/")) {
+    const response = nextQueryResponse ?? { status: "unknown" };
+    nextQueryResponse = null;
+    return { json: response, status: 200 };
   }
   return { json: {}, status: 200 };
 } };
@@ -202,6 +220,30 @@ await inst.publishCurrentNote();
 if (!calls.some((c) => c.includes("WeChat drafts"))) fail("publish success toast missing — calls: " + calls.join(" | "));
 const dupes = calls.filter((c) => c.includes("WeChat drafts")).length;
 if (dupes !== 1) fail("unexpected publish toast count: " + dupes);
+
+// A successful HTTP transport with no WeChat draft/job acknowledgement is
+// UNKNOWN, not success. Keep the exact request identity for query and retry.
+const beforeMalformedSuccess = calls.filter((c) => c.includes("WeChat drafts")).length;
+nextPublishResponse = {};
+await inst.publishCurrentNote();
+const ambiguousKey = lastSubmitted?.idempotencyKey;
+if (!ambiguousKey || inst.lastAttempt?.key !== ambiguousKey) {
+  fail("empty 200 acknowledgement must preserve the original retry identity");
+}
+if (calls.filter((c) => c.includes("WeChat drafts")).length !== beforeMalformedSuccess) {
+  fail("empty 200 acknowledgement incorrectly displayed confirmed success");
+}
+// Even a claimed query confirmation is not proof without a media ID.
+nextQueryResponse = { status: "confirmed" };
+await inst.queryLastAttempt();
+if (inst.lastAttempt?.key !== ambiguousKey) {
+  fail("confirmed query missing mediaId must remain recoverable");
+}
+// A retry must re-send the identical key and accept a valid acknowledgement.
+await inst.retryLastAttempt();
+if (lastSubmitted?.idempotencyKey !== ambiguousKey || inst.lastAttempt !== null) {
+  fail("recovery retry must reuse the same key and clear uncertainty only on confirmation");
+}
 
 // The broken image may be previewed locally, but must never be submitted.
 const beforeBlocked = calls.filter((c) => c === "request:publish").length;
