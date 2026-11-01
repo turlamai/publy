@@ -189,10 +189,43 @@ interface IdempotencyRecord {
   requestFingerprint?: string;
 }
 
+/** Reject syntactically valid but damaged entries as well as broken JSON.
+ * A null job can crash boot reconciliation; an incomplete job or draft record
+ * can silently erase the ability to recover an already-submitted draft. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+function isPersistedJob(key: string, value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.body)) return false;
+  const body = value.body;
+  return typeof value.id === "string" && value.id === key &&
+    typeof value.runAt === "number" && Number.isFinite(value.runAt) &&
+    typeof value.nextAttemptAt === "number" && Number.isFinite(value.nextAttemptAt) &&
+    typeof value.attempts === "number" && Number.isInteger(value.attempts) && value.attempts >= 0 &&
+    (value.userId === null || typeof value.userId === "string") &&
+    typeof value.status === "string" &&
+    ["pending", "running", "done", "failed", "cancelled", "interrupted"].includes(value.status) &&
+    typeof body.account === "string" && body.account.length > 0 &&
+    typeof body.title === "string" && typeof body.type === "string" &&
+    (value.idempotencyKey === undefined || typeof value.idempotencyKey === "string") &&
+    (value.error === undefined || typeof value.error === "string") &&
+    (value.result === undefined || isRecord(value.result));
+}
+
+function isPersistedIdempotency(_key: string, value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.mediaId === "string" && value.mediaId.length > 0 &&
+    typeof value.at === "number" && Number.isFinite(value.at) &&
+    typeof value.account === "string" && value.account.length > 0 &&
+    typeof value.title === "string" && typeof value.type === "string" &&
+    (value.userId === null || typeof value.userId === "string") &&
+    (value.requestFingerprint === undefined || typeof value.requestFingerprint === "string");
+}
+
 /** Persistent recovery state must fail closed: missing on first run is fine,
  * but malformed/unreadable existing files are NOT an empty queue/history.
  * Continuing would conceal scheduled jobs or allow repeated WeChat drafts. */
-function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY"): Record<string, T> {
+function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY", validEntry: (key: string, value: unknown) => boolean): Record<string, T> {
   let raw: string;
   try {
     raw = fs.readFileSync(filePath, "utf8");
@@ -203,8 +236,8 @@ function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY"): Re
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("state must be an object");
+    if (!isRecord(parsed) || !Object.entries(parsed).every(([key, entry]) => validEntry(key, entry))) {
+      throw new Error("invalid recovery state");
     }
     return parsed as Record<string, T>;
   } catch {
@@ -224,8 +257,8 @@ export function buildApp(config: ServerConfig) {
   fs.mkdirSync(dataDir, { recursive: true });
   // Inspect both files BEFORE opening SQLite or starting the scheduler. If
   // either state file is corrupt, startup stops without rewriting it.
-  const persistedJobs = readPersistedMap<StoredJob>(path.join(dataDir, "jobs.json"), "JOBS");
-  const persistedIdempotency = readPersistedMap<IdempotencyRecord>(path.join(dataDir, "idempotency.json"), "IDEMPOTENCY");
+  const persistedJobs = readPersistedMap<StoredJob>(path.join(dataDir, "jobs.json"), "JOBS", isPersistedJob);
+  const persistedIdempotency = readPersistedMap<IdempotencyRecord>(path.join(dataDir, "idempotency.json"), "IDEMPOTENCY", isPersistedIdempotency);
 
   // every unhandled error leaves this server redacted: fetch/undici messages
   // can embed full URLs with tokens/secrets (#7 — secrets stay out of logs)
