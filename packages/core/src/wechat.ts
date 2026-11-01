@@ -35,9 +35,14 @@ export class TokenManager {
     fs.mkdirSync(cacheDir, { recursive: true });
     this.file = path.join(cacheDir, "token.json");
     try {
-      this.cache = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      const parsed: unknown = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      // A parseable JSON value is not necessarily a token dictionary.
+      // Null/array/primitive legacy files must not break credential recovery.
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        this.cache = parsed as TokenCache;
+      }
     } catch {
-      /* first run */
+      /* first run or unreadable cache: refresh from the API */
     }
   }
 
