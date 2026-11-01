@@ -41,6 +41,15 @@ if (!communityOnly) {
     }
   }
 }
+// Normal CI smoke still supplies the WASM/MathJax glue sidecars (#12 remains
+// open), but must prove no font directory is required. Touch only the
+// throwaway directory created by this script; never mutate a supplied vault.
+if (!communityOnly && args.length === 0) {
+  fs.rmSync(path.join(pluginDir, "fonts"), { recursive: true, force: true });
+  if (fs.existsSync(path.join(pluginDir, "fonts"))) {
+    throw new Error("fontless plugin fixture still has a font directory");
+  }
+}
 
 // --- stubs -------------------------------------------------------------------
 
