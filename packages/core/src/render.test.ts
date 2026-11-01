@@ -37,7 +37,7 @@ test("renderMarkdown --no-footnote keeps anchors", () => {
 });
 
 test("a Markdown frontmatter theme cannot select a path-like builtin ID", () => {
-  const maliciousAlias = "---\\ntheme: ../themes/claude\\n---\\n\\n# Imported note";
+  const maliciousAlias = "---\ntheme: ../themes/claude\n---\n\n# Imported note";
   assert.throws(() => renderMarkdown(maliciousAlias), /Unknown theme id/);
   // An explicit CSS file remains available via customThemePath for trusted
   // operator workflows; a Markdown field is not that permission.
