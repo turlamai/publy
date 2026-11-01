@@ -101,6 +101,78 @@ test("POST /v1/ws-ticket issues a ticket bound to the caller", async () => {
   assert.equal(denied.statusCode, 401);
 });
 
+// --- prototype-key recovery state isolation ---------------------------------
+
+test("job routes reject inherited Object keys instead of treating them as jobs", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-proto-jobs-"));
+  const local = buildApp({ ...config, dataDir: dir, jobPollMs: 60_000 });
+  try {
+    await local.ready();
+    for (const id of ["constructor", "toString", "__proto__"]) {
+      const url = "/v1/jobs/" + encodeURIComponent(id);
+      const get = await local.inject({ method: "GET", url, headers: H("admin-key") });
+      assert.equal(get.statusCode, 404, `GET ${id} should not access an inherited object member`);
+      assert.equal(get.json().code, "NOT_FOUND");
+      const del = await local.inject({ method: "DELETE", url, headers: HP("admin-key") });
+      assert.equal(del.statusCode, 404);
+      assert.equal(del.json().code, "NOT_FOUND");
+      const retry = await local.inject({ method: "POST", url: url + "/retry", headers: HP("admin-key") });
+      assert.equal(retry.statusCode, 404);
+      assert.equal(retry.json().code, "NOT_FOUND");
+    }
+  } finally {
+    await local.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("prototype-like request IDs persist and reload only as own draft records", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-proto-idem-"));
+  const key = "__proto__";
+  const record = {
+    mediaId: "LOCAL-RECORD-ONLY", at: Date.now(), account: "TestAcct",
+    title: "safe fixture", type: "article", userId: null,
+  };
+  let local = buildApp({ ...config, dataDir: dir, jobPollMs: 60_000 });
+  try {
+    await local.ready();
+    const seam = (local as unknown as {
+      idempotency: { records: Record<string, unknown>; save: () => void };
+    }).idempotency;
+    assert.equal(Object.getPrototypeOf(seam.records), null,
+      "a client-controlled key must not reach Object.prototype");
+    seam.records[key] = record;
+    seam.save();
+    assert.deepEqual(Object.keys(seam.records), [key]);
+    assert.equal(Object.prototype.hasOwnProperty.call(Object.prototype, "mediaId"), false);
+
+    const response = await local.inject({
+      method: "GET", url: "/v1/publish-result/" + encodeURIComponent(key),
+      headers: H("admin-key"),
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().status, "confirmed");
+    assert.equal(response.json().mediaId, record.mediaId);
+    const persisted = JSON.parse(fs.readFileSync(path.join(dir, "idempotency.json"), "utf8"));
+    assert.equal(Object.hasOwn(persisted, key), true);
+    assert.equal(persisted[key].mediaId, record.mediaId);
+    await local.close();
+
+    local = buildApp({ ...config, dataDir: dir, jobPollMs: 60_000 });
+    await local.ready();
+    const recovered = await local.inject({
+      method: "GET", url: "/v1/publish-result/" + encodeURIComponent(key),
+      headers: H("admin-key"),
+    });
+    assert.equal(recovered.statusCode, 200);
+    assert.equal(recovered.json().status, "confirmed");
+    assert.equal(recovered.json().mediaId, record.mediaId);
+  } finally {
+    await local.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- publish-result query (the lost-response reconciliation path) ----------------
 
 test("publish-result returns confirmed for a fresh record, unknown otherwise", async () => {
