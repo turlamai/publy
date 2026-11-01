@@ -589,7 +589,7 @@ async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<v
   // An alias is a visible identifier, not a place to store credentials.
   // Never echo input values on JSON failures (they may contain secrets).
   const alias = name.trim();
-  if (!alias || alias.length > 128 || /[\\x00-\\x1f\\x7f]/.test(alias)) {
+  if (!alias || alias.length > 128 || /[\x00-\x1f\x7f]/.test(alias)) {
     if (!json) console.error("publy: account name must be 1-128 characters without control characters.");
     report(false, "ACCOUNT_NAME_INVALID");
     process.exitCode = 1;
