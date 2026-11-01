@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { buildApp, signWsTicket, verifyWsTicket, redactSecrets, type ServerConfig } from "./index.js";
 import { draftIdempotencyKey } from "@publy/core";
-import type { Store } from "./store.js";
+import { Store } from "./store.js";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-ready-test-"));
 
@@ -329,6 +329,68 @@ test("rotate-key invalidates the old key and keeps the user intact", async () =>
   assert.equal(newAfter.statusCode, 200);
   assert.equal(newAfter.json().plan, "personal");
   userKey = newKey; // keep later tests working
+});
+
+// --- scheduled recovery must not consume a second quota unit ------------------------
+
+test("already-delivered scheduled draft reconciles even after monthly quota is exhausted", async () => {
+  // Isolated synthetic user/account and persisted recovery files. The existing
+  // code fails QUOTA_EXCEEDED before reading the saved mediaId, so no network
+  // request is made even if this regression test fails.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-quota-recover-"));
+  const seed = new Store(dir);
+  let app4: ReturnType<typeof buildApp> | undefined;
+  try {
+    const user = seed.createUser("quota-recovery@test.invalid", "free", 0);
+    seed.upsertAccount({
+      name: "OfflineRecoveredAcct", appId: "wx_offline_only",
+      appSecret: "synthetic-never-used", ownerUserId: user.id,
+    });
+    for (let i = 0; i < 30; i++) seed.incrementUsage(user.id);
+    seed.close();
+
+    const key = "already-delivered-quota-job";
+    const body = {
+      account: "OfflineRecoveredAcct", type: "article" as const,
+      title: "Recovered draft", html: "<p>offline-only</p>", idempotencyKey: key,
+    };
+    fs.writeFileSync(path.join(dir, "idempotency.json"), JSON.stringify({
+      [key]: {
+        mediaId: "CONFIRMED_BEFORE_QUOTA", at: Date.now(),
+        account: body.account, title: body.title, type: body.type, userId: user.id,
+        requestFingerprint: draftIdempotencyKey(body),
+      },
+    }));
+    const due = Date.now() - 1000;
+    fs.writeFileSync(path.join(dir, "jobs.json"), JSON.stringify({
+      "quota-recovery-1": {
+        id: "quota-recovery-1", runAt: due, body, userId: user.id,
+        status: "pending", attempts: 0, nextAttemptAt: due, idempotencyKey: key,
+      },
+    }));
+
+    app4 = buildApp({ ...config, dataDir: dir, jobPollMs: 40 });
+    await app4.ready();
+    let recovered: { status: string; mediaId?: string; attempts: number } | undefined;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      const res = await app4.inject({ method: "GET", url: "/v1/jobs", headers: H("admin-key") });
+      recovered = res.json().jobs.find((j: { id: string }) => j.id === "quota-recovery-1");
+      if (recovered?.status === "done") break;
+    }
+    assert.equal(recovered?.status, "done", "recovery must not be rejected as a new publish");
+    assert.equal(recovered?.mediaId, "CONFIRMED_BEFORE_QUOTA");
+    assert.equal(recovered?.attempts, 0, "dedupe must not consume a retry attempt");
+    const checkStore = (app4 as unknown as { store: Store }).store;
+    assert.equal(checkStore.getUsage(user), 30, "reconciliation never consumes quota again");
+  } finally {
+    if (app4) await app4.close();
+    else {
+      // Seeded SQLite is already closed when app startup was attempted.
+      try { seed.close(); } catch { /* closed */ }
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // --- quota exhaustion stops admission ------------------------------------------------
