@@ -261,9 +261,12 @@ export function buildApp(config: ServerConfig) {
   // --- scheduled jobs --------------------------------------------------------
 
   const jobsFile = path.join(dataDir, "jobs.json");
-  let jobs: Record<string, StoredJob> = {};
+  // Job IDs arrive from authenticated URL parameters, and persisted JSON can
+  // contain arbitrary keys. A plain object inherits constructor/__proto__;
+  // use a prototype-free dictionary for both fresh and restored state.
+  const jobs: Record<string, StoredJob> = Object.create(null);
   try {
-    jobs = JSON.parse(fs.readFileSync(jobsFile, "utf-8"));
+    Object.assign(jobs, JSON.parse(fs.readFileSync(jobsFile, "utf-8")));
   } catch {
     /* first run */
   }
@@ -366,9 +369,11 @@ export function buildApp(config: ServerConfig) {
   }
 
   const idempotencyFile = path.join(dataDir, "idempotency.json");
-  let idempotency: Record<string, IdempotencyRecord> = {};
+  // Keys may be supplied by clients. Even "__proto__" must be an ordinary
+  // own property, never an inherited object or a prototype setter.
+  const idempotency: Record<string, IdempotencyRecord> = Object.create(null);
   try {
-    idempotency = JSON.parse(fs.readFileSync(idempotencyFile, "utf-8"));
+    Object.assign(idempotency, JSON.parse(fs.readFileSync(idempotencyFile, "utf-8")));
   } catch {
     /* first run */
   }
