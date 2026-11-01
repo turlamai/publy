@@ -579,15 +579,56 @@ async function cmdConfigSet(key: string, value: string, opts: { json?: boolean }
 }
 
 async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<void> {
-  const config = loadConfig();
+  const json = opts.json === true;
+  const report = (ok: boolean, code: string, extra: Record<string, unknown> = {}): void => {
+    if (json) console.log(JSON.stringify({
+      schemaVersion: 1, kind: "account-add", ok, code,
+      networkUsed: false, submitted: false, ...extra,
+    }));
+  };
+  // An alias is a visible identifier, not a place to store credentials.
+  // Never echo input values on JSON failures (they may contain secrets).
+  const alias = name.trim();
+  if (!alias || alias.length > 128 || /[\\x00-\\x1f\\x7f]/.test(alias)) {
+    if (!json) console.error("publy: account name must be 1-128 characters without control characters.");
+    report(false, "ACCOUNT_NAME_INVALID");
+    process.exitCode = 1;
+    return;
+  }
+  let config: CliConfig;
+  try {
+    config = loadConfig();
+    if (config.accounts !== undefined && (!Array.isArray(config.accounts) ||
+      config.accounts.some((a) => !a || typeof a !== "object" || typeof a.name !== "string"))) {
+      throw new Error("Invalid account collection");
+    }
+  } catch {
+    if (!json) console.error("publy: invalid local configuration");
+    report(false, "CONFIG_INVALID");
+    process.exitCode = 1;
+    return;
+  }
   config.accounts ??= [];
-  const existing = config.accounts.find((a) => a.name === name);
-  const account = { name, app_id: opts.appId, author: opts.author, theme: opts.theme };
+  const existing = config.accounts.find((a) => a.name === alias);
+  // An omitted option must not erase an existing app id, theme or author.
+  const account: CliAccount = existing ? { ...existing } : { name: alias };
+  if (opts.appId !== undefined) account.app_id = opts.appId;
+  if (opts.author !== undefined) account.author = opts.author;
+  if (opts.theme !== undefined) account.theme = opts.theme;
   if (existing) Object.assign(existing, account);
   else config.accounts.push(account);
-  if (!config.default_account) config.default_account = name;
-  saveConfig(config);
-  console.log(`account ${name} saved${config.default_account === name ? " (default)" : ""}`);
+  if (!config.default_account) config.default_account = alias;
+  try { saveConfig(config); }
+  catch {
+    if (!json) console.error("publy: cannot save local configuration");
+    report(false, "CONFIG_WRITE_FAILED");
+    process.exitCode = 1;
+    return;
+  }
+  if (json) report(true, "ACCOUNT_SAVED", {
+    name: alias, created: !existing, isDefault: config.default_account === alias,
+  });
+  else console.log(`account ${alias} saved${config.default_account === alias ? " (default)" : ""}`);
 }
 
 async function cmdThemePreview(name: string): Promise<void> {
@@ -1030,7 +1071,7 @@ const AGENT_USAGE: Record<string, string> = {
   history: "publy history --json",
   quota: "publy quota --json",
   "account list": "publy account list --json",
-  "account add": "publy account add <name> [--app-id <id>]",
+  "account add": "publy account add <name> --json [--app-id <id>]",
   "config set": "publy config set <key> <value> --json",
   "theme ls": "publy theme ls --json",
   "theme preview": "publy theme preview <name>",
@@ -1052,7 +1093,7 @@ const AGENT_COMMANDS = [
   { name: "history", json: true, network: true, effect: "read" },
   { name: "quota", json: true, network: true, effect: "read" },
   { name: "account list", json: true, network: false, effect: "read-local-config" },
-  { name: "account add", json: false, network: false, effect: "write-local-config" },
+  { name: "account add", json: true, network: false, effect: "write-local-config" },
   { name: "config set", json: true, network: false, effect: "write-local-config" },
   { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read" },
   { name: "theme preview", json: false, network: "font-fallback-may-download", effect: "write-preview-and-open-browser" },
@@ -1327,6 +1368,7 @@ export function createProgram(): Command {
     .option("--app-id <id>")
     .option("--author <name>")
     .option("--theme <id>")
+    .option("--json", "structured local account mutation without credentials")
     .description("add or update an account")
     .action(async (name: string, opts) => cmdAccountAdd(name, opts));
   accountCmd.command("list").description("list accounts").option("--json", "machine-readable account aliases (no secrets)").action(async (opts: {json?: boolean}) => {
