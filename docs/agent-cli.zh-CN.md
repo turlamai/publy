@@ -20,6 +20,7 @@ publy preview "D:/Notes/article.md" --json
 publy render "D:/Notes/article.md" --json
 publy theme ls --json
 publy account list --json
+publy account add Work --theme claude --json  # 本地写入，必须事先得到用户授权
 publy quota --json
 publy jobs list --json
 publy history --json
@@ -27,7 +28,7 @@ publy history --json
 
 `capabilities --json` 离线返回版本化的能力列表：每个命令是否
 支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿。
-**没有声明 JSON 的命令不要凭猜测去解析：**目前 `config set`、`theme preview` 等剩余命令仍偏向人类使用。
+**没有声明 JSON 的命令不要凭猜测去解析：**目前 `theme preview` 等剩余命令仍偏向人类使用。
 `jobs cancel <jobId> --json` 和 `jobs retry <jobId> --json` 现在能返回
 结构化回执，但**属于修改服务器状态的操作，Agent 必须先获得用户授权**。
 若网络异常而结果不确定，返回 `status:"unknown"` 与原 jobId，
@@ -99,3 +100,5 @@ publy publish-result <requestId> --json
 投递草稿 → 查询与恢复**。
 
 `config set <key> <value> --json` 是需要用户授权的本地配置变更，输出单个 `config-set` JSON 对象。`CONFIG_SAVED`、`CONFIG_KEY_INVALID`、`CONFIG_INVALID`、`CONFIG_WRITE_FAILED` 均不回显值（包括 API Key、含凭据的 URL）。
+
+`account add <name> --json` 为本地账号添加或更新命令，返回单个 `account-add` 对象，错误码为 `ACCOUNT_NAME_INVALID`、`CONFIG_INVALID`、`CONFIG_WRITE_FAILED`，成功码为 `ACCOUNT_SAVED`。输出不包含 App ID、作者元数据或配置原文；未指定的参数不会清空已有账号字段。此操作修改本地配置，Agent 需事先获得用户明确授权。
