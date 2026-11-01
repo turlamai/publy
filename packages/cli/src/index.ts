@@ -882,7 +882,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     result = await postPublish(server);
   } catch (err) {
     netErr = err;
-    /* network error — maybe the network blocks large POSTs and a tunnel is configured */
+    /* The request may have reached WeChat; do not replay through any route. */
   }
   // NEVER automatically replay an ambiguous publish through a tunnel.
   // A timeout, invalid acknowledgement or dropped response can occur after
