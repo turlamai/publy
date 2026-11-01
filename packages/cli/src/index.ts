@@ -863,7 +863,14 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     const body = rawResponse as PublishResult;
-    if (res.ok && !body.mediaId && !body.jobId) {
+    // A 2xx transport response is not a delivery acknowledgement. Require
+    // exactly one nonblank, correctly typed identifier before reporting success.
+    const mediaOk = typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+    const jobOk = typeof body.jobId === "string" && body.jobId.trim().length > 0;
+    if (res.ok && mediaOk === jobOk) {
+      throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
+    }
+    if (res.ok && ((!mediaOk && body.mediaId !== undefined) || (!jobOk && body.jobId !== undefined))) {
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     return { res, body };
@@ -877,19 +884,11 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     netErr = err;
     /* network error — maybe the network blocks large POSTs and a tunnel is configured */
   }
-  if (!result && config.tunnel) {
-    console.error("publy: server unreachable, bringing up the SSH tunnel…");
-    if (await ensureTunnel(config)) {
-      const tunnelServer = config.tunnel.server ?? `http://127.0.0.1:${config.tunnel.local_port}`;
-      try {
-        result = await postPublish(tunnelServer);
-      } catch (error) {
-        // Tunnel request may also have reached the remote server. Preserve
-        // the original draft identity and report an unknown outcome.
-        netErr = error;
-      }
-    }
-  }
+  // NEVER automatically replay an ambiguous publish through a tunnel.
+  // A timeout, invalid acknowledgement or dropped response can occur after
+  // WeChat accepted the draft. A second route is still a second submission.
+  // Operators can establish a tunnel explicitly before a *new* request,
+  // after independently reconciling the original request ID.
   if (!result) {
     // network-level failure: the server may or may not have delivered the
     // draft — outcome unknown, never treated as permission to re-send (#7).
@@ -899,7 +898,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       ? "server response was not valid confirmation JSON"
       : "network failed or timed out";
     console.error(`publy: cannot confirm draft delivery (${detail})`);
-    console.error(`publy: check --server / config server, or run \`publy tunnel\` when a tunnel is configured (e.g. TLS failures on the public domain)`);
+    console.error("publy: inspect the original draft outcome first. If a tunnel is needed, run `publy tunnel` before a separately reviewed submission.");
     console.error(`publy: outcome UNKNOWN — the draft may already exist. Query before retrying: publy publish-result ${idempotencyKey}`);
     agentFailure("unknown", "NETWORK_OUTCOME_UNKNOWN", 5, idempotencyKey);
     return;
@@ -1171,15 +1170,26 @@ export function createProgram(): Command {
       };
       const reply = await requestServerJson(requestConfig, `/v1/publish-result/${encodeURIComponent(key)}`);
       if (!reply.ok) { reportReadFailure(opts, "publish-result", reply.code); return; }
-      const body = reply.body as { status?: string; mediaId?: string; account?: string; title?: string } & { code?: string; message?: string };
+      const body = reply.body as { status?: unknown; mediaId?: unknown; account?: unknown; title?: unknown };
+      // A claimed "confirmed" status without a usable mediaId is still
+      // UNKNOWN. Never spread an untrusted server object over agent fields:
+      // it could override ok/schemaVersion or leak unrelated response data.
+      const confirmed = body.status === "confirmed" &&
+        typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+      const account = typeof body.account === "string" ? body.account : undefined;
+      const title = typeof body.title === "string" ? body.title : undefined;
       if (opts.json) {
-        console.log(JSON.stringify({ schemaVersion: 1, ok: body.status === "confirmed", kind: "publish-result", ...body }));
-        if (body.status !== "confirmed") process.exitCode = 4;
-      } else if (body.status === "confirmed") {
-        console.log(`已确认：《${body.title ?? "?"}》在 ${body.account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
+        console.log(JSON.stringify({
+          schemaVersion: 1, kind: "publish-result", ok: confirmed,
+          status: confirmed ? "confirmed" : "unknown",
+          mediaId: confirmed ? body.mediaId : undefined, account, title,
+        }));
+        if (!confirmed) process.exitCode = 4;
+      } else if (confirmed) {
+        console.log(`已确认：《${title ?? "?"}》在 ${account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
       } else {
-        console.log("结果未知：服务端没有这次请求的记录（超出幂等窗口或未送达）。可用原幂等键重试，或到公众号草稿箱确认。");
-        process.exit(4);
+        console.log("结果未知：服务端没有可验证的草稿 Media ID。请先在公众号草稿箱人工核对，不能据此自动重投。");
+        process.exitCode = 4;
       }
     });
 
