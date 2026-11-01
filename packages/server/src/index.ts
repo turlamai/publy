@@ -770,10 +770,11 @@ export function buildApp(config: ServerConfig) {
     return { ok: true };
   });
 
-  // explicit retry of an interrupted/failed job: the scheduler never auto-reruns
-  // interrupted work (#8), but the owner may re-admit it. The original
-  // idempotency key rides along, so if the lost run actually created the draft
-  // the retry dedupes against it instead of making a second draft.
+  // A possibly delivered draft cannot be safely retried just because
+  // someone clicks retry: WeChat has no server-side idempotency contract.
+  // Only a *locally confirmed*, matching draft can be reconciled without
+  // sending any network request. A missing/expired record stays interrupted.
+  // Known pre-publish failures retain the existing bounded retry path.
   app.post<{ Params: { id: string } }>("/v1/jobs/:id/retry", async (req, reply) => {
     const caller = (req as unknown as { caller: Caller }).caller;
     const job = jobs[(req.params as { id: string }).id];
@@ -781,6 +782,35 @@ export function buildApp(config: ServerConfig) {
     if (!caller.admin && job.userId !== caller.user.id) return reply.code(403).send({ code: "NOT_OWNED", message: "job belongs to another user" });
     if (job.status !== "interrupted" && job.status !== "failed") {
       return reply.code(400).send({ code: "NOT_RETRYABLE", message: `job is ${job.status}` });
+    }
+    if (job.status === "interrupted") {
+      const hit = job.idempotencyKey ? idempotencyFresh(job.idempotencyKey) : null;
+      if (!hit) {
+        return reply.code(409).send({
+          code: "DRAFT_OUTCOME_UNKNOWN",
+          message: "Remote draft outcome is unknown. Inspect WeChat drafts manually; this endpoint cannot safely resend an interrupted job.",
+          jobId: job.id,
+        });
+      }
+      if (!sameDraftIdentity(hit, job.body, job.userId)) {
+        return reply.code(409).send({
+          code: "IDEMPOTENCY_CONFLICT",
+          message: "Recorded draft identity does not match this job; no retry attempted.",
+          jobId: job.id,
+        });
+      }
+      // The local delivery record already confirms this exact draft. Finish
+      // the job in place instead of enqueueing it or consuming quota again.
+      job.status = "done";
+      job.result = {
+        mediaId: hit.mediaId, deduped: true,
+        account: job.body.account, title: job.body.title,
+        requestId: job.idempotencyKey,
+      };
+      job.error = undefined;
+      saveJobs();
+      audit({ event: "job-reconciled", jobId: job.id, account: job.body.account, title: job.body.title });
+      return { ok: true, job: jobInfo(job), deduped: true };
     }
     job.status = "pending";
     job.attempts = 0;
