@@ -290,12 +290,8 @@ export function buildApp(config: ServerConfig) {
     const cred = resolveAccount(body.account, caller);
     try {
       if (!cred) throw new PublishError("ACCOUNT_NOT_FOUND", `Unknown account "${body.account}"`);
-      if (!caller.admin) {
-        const user = caller.user;
-        if (user.disabledAt) throw new PublishError("USER_DISABLED", "account disabled");
-        const limit = planLimit(user);
-        const used = store.getUsage(user);
-        if (used >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
+      if (!caller.admin && caller.user.disabledAt) {
+        throw new PublishError("USER_DISABLED", "account disabled");
       }
       // idempotency reconciliation before sending: a previous lost run (crash
       // after draft/add, before the status save) may already have delivered
@@ -314,6 +310,13 @@ export function buildApp(config: ServerConfig) {
           saveJobs();
           return;
         }
+      }
+      // A previously delivered draft is a read-only recovery, not a new
+      // quota-consuming publish. Enforce quota only after the dedupe path.
+      if (!caller.admin) {
+        const limit = planLimit(caller.user);
+        const used = store.getUsage(caller.user);
+        if (used >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
       }
       const result = await publishToWechat(body, cred, tokens, materials);
       job.status = "done";
