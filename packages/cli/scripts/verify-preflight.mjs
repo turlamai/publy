@@ -157,6 +157,56 @@ try {
     '{"api_key":"' + malformedSecret + '",',
     "failed config update must preserve the original file");
 
+  // Account mutations are local, explicit and machine-readable. Never print
+  // App IDs, author metadata or private config contents to an Agent.
+  const accountConfig = path.join(dir, "agent-account-add.json");
+  const privateAppId = "wx-secret-identifier-not-for-stdout";
+  const privateAuthor = "private-author-not-for-stdout";
+  const addAccount = (...args) => spawnSync(process.execPath,
+    [entrypoint, "account", "add", ...args, "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: accountConfig },
+    });
+  const firstAccount = addAccount("Work", "--app-id", privateAppId, "--author", privateAuthor, "--theme", "claude");
+  assert.equal(firstAccount.status, 0, firstAccount.stderr);
+  const firstReport = JSON.parse(firstAccount.stdout.trim());
+  assert.equal(firstReport.schemaVersion, 1);
+  assert.equal(firstReport.kind, "account-add");
+  assert.equal(firstReport.ok, true);
+  assert.equal(firstReport.code, "ACCOUNT_SAVED");
+  assert.equal(firstReport.created, true);
+  assert.equal(firstReport.isDefault, true);
+  assert.equal(firstReport.networkUsed, false);
+  assert.equal(firstReport.submitted, false);
+  assert.ok(!firstAccount.stdout.includes(privateAppId));
+  assert.ok(!firstAccount.stdout.includes(privateAuthor));
+  const secondAccount = addAccount("Work", "--theme", "wechat");
+  assert.equal(secondAccount.status, 0, secondAccount.stderr);
+  assert.equal(JSON.parse(secondAccount.stdout).created, false);
+  const storedAccount = JSON.parse(fs.readFileSync(accountConfig, "utf8"));
+  assert.deepEqual(storedAccount.accounts, [{
+    name: "Work", app_id: privateAppId, author: privateAuthor, theme: "wechat",
+  }], "updating only a theme must not erase saved account fields");
+  assert.equal(storedAccount.default_account, "Work");
+  const invalidAccount = addAccount("  ");
+  assert.equal(invalidAccount.status, 1);
+  assert.equal(JSON.parse(invalidAccount.stdout).code, "ACCOUNT_NAME_INVALID");
+  assert.equal(fs.readFileSync(accountConfig, "utf8"), JSON.stringify(storedAccount, null, 2) + "\\n");
+  const malformedAccountConfig = path.join(dir, "malformed-account-add.json");
+  const secretConfigMarker = "hidden-account-config-token";
+  fs.writeFileSync(malformedAccountConfig, '{"api_key":"' + secretConfigMarker + '", invalid}');
+  const malformedAccount = spawnSync(process.execPath,
+    [entrypoint, "account", "add", "Work", "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: malformedAccountConfig },
+    });
+  assert.equal(malformedAccount.status, 1);
+  const malformedAccountReport = JSON.parse(malformedAccount.stdout);
+  assert.equal(malformedAccountReport.kind, "account-add");
+  assert.equal(malformedAccountReport.code, "CONFIG_INVALID");
+  assert.ok(!malformedAccount.stdout.includes(secretConfigMarker));
+  assert.ok(!malformedAccount.stderr.includes(secretConfigMarker));
+
   // Agent contract discovery is offline and truthful: don't claim JSON
   // support for operations that still only offer human-oriented output.
   const cli = (...args) => spawnSync(process.execPath, [entrypoint, ...args],
@@ -214,6 +264,12 @@ try {
   }
   assert.ok(contract.commands.some((c) => c.name === "jobs list" && c.json === true));
   assert.ok(contract.commands.some((c) => c.name === "publish" && c.effect === "create-wechat-draft"));
+  const accountMutation = contract.commands.find((c) => c.name === "account add");
+  assert.equal(accountMutation.json, true);
+  assert.equal(accountMutation.network, false);
+  assert.equal(accountMutation.requiresUserApproval, true);
+  assert.match(accountMutation.usage, /account add <name> --json/);
+
   for (const operation of ["jobs cancel", "jobs retry"]) {
     const def = contract.commands.find((c) => c.name === operation);
     assert.equal(def.json, true);
