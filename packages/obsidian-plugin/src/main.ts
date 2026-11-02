@@ -150,6 +150,7 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   copyHasImages: { zh: "Publy: 笔记含本地图片，复制路径仅保留文字排版（图片请用发布功能或手动插图）", en: "Publy: the note has local images — rich-text copy keeps text only (publish to include them)" },
   copyOk: { zh: "Publy: 已复制排版 rich text — 到公众号编辑器 Ctrl+V 粘贴", en: "Publy: rich text copied — paste into the WeChat editor with Ctrl+V" },
   wasmDown: { zh: "Publy: 卡片渲染器不可用（wasm 初始化失败）——文章发布不受影响", en: "Publy: card renderer unavailable (wasm init failed) — article publishing is unaffected" },
+  previewCard: { zh: "预览卡片 {index}", en: "Preview card {index}" },
   cardsRendering: { zh: "Publy: 正在渲染图片消息卡片…", en: "Publy: rendering image-post cards…" },
   cardsFail: { zh: "Publy: 图片消息卡片渲染失败 — {msg}", en: "Publy: card rendering failed — {msg}" },
   wasmInitFail: { zh: "Publy: 卡片渲染器初始化失败（文章功能不受影响）——详情见开发者控制台", en: "Publy: card renderer failed to init (articles unaffected) — see the developer console" },
@@ -535,7 +536,10 @@ class PublyPreviewView extends ItemView {
 
   appendCard(base64: string): void {
     const img = this.cardStrip?.createEl("img");
-    if (img) img.src = "data:image/png;base64," + base64;
+    if (img) {
+      img.alt = t("previewCard", { index: String(this.cardDone + 1) });
+      img.src = "data:image/png;base64," + base64;
+    }
     this.cardDone += 1;
     if (this.cardCounter && this.cardTotal > 0) {
       this.cardCounter.setText(`${this.cardDone} / ${this.cardTotal}`);
@@ -543,6 +547,9 @@ class PublyPreviewView extends ItemView {
   }
 
   finishCards(caption: string): void {
+    // Completion replaces the loading status rather than leaving a false
+    // "rendering" message below an already usable deck.
+    this.cardCounter?.remove();
     if (this.cardStrip) {
       const canvas = this.cardStrip.parentElement;
       const cap = canvas?.createEl("div");
