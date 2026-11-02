@@ -147,7 +147,8 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   deduped: { zh: "Publy: 10 分钟内已发过《{title}》——本次跳过（防重复）", en: "Publy: [{title}] was just published — skipped as duplicate" },
   netFail: { zh: "Publy: 发布失败 — {msg}", en: "Publy: publish failed — {msg}" },
   badServer: { zh: "Publy: Server 地址格式不对——需要带协议，例如 https://publy-api.example.com", en: "Publy: Server URL is malformed — include the protocol, e.g. https://publy-api.example.com" },
-  copyHasImages: { zh: "Publy: 笔记含本地图片，复制路径仅保留文字排版（图片请用发布功能或手动插图）", en: "Publy: the note has local images — rich-text copy keeps text only (publish to include them)" },
+  copyHasImages: { zh: "Publy: 笔记包含图片或公式附件，已取消复制以避免无效链接；请使用草稿交付功能", en: "Publy: copy cancelled — image or formula attachments need draft delivery, not unresolved clipboard links" },
+  copyMediaNotReady: { zh: "Publy: 图片或公式渲染未完成，已取消复制，剪贴板内容未修改", en: "Publy: copy cancelled — media or math could not be rendered; clipboard left unchanged" },
   copyOk: { zh: "Publy: 已复制排版 rich text — 到公众号编辑器 Ctrl+V 粘贴", en: "Publy: rich text copied — paste into the WeChat editor with Ctrl+V" },
   wasmDown: { zh: "Publy: 卡片渲染器不可用（wasm 初始化失败）——文章发布不受影响", en: "Publy: card renderer unavailable (wasm init failed) — article publishing is unaffected" },
   previewCard: { zh: "预览卡片 {index}", en: "Preview card {index}" },
@@ -1380,8 +1381,14 @@ export default class PublyPlugin extends Plugin {
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
       for (const w of rendered.warnings) console.warn("[publy] " + w);
-      if (rendered.attachments.length > 0) {
-        new Notice(t("copyHasImages"));
+      // A successful copy should be directly usable in the target editor:
+      // unavailable formulas/media and attachment:// placeholders are not.
+      // The draft workflow uploads assets and replaces placeholders safely.
+      if (rendered.warnings.some(blockingMediaWarning)) {
+        throw new Error(t("copyMediaNotReady"));
+      }
+      if (rendered.attachments.length > 0 || rendered.html.includes("attachment://")) {
+        throw new Error(t("copyHasImages"));
       }
       const item = new ClipboardItem({
         "text/html": new Blob([rendered.html], { type: "text/html" }),
