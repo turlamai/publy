@@ -193,6 +193,10 @@ globalThis.fetch = async (url) => {
   renderNetworkAttempts++;
   throw new Error("offline Obsidian rendering attempted a network fetch");
 };
+// Obsidian may already have loaded its own incompatible MathJax. The
+// bundled renderer must neither call its loader nor replace its state.
+const hostMathJax = Object.freeze({ version: "host-mathjax", loader: Object.freeze({}) });
+globalThis.MathJax = hostMathJax;
 const mainJs = path.join(pluginDir, "main.js");
 const req = createRequire(import.meta.url);
 const mod = req(path.resolve(mainJs));
@@ -239,7 +243,9 @@ try {
   await inst.previewCurrentNote(); // smart dispatch -> card deck
   // Resvg retains module state across disable/enable. A second onload must
   // accept already-initialized WASM and still render formula PNGs.
-  const reloaded = new PluginCls(app, inst.manifest);
+  delete req.cache[req.resolve(path.resolve(mainJs))];
+  const ReloadedPlugin = req(path.resolve(mainJs)).default;
+  const reloaded = new ReloadedPlugin(app, inst.manifest);
   await reloaded.onload();
   lastPreviewHtml = "";
   app.workspace.activeFile = { path: "samples/math.md", basename: "math", extension: "md" };
@@ -250,6 +256,7 @@ try {
 } finally {
   globalThis.fetch = realFetch;
 }
+if (globalThis.MathJax !== hostMathJax) fail("plugin replaced the host MathJax instance");
 if (renderNetworkAttempts !== 0) fail("offline initialization/preview attempted a network fetch");
 if (!calls.some((c) => c.startsWith("view.setCards("))) fail("card preview did not render — calls: " + calls.join(" | "));
 

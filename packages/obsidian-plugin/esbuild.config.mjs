@@ -51,7 +51,11 @@ await esbuild.build({
   external: ["obsidian", "electron", "@resvg/resvg-js"],
   plugins: [embeddedHarfBuzz],
   loader: { ".css": "text", ".otf": "binary", ".wasm": "binary" },
+  // MathJax's package bundle also supports a browser-global installation.
+  // Obsidian owns that global and may expose a different loader API. Keep
+  // both free and global.MathJax references local to this CJS plugin scope.
+  define: { MathJax: "__publyMathJax", "global.MathJax": "__publyMathJax" },
   legalComments: "inline",
-  banner: { js: "/*!\n" + fs.readFileSync(path.join(here, "third-party-notices.txt"), "utf8").replaceAll("*/", "* /") + "\n*/" },
+  banner: { js: "var __publyMathJax;\n/*!\n" + fs.readFileSync(path.join(here, "third-party-notices.txt"), "utf8").replaceAll("*/", "* /") + "\n*/" },
   logLevel: "info",
 });
