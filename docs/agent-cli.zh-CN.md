@@ -27,11 +27,14 @@ publy history --json
 
 `capabilities --json` 离线返回版本化的能力列表：每个命令是否
 支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿。
-**没有声明 JSON 的命令不要凭猜测去解析：**目前 `config set`、`theme preview` 等剩余命令仍偏向人类使用。
+**没有声明 JSON 的命令不要凭猜测去解析：**`theme preview` 等剩余命令仍偏向人类使用。
+`config set <key> <value> --json` 已支持结构化回执，不回显 API key 等配置值；这是需经操作者授权的本地修改。
 `jobs cancel <jobId> --json` 和 `jobs retry <jobId> --json` 现在能返回
 结构化回执，但**属于修改服务器状态的操作，Agent 必须先获得用户授权**。
 若网络异常而结果不确定，返回 `status:"unknown"` 与原 jobId，
 应先通过 `jobs list --json` 对账，不能盲目反复操作。
+中断草稿的 retry 只对账内容完全匹配的本地确认记录，或重新接入可证明尚未提交的失败。
+HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远端草稿；保留原账号、jobId 和请求身份。
 对 Agent 公开真实能力，不虚报“所有命令已统一”。
 
 ## 安全检查和本地预览

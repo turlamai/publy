@@ -1,5 +1,37 @@
 # Publy Roadmap
 
+## First-release priority / 首发优先级 — 2026-11-02
+
+The owner has designated Publy as the first product to deliver quickly.
+Prioritize a reliable Typora/Obsidian → local preview → explicitly selected
+WeChat draft journey, alongside documentation, CI/CD, safe distribution and
+the Commerce/Permit hosted-service integration. This changes execution order;
+it does not change the existing free-client/self-hosting policy or establish
+production readiness, merchant approval or permission to submit real drafts.
+
+用户已明确 Publy 是第一款需要快速交付的产品。先打通 Typora/Obsidian →
+本地预览 → 明确选定公众号草稿的可靠路径，同步解决文档、CI/CD、安全分发与
+Commerce/Permit 托管集成。此决定调整执行顺序，不改变免费客户端/自托管政策，
+也不代表生产、商户或真实草稿验收已经完成。
+
+- Reliability: integrate reviewed token-cache and ambiguous scheduled-delivery
+  fixes (#64/#57); preserve unknown outcomes across restart and never re-send
+  without verified evidence. 可靠性：合入经审核的 token 缓存与排程未知结果修复，
+  重启后保留状态，不以重试掩盖未确认的远端投递。
+- Distribution: #12/#14/#15 still own three-file offline Obsidian installation,
+  community review and actual desktop use; #18/#37 own no-npm CLI parity.
+  分发：三文件离线安装、社区审核、真实桌面与无 npm CLI 验收仍须单独完成。
+- Hosted commerce: #17/#44 and Commerce #21 own account-bound Permit proof,
+  current revision/refund checks and atomic quota admission. Commerce #34 is
+  an unmerged pilot dependency; no green test or implementation claim replaces
+  the required consumer integration, sandbox lifecycle and merchant gates.
+  托管商业化：账户绑定验签、当前修订/退款与原子配额是门禁，上游试点未合并，
+  不能代替消费端集成、沙盒生命周期及商户验收。
+
+Record the current source/dependency SHAs, remaining blockers and real evidence
+in #25/#7/#8. A release candidate or source PR is not a published product.
+当前源码/依赖 SHA、阻塞与真实证据回填上述议题；候选与源码 PR 不等于已发布产品。
+
 ## Actual release state / 当前真实发行状态 — 2026-10-30
 
 **Developer code ≠ tested release ≠ public availability.** The monorepo now

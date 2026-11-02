@@ -38,7 +38,9 @@ source-build functionality, **not yet a no-setup public installer**.
 
 Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Restore and test on an isolated server; do not replay an unknown-outcome job before checking remote draft/history state.
 
-When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity first (`publy publish-result <key>`, or the query action in the plugin) and only then retry the same request — the server reconciles against its idempotency record instead of creating a duplicate draft. Interrupted scheduled jobs never auto-rerun after a restart; retry them explicitly with `publy jobs retry <id>`.
+When a delivery loses its connection, its outcome is unknown. Query the original request (`publy publish-result <key>`, or the plugin's query action) and inspect the selected account's WeChat drafts before considering another submission. A missing or expired local record does not prove that WeChat rejected the draft; do not generate a new request key to bypass this uncertainty.
+
+Interrupted scheduled jobs never auto-rerun. `publy jobs retry <id>` only reconciles an exact, locally confirmed draft without contacting WeChat, or retries a failure proved to have happened before submission. HTTP 409 `DRAFT_OUTCOME_UNKNOWN` or `IDEMPOTENCY_CONFLICT` leaves the job blocked. Check the remote draft separately; this command cannot guarantee exactly-once delivery or resolve an unrecorded remote result.
 
 ## Network, keys and privacy
 

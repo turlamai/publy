@@ -36,6 +36,10 @@ every command supports `--json`: `theme preview` and some legacy commands are st
 but are **mutating operations requiring explicit user approval**. If their
 network outcome is uncertain, they return `status:"unknown"` with the original
 job ID; query `jobs list --json` before deciding what to do next.
+An interrupted draft job is never blindly re-submitted: retry only reconciles
+an exact confirmed local record, or re-admits a proven pre-submission failure.
+HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` requires remote
+draft inspection; retain the original account, job and request identity.
 Those remaining commands' `json:false` entry is deliberate, not hidden implementation detail.
 
 ## Structured local review
