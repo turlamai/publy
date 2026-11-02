@@ -9,11 +9,20 @@
 - **Lost responses**: clients reconcile via `GET /v1/publish-result/:key`
   (confirmed | unknown). A timeout is never permission to re-issue.
 - **Scheduled jobs**: admission is idempotent (same key never enqueues two
-  jobs). Jobs found `running` at boot are marked **interrupted** — draft
-  outcome unknown — and never auto-rerun; `POST /v1/jobs/:id/retry` re-admits
-  them with the original key, so a run that actually delivered reconciles to
-  `deduped` instead of duplicating. Retry before the 10-minute idempotency
-  window closes; after it, check the WeChat drafts box first.
+  jobs). Jobs found `running` at boot, or tasks whose remote submission
+  result was lost, are marked **interrupted** and never auto-rerun.
+  `POST /v1/jobs/:id/retry` does **not** re-send an interrupted job:
+  only an unexpired, exact-body-fingerprint matching local delivery record
+  allows it to mark the job `done` without contacting WeChat or using quota.
+  Otherwise it returns HTTP 409 `DRAFT_OUTCOME_UNKNOWN` (or
+  `IDEMPOTENCY_CONFLICT`) and preserves the interrupted state. Examine the
+  WeChat drafts box separately; absence of a local delivery record is not
+  evidence that WeChat rejected the draft. Previously persisted `failed`
+  jobs without proof of a pre-publish failure are also blocked. Only jobs
+  explicitly marked safe after local pre-publish errors can be re-admitted.
+  A remote review or controlled manual resolution procedure is still needed
+  before any future re-submission; this endpoint cannot guarantee exactly-once
+  delivery.
 - **Restore safety**: a restored `jobs.json` never re-publishes already
   accepted content — only `pending` jobs execute, `done`/`cancelled`/`failed`
   stay terminal, and `running` jobs boot as `interrupted` (see above).
