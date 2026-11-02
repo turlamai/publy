@@ -14,6 +14,9 @@ import {
   setEmbeddedFontSubsets,
   generateTitleCover,
 } from "@publy/core";
+import { configureBundledMath } from "@publy/core/math-bundled";
+import { Resvg, initWasm } from "@resvg/resvg-wasm";
+import embeddedResvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 // theme/highlight css inlined as text by esbuild (loader ".css": "text")
 import claudeThemeCss from "../../core/themes/claude.css";
 import mediumThemeCss from "../../core/themes/medium.css";
@@ -214,29 +217,6 @@ function t(key: string, vars?: Record<string, string | number>): string {
 
 const VIEW_TYPE_PUBLY_PREVIEW = "publy-preview";
 const PUBLY_HISTORY_VIEW = "publy-history";
-
-// Obsidian evaluates plugin bundles with a synthetic module context
-// (module.filename = null, __dirname = electron.asar/renderer), so package
-// requires — top-level or relative — can never resolve. Node builtins still
-// work, so bootstrap the real resolver via createRequire and load the wasm
-// glue packages from the plugin dir by absolute path at runtime.
-type ResvgModule = typeof import("@resvg/resvg-wasm");
-let resvgModule: ResvgModule | null = null;
-
-function loadPluginModule<T>(pluginDir: string, rel: string): T {
-  const { createRequire } = require("node:module");
-  const req = createRequire(path.join(pluginDir, "manifest.json"));
-  return req(path.join(pluginDir, rel)) as T;
-}
-
-// manifest.dir is vault-relative in real Obsidian; createRequire and fs both
-// need absolute paths (and process.cwd() is the install dir, not the vault).
-function absolutePluginDir(plugin: Plugin): string {
-  const dir = plugin.manifest.dir ?? "";
-  return path.isAbsolute(dir)
-    ? dir
-    : path.join((plugin.app.vault.adapter as unknown as { getBasePath(): string }).getBasePath(), dir);
-}
 
 interface PublySettings {
   server: string;
@@ -966,30 +946,19 @@ export default class PublyPlugin extends Plugin {
     // Graceful degradation: if wasm init fails, article publish/preview still
     // work — only the card renderer is unavailable.
     try {
-      const pluginDir = absolutePluginDir(this);
-      resvgModule = loadPluginModule<ResvgModule>(pluginDir, path.join("node_modules", "@resvg", "resvg-wasm", "index.js"));
-      const wasmFile = path.join(pluginDir, "node_modules", "@resvg", "resvg-wasm", "index_bg.wasm");
-      // BufferSource path — Node fetch() cannot read file:// URLs.
-      // Already-initialized is success: resvg's module state survives plugin
-      // disable/enable (require cache), so a second onload must not fail.
+      // Explicit bytes prevent resvg's default URL/fetch fallback. The glue
+      // and binary are part of main.js, including after disable/re-enable.
       try {
-        await resvgModule.initWasm(fs.readFileSync(wasmFile));
+        await initWasm(embeddedResvgWasm);
       } catch (err) {
         if (!/already initialized/i.test(String((err as Error)?.message ?? err))) throw err;
       }
-      // satori imports harfbuzzjs at bundle-eval time; the esbuild shim defers
-      // it behind a promise bridge, armed here with the real plugin dir.
-      const gp = globalThis as { __publyHarfbuzzBridge?: (p: Promise<unknown>) => void };
-      if (gp.__publyHarfbuzzBridge) {
-        gp.__publyHarfbuzzBridge(
-          Promise.resolve(loadPluginModule<unknown>(pluginDir, path.join("node_modules", "harfbuzzjs", "index.js"))),
-        );
-      }
+      configureBundledMath();
       // The wasm Resvg build requires raw font buffers, not fontPaths.
       // Both are embedded in main.js and require no other installed files.
       const fontBuffers = [embeddedRegularFont, embeddedBoldFont];
       setPngRenderer((svg, fitWidth) => {
-        const resvg = new resvgModule!.Resvg(svg, {
+        const resvg = new Resvg(svg, {
           font: {
             fontBuffers,
             defaultFontFamily: "Noto Sans SC",

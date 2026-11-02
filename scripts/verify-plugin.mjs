@@ -43,16 +43,6 @@ if (suppliedPluginDir === undefined) {
     }
   }
 }
-// Normal CI smoke still supplies the WASM/MathJax glue sidecars (#12 remains
-// open), but must prove no font directory is required. Touch only the
-// throwaway directory created by this script; never mutate a supplied vault.
-if (!communityOnly && args.length === 0) {
-  fs.rmSync(path.join(pluginDir, "fonts"), { recursive: true, force: true });
-  if (fs.existsSync(path.join(pluginDir, "fonts"))) {
-    throw new Error("fontless plugin fixture still has a font directory");
-  }
-}
-
 if (communityOnly) {
   // The Community Directory downloads exactly three release files. Reject
   // extra files/directories rather than silently deleting or ignoring them.
@@ -72,6 +62,7 @@ if (communityOnly) {
 
 const calls = [];
 let lastSubmitted = null;
+let lastPreviewHtml = "";
 
 class Component {
   replaceChildren(...children) { this.children = children; }
@@ -87,7 +78,7 @@ class ItemView {
   getIcon() { return "send"; }
   async onOpen() {}
   async onClose() {}
-  setHtml(html) { calls.push("view.setHtml(" + html.length + " chars)"); }
+  setHtml(html) { lastPreviewHtml = html; calls.push("view.setHtml(" + html.length + " chars)"); }
   beginCards() { this.cards = []; calls.push("view.beginCards"); }
   appendCard(b64) { if (typeof b64 !== "string" || b64.length === 0) throw new Error("empty rendered card"); this.cards.push(b64); }
   finishCards(caption) { calls.push("view.setCards(" + this.cards.length + " cards)"); }
@@ -170,6 +161,7 @@ class Modal {
 }
 class TFile { path = ""; }
 const stub = { Plugin, ItemView, WorkspaceLeaf, Notice, PluginSettingTab, App, Setting, TFile, Modal, sanitizeHTMLToDom: (html) => ({ html }), requestUrl: async (req) => {
+  calls.push("server-request:" + req.method + ":" + new URL(req.url).pathname);
   if (req.method === "POST" && new URL(req.url).pathname === "/v1/publish") {
     lastSubmitted = JSON.parse(req.body);
     calls.push("request:publish");
@@ -182,11 +174,25 @@ const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "obsidian") return stub;
   if (request === "electron") return { shell: { openPath: async (p) => { calls.push("shell.openPath:" + p); return ""; } } };
+  if (communityOnly && !Module.isBuiltin(request) &&
+      path.resolve(request) !== path.join(pluginDir, "main.js")) {
+    throw new Error("unexpected runtime package require: " + request);
+  }
   return origLoad.apply(this, arguments);
 };
 
 // --- drive the plugin --------------------------------------------------------
 
+// Deny network from bundle evaluation through onload and local rendering.
+const realFetch = globalThis.fetch;
+let renderNetworkAttempts = 0;
+globalThis.fetch = async (url) => {
+  // Satori decodes its embedded Yoga WASM through a data URL. This is
+  // bundle-local bytes, not a network or filesystem resource.
+  if (typeof url === "string" && url.startsWith("data:")) return realFetch(url);
+  renderNetworkAttempts++;
+  throw new Error("offline Obsidian rendering attempted a network fetch");
+};
 const mainJs = path.join(pluginDir, "main.js");
 const req = createRequire(import.meta.url);
 const mod = req(path.resolve(mainJs));
@@ -212,22 +218,39 @@ app.workspace.activeFile = { path: "samples/article-sample.md", basename: "artic
 await inst.previewCurrentNote(); // smart dispatch -> article
 if (!calls.some((c) => c.startsWith("view.setHtml("))) fail("article preview did not render — calls: " + calls.join(" | "));
 
+// Valid TeX must become real PNGs, not a raw-TeX fallback that merely makes
+// article preview appear successful when MathJax is absent.
+app.vaultContentByPath["samples/math.md"] = "# Math\n\nInline $E=mc^2$.\n\n$$\n\\int_0^1 x^2 \\, dx = \\frac{1}{3}\n$$\n";
+app.workspace.activeFile = { path: "samples/math.md", basename: "math", extension: "md" };
+await inst.previewCurrentNote();
+const mathPngs = [...lastPreviewHtml.matchAll(/src="data:image\/png;base64,([^"\s]+)"/g)];
+if (mathPngs.length !== 2) fail("inline and block math must render two PNGs without sidecars");
+for (const [, data] of mathPngs) {
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.length < 500 || !bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
+    fail("formula output is not a nonempty PNG");
+  }
+}
+if (calls.some((c) => c.startsWith("server-request:"))) fail("local preview contacted the server");
+
 // card deck render into the in-app preview view (wasm + satori + harfbuzzjs)
 app.workspace.activeFile = { path: "samples/card-sample.md", basename: "card-sample", extension: "md" };
-// Card preview must not silently download full CJK fonts when the subset
-// doesn't cover a glyph. Stub network calls to make that behavior testable.
-const realFetch = globalThis.fetch;
-let fontNetworkAttempts = 0;
-globalThis.fetch = async () => {
-  fontNetworkAttempts++;
-  throw new Error("offline Obsidian card smoke attempted a network fetch");
-};
 try {
   await inst.previewCurrentNote(); // smart dispatch -> card deck
+  // Resvg retains module state across disable/enable. A second onload must
+  // accept already-initialized WASM and still render formula PNGs.
+  const reloaded = new PluginCls(app, inst.manifest);
+  await reloaded.onload();
+  lastPreviewHtml = "";
+  app.workspace.activeFile = { path: "samples/math.md", basename: "math", extension: "md" };
+  await reloaded.previewCurrentNote();
+  if ([...lastPreviewHtml.matchAll(/src="data:image\/png;base64,/g)].length !== 2) {
+    fail("math preview failed after plugin reload");
+  }
 } finally {
   globalThis.fetch = realFetch;
 }
-if (fontNetworkAttempts !== 0) fail("offline card preview attempted to fetch remote font resources");
+if (renderNetworkAttempts !== 0) fail("offline initialization/preview attempted a network fetch");
 if (!calls.some((c) => c.startsWith("view.setCards("))) fail("card preview did not render — calls: " + calls.join(" | "));
 
 // history view renders from the (stub) server API
@@ -350,4 +373,4 @@ try {
   fs.rmSync(idCover, { force: true });
 }
 
-console.log(`PASS — ${communityOnly ? "simulated Community Directory three-file install" : "side-loaded development bundle"}: onload, article preview, card deck preview, history, publish`);
+console.log(`PASS — ${communityOnly ? "simulated Community Directory three-file install" : "side-loaded development bundle"}: onload, offline article/math/card preview, history, simulated publish`);

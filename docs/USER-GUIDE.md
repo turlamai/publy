@@ -8,6 +8,8 @@ Turn Markdown into WeChat article drafts and image-post cards, with local previe
 
 CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.
 
+The development plugin embeds its renderer WASM, CJK subset fonts and MathJax in `main.js`. The three-file smoke checks offline article, formula and card previews without sidecars. This is a source-build candidate; clean-vault Obsidian desktop installation and update acceptance remain open ([#12](https://github.com/turlamai/publy/issues/12), [#15](https://github.com/turlamai/publy/issues/15)).
+
 ## Platforms and installation
 
 CLI and Obsidian workflows; this is not a Rivet/Glaze desktop application. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.

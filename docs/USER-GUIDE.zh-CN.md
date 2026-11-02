@@ -8,6 +8,8 @@
 
 CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。
 
+开发版插件已将渲染器 WASM、CJK 子集字体和 MathJax 嵌入 `main.js`，三文件 smoke 检查无需额外目录的离线文章、公式和卡片预览。这仍是源码构建候选；干净库内的真实 Obsidian 桌面安装与更新验收尚未完成（[#12](https://github.com/turlamai/publy/issues/12)、[#15](https://github.com/turlamai/publy/issues/15)）。
+
 ## 平台与安装
 
 提供 CLI 与 Obsidian 工作流；不是 Rivet/Glaze 桌面应用。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
