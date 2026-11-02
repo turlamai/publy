@@ -21,23 +21,25 @@ const communityOnly = process.argv.includes("--community-only");
 // files fetched by Obsidian. Side-loaded ZIPs are a different contract.
 const args = process.argv.slice(2).filter((x) => x !== "--community-only");
 if (args.length > 1) throw new Error("usage: verify-plugin.mjs [--community-only] [plugin-directory]");
-const pluginDir = args[0] ?? fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-verify-"));
+const suppliedPluginDir = args[0];
+// A supplied directory represents an already-prepared install. Never replace
+// its files with local dist output or remove its sidecars: doing so could make
+// a broken release appear to pass, and would mutate the caller's vault.
+const pluginDir = suppliedPluginDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-verify-"));
+const communityFiles = ["main.js", "manifest.json", "styles.css"];
 
-// prepare the vault plugin dir from dist (same layout as a real install)
-for (const f of (communityOnly
-  ? ["main.js", "manifest.json", "styles.css"]
-  : ["main.js", "manifest.json", "versions.json", "styles.css"])) {
-  fs.copyFileSync(path.join(distDir, f), path.join(pluginDir, f));
-}
-// No installed sidecars in community-only mode, even when a developer happens
-// to reuse an existing vault-like directory from a previous side-loaded build.
-for (const dir of ["node_modules", "fonts"]) {
-  fs.rmSync(path.join(pluginDir, dir), { recursive: true, force: true });
-}
-if (!communityOnly) {
-  for (const dir of ["node_modules", "fonts"]) {
-    if (fs.existsSync(path.join(distDir, dir))) {
-      fs.cpSync(path.join(distDir, dir), path.join(pluginDir, dir), { recursive: true });
+if (suppliedPluginDir === undefined) {
+  // Only synthesize an installation when no directory was supplied.
+  for (const f of (communityOnly
+    ? communityFiles
+    : [...communityFiles, "versions.json"])) {
+    fs.copyFileSync(path.join(distDir, f), path.join(pluginDir, f));
+  }
+  if (!communityOnly) {
+    for (const dir of ["node_modules", "fonts"]) {
+      if (fs.existsSync(path.join(distDir, dir))) {
+        fs.cpSync(path.join(distDir, dir), path.join(pluginDir, dir), { recursive: true });
+      }
     }
   }
 }
@@ -48,6 +50,21 @@ if (!communityOnly && args.length === 0) {
   fs.rmSync(path.join(pluginDir, "fonts"), { recursive: true, force: true });
   if (fs.existsSync(path.join(pluginDir, "fonts"))) {
     throw new Error("fontless plugin fixture still has a font directory");
+  }
+}
+
+if (communityOnly) {
+  // The Community Directory downloads exactly three release files. Reject
+  // extra files/directories rather than silently deleting or ignoring them.
+  const actual = fs.readdirSync(pluginDir);
+  const missing = communityFiles.filter((name) => !actual.includes(name));
+  const unexpected = actual.filter((name) => !communityFiles.includes(name));
+  if (missing.length || unexpected.length) {
+    throw new Error(
+      "Community Directory install must contain exactly main.js, manifest.json, styles.css" +
+      "; missing: " + (missing.join(", ") || "none") +
+      "; unexpected: " + (unexpected.join(", ") || "none"),
+    );
   }
 }
 

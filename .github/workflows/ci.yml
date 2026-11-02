@@ -30,6 +30,7 @@ jobs:
       - run: pnpm -r build
       - run: pnpm -r test
       - run: node scripts/check-plugin-metadata.mjs
+      - run: node --test scripts/verify-plugin-layout.test.mjs
       - run: node scripts/verify-plugin.mjs
 
   racket-ws:
