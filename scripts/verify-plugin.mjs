@@ -243,6 +243,12 @@ if (!calls.some((c) => c.startsWith("command:"))) fail("commands not registered"
   try {
     await copy("copy-plain", "# A safe note\n\nHello **world**.");
     if (writes.length !== 1) fail("plain text-only copy should use clipboard exactly once");
+    const copiedHtml = await writes[0][0].data["text/html"].text();
+    if (!copiedHtml.includes("Hello") || !/<strong\b[^>]*>world<\/strong>/.test(copiedHtml)) {
+      fail("successful text-only copy lost the rendered content");
+    }
+    await copy("copy-valid-formula", "# Formula\n\nInline $E=mc^2$.");
+    if (writes.length !== 1) fail("rendered formula attachments must not copy unresolved links");
     await copy("copy-invalid-formula", String.raw`Bad formula $\frac{$ should not silently become pasted text.`);
     if (writes.length !== 1) fail("invalid formula must not modify clipboard");
     await copy("copy-image", "# Attachment\n\n![tiny](" + imageName + ")");

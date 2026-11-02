@@ -30,6 +30,8 @@ source-build functionality, **not yet a no-setup public installer**.
 [Typora quick start](typora.md) · [Supported input paths, limitations and commercial user-experience standard](editor-workflows.md)
 · [简体中文](editor-workflows.zh-CN.md)
 
+In the development Obsidian plugin, **Copy rendered rich text** accepts fully rendered text without local image or formula attachments. If media is missing, math fails, or attachments remain, copying stops and leaves the clipboard unchanged. Use the configured draft-delivery path for attachments; this local check does not submit a draft. Folder embeds are reported as missing assets, not accepted as image files.
+
 ## Your first successful session
 
 1. Install from the source instructions and preview a non-sensitive Markdown article locally before configuring delivery.
