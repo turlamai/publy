@@ -41,6 +41,15 @@ if (!communityOnly) {
     }
   }
 }
+// Normal CI smoke still supplies the WASM/MathJax glue sidecars (#12 remains
+// open), but must prove no font directory is required. Touch only the
+// throwaway directory created by this script; never mutate a supplied vault.
+if (!communityOnly && args.length === 0) {
+  fs.rmSync(path.join(pluginDir, "fonts"), { recursive: true, force: true });
+  if (fs.existsSync(path.join(pluginDir, "fonts"))) {
+    throw new Error("fontless plugin fixture still has a font directory");
+  }
+}
 
 // --- stubs -------------------------------------------------------------------
 
@@ -188,7 +197,20 @@ if (!calls.some((c) => c.startsWith("view.setHtml("))) fail("article preview did
 
 // card deck render into the in-app preview view (wasm + satori + harfbuzzjs)
 app.workspace.activeFile = { path: "samples/card-sample.md", basename: "card-sample", extension: "md" };
-await inst.previewCurrentNote(); // smart dispatch -> card deck
+// Card preview must not silently download full CJK fonts when the subset
+// doesn't cover a glyph. Stub network calls to make that behavior testable.
+const realFetch = globalThis.fetch;
+let fontNetworkAttempts = 0;
+globalThis.fetch = async () => {
+  fontNetworkAttempts++;
+  throw new Error("offline Obsidian card smoke attempted a network fetch");
+};
+try {
+  await inst.previewCurrentNote(); // smart dispatch -> card deck
+} finally {
+  globalThis.fetch = realFetch;
+}
+if (fontNetworkAttempts !== 0) fail("offline card preview attempted to fetch remote font resources");
 if (!calls.some((c) => c.startsWith("view.setCards("))) fail("card preview did not render — calls: " + calls.join(" | "));
 
 // history view renders from the (stub) server API

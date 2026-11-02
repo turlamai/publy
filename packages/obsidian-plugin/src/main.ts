@@ -11,7 +11,7 @@ import {
   blockingMediaWarning,
   draftIdempotencyKey,
   setPngRenderer,
-  setFontDir,
+  setEmbeddedFontSubsets,
   generateTitleCover,
 } from "@publy/core";
 // theme/highlight css inlined as text by esbuild (loader ".css": "text")
@@ -27,6 +27,10 @@ import terminalThemeCss from "../../core/themes/terminal.css";
 import newsThemeCss from "../../core/themes/news.css";
 import hljsGithubCss from "highlight.js/styles/github.css";
 import hljsGithubDarkCss from "highlight.js/styles/github-dark.css";
+// esbuild's binary loader embeds these two font subsets in main.js. Official
+// Community Directory installs do not fetch the dist/fonts sidecar.
+import embeddedRegularFont from "../../core/fonts/NotoSansSC-subset-Regular.otf";
+import embeddedBoldFont from "../../core/fonts/NotoSansSC-subset-Bold.otf";
 
 const THEME_CSS: Record<string, string> = {
   claude: claudeThemeCss,
@@ -954,6 +958,10 @@ export default class PublyPlugin extends Plugin {
   private lastAttempt: { payload: Record<string, unknown>; key: string; title: string; account: string } | null = null;
 
   async onload(): Promise<void> {
+    // Initialize bundled fonts independent of side-loaded package directories.
+    // Rendering must remain offline even when the three-file install has no
+    // font directory. WASM availability is checked separately below.
+    setEmbeddedFontSubsets({ regular: embeddedRegularFont, bold: embeddedBoldFont });
     // WASM PNG renderer (community-plugin safe: no native binaries).
     // Graceful degradation: if wasm init fails, article publish/preview still
     // work — only the card renderer is unavailable.
@@ -977,15 +985,9 @@ export default class PublyPlugin extends Plugin {
           Promise.resolve(loadPluginModule<unknown>(pluginDir, path.join("node_modules", "harfbuzzjs", "index.js"))),
         );
       }
-      const fontDir = path.join(pluginDir, "fonts");
-      const fontFiles = ["NotoSansSC-subset-Regular.otf", "NotoSansSC-subset-Bold.otf"]
-        .map((f) => path.join(fontDir, f))
-        .filter((p) => fs.existsSync(p));
-      setFontDir(fontDir);
-      // the wasm resvg build silently loads NOTHING from fontFiles (paths) —
-      // raw buffers work. family mappings route the generic families external
-      // diagrams request (sans-serif/monospace/…) to the shipped subsets
-      const fontBuffers = fontFiles.map((f) => new Uint8Array(fs.readFileSync(f)));
+      // The wasm Resvg build requires raw font buffers, not fontPaths.
+      // Both are embedded in main.js and require no other installed files.
+      const fontBuffers = [embeddedRegularFont, embeddedBoldFont];
       setPngRenderer((svg, fitWidth) => {
         const resvg = new resvgModule!.Resvg(svg, {
           font: {
@@ -1371,6 +1373,7 @@ export default class PublyPlugin extends Plugin {
       view.beginCards();
       const result = await renderCards(raw, {
         outDir,
+        offline: true, // Never download a full font during offline plugin preview.
         onCard: (card) => {
           if (stale()) return; // drop late cards instead of overpainting
           try {
@@ -1507,7 +1510,7 @@ export default class PublyPlugin extends Plugin {
         if (!this.wasmOk) throw new Error(t("wasmDown"));
         const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
         try {
-          const cards = await renderCards(raw, { outDir });
+          const cards = await renderCards(raw, { outDir, offline: true });
           if (!cards.lint.ok) {
             throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
           }

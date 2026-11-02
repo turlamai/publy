@@ -27,7 +27,7 @@
 
 ## 3. 发布前的机器可验证门禁
 
-1. `pnpm install --frozen-lockfile && pnpm -r build && pnpm -r test`；执行 `node scripts/check-plugin-metadata.mjs` 和 `node scripts/verify-plugin.mjs`。后者只是使用额外依赖的侧载布局模拟 Obsidian API 的 Node smoke。正式发行前还必须执行 `node scripts/verify-plugin.mjs --community-only`（只复制 main.js、manifest.json、styles.css，严格拒绝任何额外 node_modules/ 和 fonts/）；也可以在 Actions 手动运行 **Obsidian Community Directory three-file gate**。**当前预期因卡片/WASM 依赖而失败**，这不是绿灯；该脚本仍只模拟 Obsidian，成功后也必须通过真实桌面库验收。
+1. `pnpm install --frozen-lockfile && pnpm -r build && pnpm -r test`；执行 `node scripts/check-plugin-metadata.mjs` 和 `node scripts/verify-plugin.mjs`。后者只是使用额外依赖的侧载布局模拟 Obsidian API 的 Node smoke。正式发行前还必须执行 `node scripts/verify-plugin.mjs --community-only`（只复制 main.js、manifest.json、styles.css，严格拒绝任何额外 node_modules/ 和 fonts/）；也可以在 Actions 手动运行 **Obsidian Community Directory three-file gate**。**即使字体已嵌入 `main.js`，WASM glue、渲染器和 MathJax 的三文件运行依赖尚未消除，因此当前预期仍会失败**，这不是绿灯；该脚本仍只模拟 Obsidian，成功后也必须通过真实桌面库验收。
 2. 确认仓库根 `manifest.json` 与 `packages/obsidian-plugin/manifest.json` 完全一致；根/子 `versions.json` 一致，`packages/obsidian-plugin/package.json` 版本匹配。当前源码的 `0.8.7` **不是**已发布版本。
 3. 从审核通过的确切 commit SHA 构建；以相同版本号创建 Git tag 和 GitHub Release，上传构建产物 `main.js`、`manifest.json`、`styles.css`。确保 Release assets 实际与本次构建内容一致，并记录校验和；不要使用旧 Release 附件。
 4. **重要**：在干净的真实 Obsidian 桌面库中，仅复制社区安装会取得的三个文件，禁止额外字体、模块或 ZIP；重启后验证离线预览、富文本复制、图片卡片、数学公式、加载/卸载、更新和错误提示，覆盖实际支持的操作系统。当前这一步尚未通过（#12）。
