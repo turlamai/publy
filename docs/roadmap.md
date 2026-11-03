@@ -12,9 +12,9 @@ local integration work, not a merge, release, deployed service or sales claim.
   #60, #61, #63 and #64; preserve those source PRs until reviewed integration
   and exact-head CI are complete. Additional local integrations cover #48,
   #49, #50, #52, #53, #54, #55, #56, #58 and #59; adaptations to overlapping
-  files need review against each original PR. #62 remains separate: its
-  indented-line handling has a documented active-embed regression and must
-  not be included unchanged.
+  files need review against each original PR. #62's code-example handling is
+  adapted using Markdown block parsing, with a regression for an indented
+  paragraph continuation; it still needs cross-platform and native evidence.
 - Product proof still required: clean Obsidian install/update on target
   systems, real Typora/Obsidian source-to-draft walkthrough, and a no-npm
   packaged CLI. Synthetic three-file smoke is not directory listing or a
