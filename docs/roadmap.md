@@ -26,12 +26,17 @@ local integration work, not a merge, release, deployed service or sales claim.
   not production integrated. A development-only shadow client signs requests
   against Commerce’s Racket framing and can observe proof responses. A
   separate SQLite quota ledger reserves atomically, holds uncertain results
-  and checks expiry before send; neither component is wired to a user route
-  or grants access. The loopback-only synthetic probe
-  `COMMERCE_ROOT=<pinned-checkout> node scripts/verify-commerce-shadow.mjs`
+  and checks expiry before send. An independent Permit verifier and durable
+  entitlement revision fence validate synthetic credentials and reject
+  rollback. These components are not wired to a user route and cannot grant
+  access. The loopback-only synthetic probe
+  `COMMERCE_ROOT=<pinned-checkout> PERMIT_ROOT=<pinned-checkout> node scripts/verify-commerce-shadow.mjs`
   uses synthetic payment and signing fixtures against the Commerce HTTP
-  listener to check signed-proof transport, stale revision and cross-account
-  denial. It does not verify a real payment or grant product access. Billing-window policy, known-failure reconciliation,
+  listener to check signed-proof transport, independent Permit verification,
+  tampering, stale revision, cross-account denial, and synthetic persisted
+  fence/quota transitions. Permit source pin is
+  `4ac89f540bf6ddc3f337239d974a198612f8e705`. It does not verify a real
+  payment or grant product access. Billing-window policy, known-failure reconciliation,
   current-entitlement rechecks and full deployment recovery remain open. Complete
   #17/#44, the fixed-egress recovery pilot #7/#8, retention/backup and real
   merchant admission before enabling checkout. Free local and self-hosted

@@ -46,7 +46,15 @@ jobs:
           distribution: full
           variant: CS
           version: stable
-      - name: Install websocket package (catalog)
-        run: raco pkg install --auto --batch websocket
-      - name: Run publy-ws tests
+      - name: Check out pinned Permit verifier
+        uses: actions/checkout@v4
+        with:
+          repository: turlamai/permit
+          ref: 4ac89f540bf6ddc3f337239d974a198612f8e705
+          path: .deps/permit
+      - name: Install websocket and Permit test dependencies
+        run: |
+          raco pkg install --auto --batch websocket
+          raco pkg install --auto --batch --no-docs --name permit .deps/permit
+      - name: Run Racket tests
         run: raco test racket
