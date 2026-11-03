@@ -41,8 +41,10 @@ It refuses to overwrite an existing output directory, removes only pnpm's
 known source-checkout self-link and rejects other links escaping the package.
 The launcher, card preview and capability query were exercised with an empty
 home and a system-only PATH. The runtime must be authenticated and supplied
-by the build operator; the script does not authenticate it. It does not yet
-build Windows packages or establish a clean-machine installation guarantee.
+by the build operator; the script does not authenticate it. The developer
+workflow `portable-probe.yml` exercises the candidate on Linux and macOS CI;
+only an actual passing run is evidence. It does not yet build Windows
+packages or establish a clean-machine installation guarantee.
 
 The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
 `037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
