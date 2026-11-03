@@ -54,6 +54,20 @@ when a network listener is needed. This changes older direct-listener behavior:
 check reverse-proxy routing and firewall rules before an upgrade. A public
 reverse proxy requires its own HTTPS and access controls.
 
+## Restricted systemd service (development template)
+
+[`deploy/publy-server.service`](../deploy/publy-server.service) is a Linux
+systemd template tested with an isolated synthetic staging instance. It runs
+under a dynamic non-root identity, loads a root-owned configuration as a
+systemd credential, restricts filesystem access and keeps state in a private
+`/var/lib/publy` directory. It expects a reviewed release at
+`/opt/publy-releases/current`, an independently verified Node runtime at
+`/opt/publy-runtime/node`, and a protected `/etc/publy/server.json` with
+`host: "127.0.0.1"` and `dataDir: "/var/lib/publy"`. Do not enable this unit
+or point a public proxy to it before the deployment and release gates pass.
+Staging with synthetic credentials does not verify production backup/restore,
+merchant admission, egress policy, TLS, proxy access controls or hosted billing.
+
 ## Fixed-egress personal pilot runbook (issue #8) — NOT YET EXECUTED
 
 The checklist below is the acceptance contract for the first owned-account

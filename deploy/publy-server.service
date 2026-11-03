@@ -1,0 +1,25 @@
+[Unit]
+Description=Publy draft delivery service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=publy
+StateDirectoryMode=0700
+LoadCredential=server.json:/etc/publy/server.json
+Environment=PUBLY_SERVER_CONFIG=%d/server.json
+WorkingDirectory=/opt/publy-releases/current
+ExecStart=/opt/publy-runtime/node /opt/publy-releases/current/packages/server/dist/index.js
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
