@@ -1312,15 +1312,15 @@ export default class PublyPlugin extends Plugin {
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
       try {
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      if (gen !== this.previewGen) return;
-      const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
-      view.refresh = () => this.previewCurrentNote(f);
-      view.setHtml(this.inlineImages(rendered.html, rendered.attachments), {
-        title: rendered.title || f.basename,
-        author: rendered.meta.author,
-        account: this.settings.account || undefined,
-      });
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        if (gen !== this.previewGen) return;
+        const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
+        view.refresh = () => this.previewCurrentNote(f);
+        view.setHtml(this.inlineImages(rendered.html, rendered.attachments), {
+          title: rendered.title || f.basename,
+          author: rendered.meta.author,
+          account: this.settings.account || undefined,
+        });
       } finally { rendered.cleanup(); }
     } catch (err) {
       if (gen === this.previewGen) new Notice(`Publy: ${(err as Error).message}`);
@@ -1384,22 +1384,22 @@ export default class PublyPlugin extends Plugin {
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
       try {
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      // A successful copy should be directly usable in the target editor:
-      // unavailable formulas/media and attachment:// placeholders are not.
-      // The draft workflow uploads assets and replaces placeholders safely.
-      if (rendered.warnings.some(blockingMediaWarning)) {
-        throw new Error(t("copyMediaNotReady"));
-      }
-      if (rendered.attachments.length > 0 || rendered.html.includes("attachment://")) {
-        throw new Error(t("copyHasImages"));
-      }
-      const item = new ClipboardItem({
-        "text/html": new Blob([rendered.html], { type: "text/html" }),
-        "text/plain": new Blob([f.basename], { type: "text/plain" }),
-      });
-      await navigator.clipboard.write([item]);
-      new Notice(t("copyOk"));
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        // A successful copy should be directly usable in the target editor:
+        // unavailable formulas/media and attachment:// placeholders are not.
+        // The draft workflow uploads assets and replaces placeholders safely.
+        if (rendered.warnings.some(blockingMediaWarning)) {
+          throw new Error(t("copyMediaNotReady"));
+        }
+        if (rendered.attachments.length > 0 || rendered.html.includes("attachment://")) {
+          throw new Error(t("copyHasImages"));
+        }
+        const item = new ClipboardItem({
+          "text/html": new Blob([rendered.html], { type: "text/html" }),
+          "text/plain": new Blob([f.basename], { type: "text/plain" }),
+        });
+        await navigator.clipboard.write([item]);
+        new Notice(t("copyOk"));
       } finally { rendered.cleanup(); }
     } catch (err) {
       new Notice(`Publy: ${(err as Error).message}`);
@@ -1487,77 +1487,77 @@ export default class PublyPlugin extends Plugin {
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
       try {
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      const problems = rendered.warnings.filter(blockingMediaWarning);
-      if (problems.length) {
-        throw new Error(t("mediaNotReady") + " " + problems.join("; "));
-      }
-      type = rendered.type;
-      title = rendered.title || f.basename;
-      author = rendered.meta.author;
-      if (type === "image_post" && rendered.meta.mode?.toLowerCase() === "cards") {
-        if (!this.wasmOk) throw new Error(t("wasmDown"));
-        const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
-        try {
-          const cards = await renderCards(raw, { outDir, offline: true });
-          if (!cards.lint.ok) {
-            throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
-          }
-          payloadAttachments = cards.cards.map((card) => ({
-            name: card.name,
-            data: fs.readFileSync(card.file).toString("base64"),
-            contentType: "image/png",
-          }));
-          if (!payloadAttachments.length) {
-            throw new Error(t("mediaNotReady") + " No cards were generated.");
-          }
-          html = captionToHtml(cards.caption);
-          coverName = payloadAttachments[0].name;
-        } finally {
-          // The POST payload now owns the base64 data. Avoid leaving copies
-          // of private note content in the system temp directory.
-          fs.rmSync(outDir, { recursive: true, force: true });
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        const problems = rendered.warnings.filter(blockingMediaWarning);
+        if (problems.length) {
+          throw new Error(t("mediaNotReady") + " " + problems.join("; "));
         }
-      } else {
-        payloadAttachments = rendered.attachments.map((a) => ({
-          name: a.name,
-          data: fs.readFileSync(a.path).toString("base64"),
-          contentType: a.contentType,
-        }));
-        if (type === "image_post" && !payloadAttachments.length) {
-          throw new Error(t("mediaNotReady") + " No local images found for image post.");
-        }
-        if (rendered.cover) {
-          const existing = rendered.attachments.find((a) => a.path === rendered.cover);
-          if (existing) {
-            coverName = existing.name;
-            explicitCover = true;
-          } else {
-            // The cover can be a standalone frontmatter image, not in body.
-            const ext = path.extname(rendered.cover).toLowerCase();
-            const data = fs.readFileSync(rendered.cover);
-            const png = ext === ".png" &&
-              data.length > 8 && data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-            const jpg = (ext === ".jpg" || ext === ".jpeg") &&
-              data.length > 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
-            if (!png && !jpg) {
-              throw new Error(t("coverFormatBad", { path: path.basename(rendered.cover) }));
+        type = rendered.type;
+        title = rendered.title || f.basename;
+        author = rendered.meta.author;
+        if (type === "image_post" && rendered.meta.mode?.toLowerCase() === "cards") {
+          if (!this.wasmOk) throw new Error(t("wasmDown"));
+          const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
+          try {
+            const cards = await renderCards(raw, { outDir, offline: true });
+            if (!cards.lint.ok) {
+              throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
             }
-            const basename = path.basename(rendered.cover);
-            const name = payloadAttachments.some((attachment) => attachment.name === basename)
-              ? `cover-${crypto.createHash("sha256").update(data).digest("hex").slice(0,12)}${ext}`
-              : basename;
-            payloadAttachments.unshift({
-              name,
-              data: data.toString("base64"),
-              contentType: png ? "image/png" : "image/jpeg",
-            });
-            coverName = name;
-            explicitCover = true;
+            payloadAttachments = cards.cards.map((card) => ({
+              name: card.name,
+              data: fs.readFileSync(card.file).toString("base64"),
+              contentType: "image/png",
+            }));
+            if (!payloadAttachments.length) {
+              throw new Error(t("mediaNotReady") + " No cards were generated.");
+            }
+            html = captionToHtml(cards.caption);
+            coverName = payloadAttachments[0].name;
+          } finally {
+            // The POST payload now owns the base64 data. Avoid leaving copies
+            // of private note content in the system temp directory.
+            fs.rmSync(outDir, { recursive: true, force: true });
           }
+        } else {
+          payloadAttachments = rendered.attachments.map((a) => ({
+            name: a.name,
+            data: fs.readFileSync(a.path).toString("base64"),
+            contentType: a.contentType,
+          }));
+          if (type === "image_post" && !payloadAttachments.length) {
+            throw new Error(t("mediaNotReady") + " No local images found for image post.");
+          }
+          if (rendered.cover) {
+            const existing = rendered.attachments.find((a) => a.path === rendered.cover);
+            if (existing) {
+              coverName = existing.name;
+              explicitCover = true;
+            } else {
+              // The cover can be a standalone frontmatter image, not in body.
+              const ext = path.extname(rendered.cover).toLowerCase();
+              const data = fs.readFileSync(rendered.cover);
+              const png = ext === ".png" &&
+                data.length > 8 && data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+              const jpg = (ext === ".jpg" || ext === ".jpeg") &&
+                data.length > 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+              if (!png && !jpg) {
+                throw new Error(t("coverFormatBad", { path: path.basename(rendered.cover) }));
+              }
+              const basename = path.basename(rendered.cover);
+              const name = payloadAttachments.some((attachment) => attachment.name === basename)
+                ? `cover-${crypto.createHash("sha256").update(data).digest("hex").slice(0,12)}${ext}`
+                : basename;
+              payloadAttachments.unshift({
+                name,
+                data: data.toString("base64"),
+                contentType: png ? "image/png" : "image/jpeg",
+              });
+              coverName = name;
+              explicitCover = true;
+            }
+          }
+          html = rendered.html;
         }
-        html = rendered.html;
-      }
       } finally { rendered.cleanup(); }
     } catch (err) {
       progress.hide();

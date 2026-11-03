@@ -216,19 +216,19 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
           footer: opts.footer,
         });
         try {
-        attachments = rendered.attachments.length;
-        warnings.push(...rendered.warnings);
-        for (const warning of rendered.warnings) {
-          if (blockingMediaWarning(warning)) {
-            problems.push(warning);
+          attachments = rendered.attachments.length;
+          warnings.push(...rendered.warnings);
+          for (const warning of rendered.warnings) {
+            if (blockingMediaWarning(warning)) {
+              problems.push(warning);
+            }
           }
-        }
-        if (type === "article" && !rendered.cover && attachments === 0) {
-          problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-        }
-        if (type === "image_post" && attachments === 0) {
-          problems.push("No local images found for the image post.");
-        }
+          if (type === "article" && !rendered.cover && attachments === 0) {
+            problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+          }
+          if (type === "image_post" && attachments === 0) {
+            problems.push("No local images found for the image post.");
+          }
         } finally { rendered.cleanup(); }
       }
     } catch {
@@ -321,49 +321,49 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
   }
 
   try {
-  const problems = result.warnings.filter(blockingMediaWarning);
-  if (result.type === "article" && !result.cover && result.attachments.length === 0) {
-    problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-  } else if (result.type === "image_post" && result.attachments.length === 0) {
-    problems.push("No local images found for the image post.");
-  }
-  for (const warning of result.warnings) console.error("warn: " + warning);
+    const problems = result.warnings.filter(blockingMediaWarning);
+    if (result.type === "article" && !result.cover && result.attachments.length === 0) {
+      problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+    } else if (result.type === "image_post" && result.attachments.length === 0) {
+      problems.push("No local images found for the image post.");
+    }
+    for (const warning of result.warnings) console.error("warn: " + warning);
 
-  const out = opts.out
-    ? path.resolve(opts.out)
-    : opts.json ? path.join(fs.mkdtempSync(path.join(os.tmpdir(), "publy-render-")), "index.html") : null;
-  if (out) {
-    if (!allowHtmlOutput(source, out, opts.force === true)) {
-      if (opts.json) console.log(JSON.stringify({
-        schemaVersion: 1, kind: "html-render", ok: false, code: "OUTPUT_INVALID",
-        source, problems: ["Choose a new .html output path or explicitly use --force."],
+    const out = opts.out
+      ? path.resolve(opts.out)
+      : opts.json ? path.join(fs.mkdtempSync(path.join(os.tmpdir(), "publy-render-")), "index.html") : null;
+    if (out) {
+      if (!allowHtmlOutput(source, out, opts.force === true)) {
+        if (opts.json) console.log(JSON.stringify({
+          schemaVersion: 1, kind: "html-render", ok: false, code: "OUTPUT_INVALID",
+          source, problems: ["Choose a new .html output path or explicitly use --force."],
+          networkUsed: false, submitted: false,
+        }));
+        return;
+      }
+      try {
+        fs.writeFileSync(out, result.html, { flag: opts.force ? "w" : "wx", mode: 0o600 });
+        if (process.platform !== "win32") fs.chmodSync(out, 0o600);
+      } catch {
+        agentError("OUTPUT_FAILED", 2, ["Cannot write the requested local HTML output."]);
+        return;
+      }
+    }
+    if (opts.json) {
+      console.log(JSON.stringify({
+        schemaVersion: 1, kind: "html-render", ok: problems.length === 0,
+        source, output: out, title: result.title, type: result.type,
+        contentType: "text/html", attachmentCount: result.attachments.length,
+        containsAttachmentReferences: result.html.includes("attachment://"),
+        problems, warnings: result.warnings,
         networkUsed: false, submitted: false,
       }));
-      return;
+      if (problems.length) process.exitCode = 4;
+    } else if (out) {
+      console.error(`rendered → ${out}`);
+    } else {
+      process.stdout.write(result.html);
     }
-    try {
-      fs.writeFileSync(out, result.html, { flag: opts.force ? "w" : "wx", mode: 0o600 });
-      if (process.platform !== "win32") fs.chmodSync(out, 0o600);
-    } catch {
-      agentError("OUTPUT_FAILED", 2, ["Cannot write the requested local HTML output."]);
-      return;
-    }
-  }
-  if (opts.json) {
-    console.log(JSON.stringify({
-      schemaVersion: 1, kind: "html-render", ok: problems.length === 0,
-      source, output: out, title: result.title, type: result.type,
-      contentType: "text/html", attachmentCount: result.attachments.length,
-      containsAttachmentReferences: result.html.includes("attachment://"),
-      problems, warnings: result.warnings,
-      networkUsed: false, submitted: false,
-    }));
-    if (problems.length) process.exitCode = 4;
-  } else if (out) {
-    console.error(`rendered → ${out}`);
-  } else {
-    process.stdout.write(result.html);
-  }
   } finally { result.cleanup(); }
 }
 
@@ -469,17 +469,17 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
       footer: opts.footer,
     });
     try {
-    for (const warning of result.warnings) console.error("warn: " + warning);
-    preview = inlineLocalPreviewImages(result.html, result.attachments);
-    problems = result.warnings.filter(blockingMediaWarning);
-    // Preview readiness should not contradict the separate local check:
-    // WeChat articles need a cover or a body image; image posts need media.
-    if (publishType(parsed.meta) === "article" &&
-        !result.cover && result.attachments.length === 0) {
-      problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-    } else if (publishType(parsed.meta) === "image_post" && result.attachments.length === 0) {
-      problems.push("No local images found for the image post.");
-    }
+      for (const warning of result.warnings) console.error("warn: " + warning);
+      preview = inlineLocalPreviewImages(result.html, result.attachments);
+      problems = result.warnings.filter(blockingMediaWarning);
+      // Preview readiness should not contradict the separate local check:
+      // WeChat articles need a cover or a body image; image posts need media.
+      if (publishType(parsed.meta) === "article" &&
+          !result.cover && result.attachments.length === 0) {
+        problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+      } else if (publishType(parsed.meta) === "image_post" && result.attachments.length === 0) {
+        problems.push("No local images found for the image post.");
+      }
     } finally { result.cleanup(); }
   }
 
@@ -773,19 +773,19 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     if (mode === "cards") {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       try {
-      const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
-      if (!cardResult.lint.ok) {
-        for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
-        agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
-        return;
-      }
-      images = cardResult.cards.map((c) => ({
-        name: c.name,
-        data: fs.readFileSync(c.file).toString("base64"),
-        contentType: "image/png",
-      }));
-      html = captionToHtml(cardResult.caption);
-      coverName = images[0]?.name;
+        const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
+        if (!cardResult.lint.ok) {
+          for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
+          agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
+          return;
+        }
+        images = cardResult.cards.map((c) => ({
+          name: c.name,
+          data: fs.readFileSync(c.file).toString("base64"),
+          contentType: "image/png",
+        }));
+        html = captionToHtml(cardResult.caption);
+        coverName = images[0]?.name;
       } finally { fs.rmSync(outDir, { recursive: true, force: true }); }
     } else {
       const rendered = renderMarkdown(raw, {
@@ -814,36 +814,36 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       footer: opts.footer,
     });
     try {
-    emitWarnings(rendered.warnings);
-    const attachments: Attachment[] = rendered.attachments.map((a) => ({
-      name: a.name,
-      data: fs.readFileSync(a.path).toString("base64"),
-      contentType: a.contentType,
-    }));
-    const coverPath = opts.cover || rendered.cover;
-    if (coverPath) {
-      const resolved = path.isAbsolute(coverPath) ? coverPath : path.resolve(baseDir, coverPath);
-      if (!fs.existsSync(resolved)) {
-        console.error(`publy: cover not found: ${resolved}`);
-        agentFailure("not_submitted", "COVER_NOT_FOUND", 2);
-        return;
+      emitWarnings(rendered.warnings);
+      const attachments: Attachment[] = rendered.attachments.map((a) => ({
+        name: a.name,
+        data: fs.readFileSync(a.path).toString("base64"),
+        contentType: a.contentType,
+      }));
+      const coverPath = opts.cover || rendered.cover;
+      if (coverPath) {
+        const resolved = path.isAbsolute(coverPath) ? coverPath : path.resolve(baseDir, coverPath);
+        if (!fs.existsSync(resolved)) {
+          console.error(`publy: cover not found: ${resolved}`);
+          agentFailure("not_submitted", "COVER_NOT_FOUND", 2);
+          return;
+        }
+        const existing = rendered.attachments.find((a) => a.path === resolved);
+        if (existing) {
+          coverName = existing.name;
+        } else {
+          const ext = path.extname(resolved).toLowerCase();
+          coverName = path.basename(resolved);
+          attachments.unshift({
+            name: coverName,
+            data: fs.readFileSync(resolved).toString("base64"),
+            contentType: ext === ".png" ? "image/png" : "image/jpeg",
+          });
+        }
       }
-      const existing = rendered.attachments.find((a) => a.path === resolved);
-      if (existing) {
-        coverName = existing.name;
-      } else {
-        const ext = path.extname(resolved).toLowerCase();
-        coverName = path.basename(resolved);
-        attachments.unshift({
-          name: coverName,
-          data: fs.readFileSync(resolved).toString("base64"),
-          contentType: ext === ".png" ? "image/png" : "image/jpeg",
-        });
-      }
-    }
-    html = rendered.html;
-    images = attachments;
-    title = opts.title || rendered.title || path.basename(file, path.extname(file));
+      html = rendered.html;
+      images = attachments;
+      title = opts.title || rendered.title || path.basename(file, path.extname(file));
     } finally { rendered.cleanup(); }
   }
 

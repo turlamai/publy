@@ -164,6 +164,16 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     generatedDirs.clear();
   };
   try {
+    return renderMarkdownWithCleanup(raw, opts, generatedDirs, cleanup);
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}
+
+function renderMarkdownWithCleanup(
+  raw: string, opts: RenderOptions, generatedDirs: Set<string>, cleanup: () => void,
+): RenderResult {
   const warnings: string[] = [];
   const { meta, body } = parseSource(raw);
   const baseDir = opts.baseDir ?? process.cwd();
@@ -389,10 +399,6 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     warnings,
     cleanup,
   };
-  } catch (error) {
-    cleanup();
-    throw error;
-  }
 }
 
 function escapeText(s: string): string {
