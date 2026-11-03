@@ -34,6 +34,12 @@ network or performs a draft-creating/mutating action. **Do not guess** that
 every command supports `--json`: `theme preview` and some legacy commands are still human-oriented.
 `account add <name> --json` returns an `account-add` object with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or configuration contents; omitted options preserve existing fields. This local mutation requires explicit user approval.
 
+A `DRAFT_OUTCOME_UNKNOWN` response to `publish --json` is reported as
+`status:"unknown"` with the original request ID (exit 5). The server keeps an
+unresolved keyed immediate request blocked after restart; query its result and
+inspect WeChat drafts rather than replaying it. This is a development-source
+contract, not an exactly-once guarantee.
+
 `config set <key> <value> --json` returns a single `config-set` object (`CONFIG_SAVED`, `CONFIG_KEY_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`) without ever echoing values, including API keys or credential-bearing URLs. This is a local mutation and requires the operator's approval.
 `jobs cancel --json` and `jobs retry --json` now return structured results,
 but are **mutating operations requiring explicit user approval**. If their

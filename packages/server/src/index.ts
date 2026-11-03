@@ -695,6 +695,11 @@ export function buildApp(config: ServerConfig) {
     });
 
     const key = body.idempotencyKey;
+    if (key !== undefined && (typeof key !== "string" || key.length < 1 || key.length > 256)) {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "idempotencyKey must be a non-empty string up to 256 characters" });
+    }
+    const owner = caller.admin ? "admin" : `user:${caller.user.id}`;
+    const fingerprint = key ? draftIdempotencyKey(body) : "";
     if (key) {
       const hit = idempotencyFresh(key);
       if (hit) {
@@ -707,8 +712,22 @@ export function buildApp(config: ServerConfig) {
         // re-delivery of a request whose draft already landed — the response
         // names the original destination so a caller that lost the first
         // response can reconcile instead of sending a second publish (#7)
+        const pending = store.getImmediateClaim(key);
+        if (pending && pending.state === "pending" && pending.owner === owner && pending.fingerprint === fingerprint && hit.requestFingerprint === fingerprint) {
+          store.confirmImmediate(key, owner, fingerprint, hit.mediaId, hit.at);
+        }
         audit({ event: "deduped", key, account: body.account, title: body.title });
         return { mediaId: hit.mediaId, deduped: true, account: hit.account || body.account, title: hit.title || body.title, requestId: key };
+      }
+      const prior = store.getImmediateClaim(key);
+      if (prior && (prior.state === "pending" || !prior.mediaId || prior.completedAt === null || Date.now() - prior.completedAt < IDEMPOTENCY_TTL_MS)) {
+        if (prior.owner !== owner || prior.fingerprint !== fingerprint) {
+          return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
+        }
+        if (prior.state === "confirmed" && prior.mediaId) {
+          return { mediaId: prior.mediaId, deduped: true, account: body.account, title: body.title, requestId: key };
+        }
+        return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The original draft outcome is unknown. Inspect WeChat drafts before another submission.", requestId: key });
       }
     }
 
@@ -743,15 +762,30 @@ export function buildApp(config: ServerConfig) {
     }
 
     if (quotaExceeded) return quotaReply();
+    if (key && Object.values(jobs).some((j) => j.idempotencyKey === key && ["pending", "running", "interrupted"].includes(j.status))) {
+      return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key already identifies a scheduled draft." });
+    }
 
+    let claimed = false, draftStarted = false;
     try {
       const cred = resolveAccount(body.account, caller);
       if (!cred) {
         const code = caller.admin ? "ACCOUNT_NOT_FOUND" : "ACCOUNT_NOT_OWNED";
         return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${body.account}"` });
       }
-      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials);
       if (key) {
+        const outcome = store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS);
+        if (outcome !== "claimed") {
+          const prior = store.getImmediateClaim(key);
+          if (!prior || prior.owner !== owner || prior.fingerprint !== fingerprint) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
+          if (prior.state === "confirmed" && prior.mediaId) return { mediaId: prior.mediaId, deduped: true, account: body.account, title: body.title, requestId: key };
+          return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The original draft outcome is unknown. Inspect WeChat drafts before another submission.", requestId: key });
+        }
+        claimed = true;
+      }
+      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials, () => { draftStarted = true; });
+      if (key) {
+        store.confirmImmediate(key, owner, fingerprint, result.mediaId, Date.now());
         idempotency[key] = { mediaId: result.mediaId, at: Date.now(), account: body.account, title: body.title, type: body.type, userId: caller.admin ? null : caller.user.id, requestFingerprint: draftIdempotencyKey(body) };
         saveIdempotency();
       }
@@ -762,6 +796,16 @@ export function buildApp(config: ServerConfig) {
       // request so clients cannot attach them to the wrong preview (#7)
       return { ...result, account: body.account, title: body.title, requestId: key };
     } catch (err) {
+      if (claimed && key && (!draftStarted || err instanceof WechatError)) {
+        // Before draft/add, or on an explicit WeChat rejection, no draft was
+        // created. Release the claim so the user can correct and retry.
+        store.releaseImmediate(key, owner, fingerprint);
+        claimed = false;
+      }
+      if (claimed) {
+        audit({ event: "outcome-unknown", account: body.account, type: body.type, title: body.title, key });
+        return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The draft outcome cannot be confirmed. Inspect WeChat drafts before another submission.", requestId: key });
+      }
       audit({ event: "failed", account: body.account, type: body.type, title: body.title, error: (err as Error).message });
       notifyWebhook(body.account, "failed", { title: body.title, error: (err as Error).message });
       if (err instanceof PublishError) {
@@ -782,10 +826,16 @@ export function buildApp(config: ServerConfig) {
     const caller = (req as unknown as { caller: Caller }).caller;
     const key = (req.params as { key: string }).key;
     const hit = idempotencyFresh(key);
-    if (!hit || (!caller.admin && hit.userId !== caller.user.id)) {
+    if (hit && (caller.admin || hit.userId === caller.user.id)) {
+      return { status: "confirmed", mediaId: hit.mediaId, account: hit.account, title: hit.title, requestId: key };
+    }
+    // The SQLite claim survives a lost local JSON write or another process.
+    const claim = store.getImmediateClaim(key);
+    const owner = caller.admin ? "admin" : `user:${caller.user.id}`;
+    if (!claim || (!caller.admin && claim.owner !== owner) || claim.state !== "confirmed" || !claim.mediaId || claim.completedAt === null || Date.now() - claim.completedAt >= IDEMPOTENCY_TTL_MS) {
       return { status: "unknown" };
     }
-    return { status: "confirmed", mediaId: hit.mediaId, account: hit.account, title: hit.title, requestId: key };
+    return { status: "confirmed", mediaId: claim.mediaId, requestId: key };
   });
 
   // accounts visible to the caller: names only — secrets and appIds never

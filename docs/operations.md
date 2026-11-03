@@ -6,6 +6,16 @@
   server keeps a durable record per key for 10 minutes and answers retries
   with the original `media_id` (`deduped: true`) instead of creating a second
   draft. Failed attempts are not recorded — only successes dedupe.
+- **Immediate draft claims (development source):** a keyed immediate request
+  first reserves its identity in SQLite. Concurrent duplicates cannot send a
+  second draft, and a possibly submitted operation stays blocked after restart.
+  A confirmed result is also kept in SQLite for the ten-minute duplicate
+  window. A failure before draft submission or an explicit WeChat rejection
+  releases the claim; an unresolved claim does not expire automatically.
+  Inspect WeChat drafts and keep the original identity. No operator recovery
+  action for clearing an unresolved claim is provided yet. Requests without a key retain legacy
+  behavior and do not receive this protection. This is not multi-instance
+  hosted-service or exactly-once acceptance evidence.
 - **Lost responses**: clients reconcile via `GET /v1/publish-result/:key`
   (confirmed | unknown). A timeout is never permission to re-issue.
 - **Scheduled jobs**: admission is idempotent (same key never enqueues two

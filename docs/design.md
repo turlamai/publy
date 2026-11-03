@@ -139,6 +139,12 @@ wenyan（文颜）验证了 CLI + server 路线可行（tlai-wechat-publish 技�
 
 ## 3. CLI 契约（agent-first）
 
+**开发版即时草稿保护：** 带 `idempotencyKey` 的即时请求先在服务端
+SQLite 中持久占位；并发重复或结果未知的原请求不会自动再次投递。
+`DRAFT_OUTCOME_UNKNOWN` 是未知结果，CLI `--json` 报告 `unknown`、
+原请求 ID 与退出码 5；先查并核对微信草稿箱。无键的旧请求不具备此
+保护。该机制尚不是跨实例运营验收或端到端恰好一次保证。
+
 **2026-10-30 新增开发版命令：** `publy check <file> [--json]`，
 离线检查原始 Markdown 的图片、封面、卡片结构和渲染准备情况，不配置服务器
 也能使用，不修改源文件、不创建草稿。标准 Markdown 按源文档目录优先解析

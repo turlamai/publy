@@ -32,17 +32,26 @@ fs.mkdirSync(output, { recursive: false, mode: 0o755 });
 const app = path.join(output, "app");
 const result = spawnSync("pnpm", ["--filter", "@turlamai/publy", "--prod", "deploy", "--legacy", app], { cwd: root, stdio: "inherit" });
 if (result.status !== 0) throw new Error("Dependency deployment failed; inspect the new output directory before removing it");
-// pnpm legacy deploy may add a self-reference into the source checkout.
-// Remove only that exact expected link; reject every other external link.
-const self = path.join(app, "node_modules", ".pnpm", "node_modules", "@turlamai", "publy");
-if (fs.existsSync(self) && fs.lstatSync(self).isSymbolicLink() && fs.realpathSync(self) === fs.realpathSync(path.join(root, "packages", "cli"))) fs.unlinkSync(self);
+// pnpm may place workspace-index links in its shared virtual-store hub.
+// Remove only hub links that resolve exactly to one of this repo's packages;
+// reject every other link escaping the portable package.
+const workspaceTargets = new Set(fs.readdirSync(path.join(root, "packages"), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory()).map((entry) => fs.realpathSync(path.join(root, "packages", entry.name))));
+const workspaceHub = path.join(app, "node_modules", ".pnpm", "node_modules");
 function checkLinks(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const name = path.join(dir, entry.name);
     if (entry.isSymbolicLink()) {
       const resolved = fs.realpathSync(name);
       const relative = path.relative(app, resolved);
-      if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) throw new Error("Dependency link escapes the package: " + path.relative(app, name));
+      if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+        const hubRelative = path.relative(workspaceHub, name);
+        if (hubRelative && hubRelative !== ".." && !hubRelative.startsWith(".." + path.sep) && !path.isAbsolute(hubRelative) && workspaceTargets.has(resolved)) {
+          fs.unlinkSync(name);
+        } else {
+          throw new Error("Dependency link escapes the package: " + path.relative(app, name));
+        }
+      }
     } else if (entry.isDirectory()) checkLinks(name);
   }
 }

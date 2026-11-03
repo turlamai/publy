@@ -833,6 +833,9 @@ const server = http.createServer((_req, res) => {
   if (key === "bad-response") {
     res.writeHead(200); res.end('{"mediaId":'); return;
   }
+  if (key === "unknown-claim") {
+    res.writeHead(409); res.end(JSON.stringify({ code: "DRAFT_OUTCOME_UNKNOWN" })); return;
+  }
   if (key === "denied-response") {
     res.writeHead(400); res.end(JSON.stringify({
       code: "BAD_ARGUMENT", message: "${privateServerMarker}",
@@ -868,6 +871,7 @@ server.listen(0, "127.0.0.1", () => {
       ["invalid-media", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["invalid-job", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["denied-response", "rejected", "BAD_ARGUMENT"],
+      ["unknown-claim", "unknown", "DRAFT_OUTCOME_UNKNOWN"],
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
       const runReply = spawnSync(process.execPath,

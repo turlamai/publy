@@ -105,3 +105,5 @@ publy publish-result <requestId> --json
 `config set <key> <value> --json` 是需要用户授权的本地配置变更，输出单个 `config-set` JSON 对象。`CONFIG_SAVED`、`CONFIG_KEY_INVALID`、`CONFIG_INVALID`、`CONFIG_WRITE_FAILED` 均不回显值（包括 API Key、含凭据的 URL）。
 
 `account add <name> --json` 返回单个 `account-add` 对象，成功码为 `ACCOUNT_SAVED`，错误码为 `ACCOUNT_NAME_INVALID`、`CONFIG_INVALID` 或 `CONFIG_WRITE_FAILED`。输出不包含 App ID、作者元数据或配置原文；未指定参数会保留原有字段。此操作修改本地配置，Agent 须事先获得用户明确授权。
+
+`publish --json` 收到 `DRAFT_OUTCOME_UNKNOWN` 时返回 `status:"unknown"`、原请求 ID 和退出码 5。服务端会在重启后继续阻止未解决的带键即时请求；请先查询并检查微信草稿箱，不要盲目重发。这是开发版契约，不代表端到端恰好一次。

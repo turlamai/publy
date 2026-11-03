@@ -95,6 +95,14 @@ export class Store {
         app_secret TEXT NOT NULL,
         owner_user_id TEXT
       );
+      CREATE TABLE IF NOT EXISTS immediate_publish_claims (
+        request_key TEXT PRIMARY KEY,
+        owner TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('pending', 'confirmed')),
+        media_id TEXT,
+        completed_at INTEGER
+      );
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         contact TEXT NOT NULL,
@@ -212,6 +220,43 @@ export class Store {
   /** the allowance currently in force for this user */
   planAllowance(user: UserRow): { monthlyPublishes: number; accounts: number } {
     return this.isProActive(user) ? PLAN_LIMITS[user.plan] : PLAN_LIMITS.free;
+  }
+
+  /** Durable immediate-publish claim; unknown outcomes never expire. */
+  getImmediateClaim(key: string): { owner: string; fingerprint: string; state: "pending" | "confirmed"; mediaId: string | null; completedAt: number | null } | null {
+    const row = this.db.prepare("SELECT owner, fingerprint, state, media_id, completed_at FROM immediate_publish_claims WHERE request_key = ?").get(key) as
+      { owner: string; fingerprint: string; state: "pending" | "confirmed"; media_id: string | null; completed_at: number | null } | undefined;
+    return row ? { owner: row.owner, fingerprint: row.fingerprint, state: row.state, mediaId: row.media_id, completedAt: row.completed_at } : null;
+  }
+
+  claimImmediate(key: string, owner: string, fingerprint: string, now: number, ttl: number): "claimed" | "existing" {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.getImmediateClaim(key);
+      if (existing && !(existing.state === "confirmed" && existing.mediaId && existing.completedAt !== null && now - existing.completedAt >= ttl)) {
+        this.db.exec("COMMIT");
+        return "existing";
+      }
+      if (existing) this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ?").run(key);
+      this.db.prepare("INSERT INTO immediate_publish_claims(request_key, owner, fingerprint, state) VALUES (?, ?, ?, 'pending')").run(key, owner, fingerprint);
+      this.db.exec("COMMIT");
+      return "claimed";
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  releaseImmediate(key: string, owner: string, fingerprint: string): void {
+    const changed = this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ? AND owner = ? AND fingerprint = ? AND state = 'pending'")
+      .run(key, owner, fingerprint);
+    if (Number(changed.changes) !== 1) throw new Error("IMMEDIATE_CLAIM_CONFLICT");
+  }
+
+  confirmImmediate(key: string, owner: string, fingerprint: string, mediaId: string, now: number): void {
+    const changed = this.db.prepare("UPDATE immediate_publish_claims SET state = 'confirmed', media_id = ?, completed_at = ? WHERE request_key = ? AND owner = ? AND fingerprint = ? AND state = 'pending'")
+      .run(mediaId, now, key, owner, fingerprint);
+    if (Number(changed.changes) !== 1) throw new Error("IMMEDIATE_CLAIM_CONFLICT");
   }
 
   // --- accounts ------------------------------------------------------------
