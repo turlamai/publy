@@ -15,7 +15,10 @@ test("operator requests retain authentication and live feed uses short-lived tic
   const calls: Array<{ url: string; options: any }> = [];
   const sockets: string[] = [];
   const context = vm.createContext({
-    document: { getElementById: element, addEventListener() {}, querySelectorAll() { return []; }, createElement() { return element("created"); } },
+    document: { getElementById: element, addEventListener() {}, querySelectorAll() { return []; }, createElement() {
+      let content = "";
+      return { set textContent(value: unknown) { content = String(value); }, get innerHTML() { return content.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); } };
+    } },
     sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
     localStorage: { getItem() { return null; }, setItem() {} },
     location: { protocol: "https:", port: "", hostname: "example.test" },
@@ -38,4 +41,16 @@ test("operator requests retain authentication and live feed uses short-lived tic
   await context.wsConnect();
   assert.equal(sockets.length, 1, "ticket failure must not fall back to the long-lived key");
   assert.match(element("ws-state").textContent, /连接失败/);
+  context.fetch = async (_url: string, options: any) => {
+    assert.equal(options.headers["x-api-key"], "private-admin-key");
+    return { ok: true, status: 200, json: async () => ({ jobs: [{ id: "job-1", title: "<script>bad</script>", account: "a", runAt: "2026-11-01T00:00:00Z", status: "interrupted" }] }) };
+  };
+  await context.loadJobs();
+  assert.match(element("j-rows").innerHTML, /结果未知，请检查草稿箱/);
+  assert.match(element("j-rows").innerHTML, /&lt;script&gt;/);
+  assert.doesNotMatch(element("j-rows").innerHTML, /<script>/);
+  context.fetch = async () => { throw new Error("offline"); };
+  await context.loadJobs();
+  assert.match(element("jobs-status").textContent, /无法读取任务/);
+  assert.equal(element("j-rows").innerHTML, "");
 });

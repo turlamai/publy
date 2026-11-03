@@ -46,8 +46,10 @@ before deciding whether to submit again: a missing server record does not prove
 that WeChat did not receive the draft.
 
 A self-hosted server also has an operator page at `/admin` for service users,
-WeChat accounts, historical orders and events. It is not a note manager. This
-page is still a development-stage tool; public hosting and checkout are not
+WeChat accounts, scheduled draft tasks, historical orders and events. The
+**Draft tasks** view shows pending, confirmed and unknown outcomes; it does
+not list all immediate submissions or replace checking the WeChat draft box.
+It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
 open. Access it over HTTPS or a trusted private network and keep the admin key
 private. See [operations and backups](operations.md) for server details.
 

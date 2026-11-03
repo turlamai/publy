@@ -1,6 +1,6 @@
 // Admin console — a zero-dependency single-page operator tool.
 //
-// Five tabs: overview, users, orders, accounts, and a LIVE feed wired to
+// Tabs for overview, scheduled drafts, users, orders, accounts, and a LIVE feed wired to
 // the publy-ws event gateway (same admin key). Auth is the admin key in
 // sessionStorage; every data call carries it as x-api-key.
 
@@ -32,6 +32,7 @@ export function adminPage(): string {
 <div id="app" style="display:none">
   <nav class="tabs" id="tabs">
     <button data-tab="overview" class="tab active">概览</button>
+    <button data-tab="jobs" class="tab">草稿任务</button>
     <button data-tab="users" class="tab">用户</button>
     <button data-tab="orders" class="tab">订单</button>
     <button data-tab="accounts" class="tab">账号</button>
@@ -44,12 +45,26 @@ export function adminPage(): string {
       <h3>服务管理</h3>
       <p class="hint">笔记仍在原来的文件夹或 Obsidian 笔记库中管理；公众号草稿请在微信后台查看。此处是自托管服务的开发期管理工具，订单功能仅用于历史数据及隔离测试。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('jobs')">查看草稿任务</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('users')">开通 / 延期用户</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">查看历史订单</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('accounts')">绑定公众号</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('feed')">实时动态</button>
       </div>
       <div class="hint">概览数据在切回本页时自动刷新。</div>
+    </div>
+  </section>
+
+  <section id="tab-jobs" class="panel" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <h3>草稿任务</h3>
+        <button class="btn btn-ghost btn-sm" id="jobs-refresh">刷新</button>
+      </div>
+      <p class="hint">这里只显示服务端排程任务，时间按本机时区显示。已完成表示草稿已创建，不表示公开发布。结果未知时先检查微信公众号草稿箱，再决定后续操作。</p>
+      <div id="jobs-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th></tr></thead>
+      <tbody id="j-rows"></tbody></table>
     </div>
   </section>
 
@@ -216,6 +231,7 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
   document.getElementById('tab-' + name).style.display = 'block';
   if (name === 'overview') loadOverview();
+  if (name === 'jobs') loadJobs();
   if (name === 'users') loadUsers();
   if (name === 'orders') loadOrders();
   if (name === 'accounts') loadAccounts();
@@ -241,6 +257,36 @@ async function loadOverview() {
       + '<div class="stat-t">' + esc(c[0]) + '</div><div class="stat-s">' + esc(c[2]) + '</div></div>';
   }).join('');
 }
+
+/* ---------- scheduled drafts (read only) ---------- */
+async function loadJobs() {
+  var status = document.getElementById('jobs-status'), rows = document.getElementById('j-rows');
+  status.textContent = '正在读取任务…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/jobs');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.jobs)) throw new Error('任务数据格式错误');
+    var labels = { pending: '等待投递', running: '投递中', done: '草稿已确认',
+      failed: '失败，请核对', cancelled: '已取消', interrupted: '结果未知，请检查草稿箱' };
+    if (!data.jobs.length) {
+      rows.innerHTML = '<tr><td colspan="5" class="empty">暂无排程任务</td></tr>';
+    } else {
+      rows.innerHTML = data.jobs.map(function (job) {
+        var when = new Date(job.runAt);
+        var label = Object.prototype.hasOwnProperty.call(labels, job.status) ? labels[job.status] : '状态未知，请检查';
+        return '<tr><td>' + esc(job.title) + '</td><td>' + esc(job.account) + '</td><td>'
+          + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
+          + esc(label) + '</td><td class="key">' + esc(job.id) + '</td></tr>';
+      }).join('');
+    }
+    status.textContent = '共 ' + data.jobs.length + ' 个任务';
+  } catch (error) {
+    status.textContent = '无法读取任务，请检查服务连接和权限后刷新。';
+  }
+}
+document.getElementById('jobs-refresh').onclick = loadJobs;
 
 /* ---------- users ---------- */
 var usersCache = [];
