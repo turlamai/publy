@@ -23,6 +23,28 @@ On Windows, the executable is named `publy-racket-probe.exe`. The distribution i
 
 The GitHub Actions workflow [racket-probe.yml](../.github/workflows/racket-probe.yml) builds/test-packages the probe on Windows/macOS/Linux and uploads temporary **CI artifacts**, not signed public GitHub Releases. CI success on its runner is not clean-user-machine acceptance.
 
+## No-npm Node packaging probe — 2026-11-03
+
+On macOS 26.6.2 arm64, a local candidate was built with Node 26.12.0 and
+pnpm 11.8.0 using `pnpm --filter @turlamai/publy --prod deploy --legacy`.
+The deployed CLI was run using the official Node **22.23.4** macOS arm64
+binary with an empty temporary home and a system-only PATH: `capabilities
+--json` and offline card `preview --json` completed, and preview reported
+`networkUsed:false` and `submitted:false`. One deploy-generated symlink
+pointed back into the source checkout; the probe removed that link and
+repeated the preview successfully. The dependency folder was approximately
+101 MiB and the Node executable 116 MiB before compression.
+
+The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
+`037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
+The signed manifest was not independently verified. This is a local developer
+probe, not a reproducible installer or a release asset. A real package must
+eliminate external symlinks by construction, authenticate the runtime,
+include all required licences, test article/media/math/cards and failure
+paths without source/developer dependencies, and be verified on clean target
+machines including install, update, rollback and uninstall. Windows/Linux,
+x64, executable signing and notarization remain untested.
+
 ## Gate before a full Racket migration
 
 Compare the native probe to a no-npm packaged version of the existing CLI, then verify strict compatibility on synthetic markdown/WeChat HTML, code/math, fonts, image cards, attachment references, `--json`, exit codes and network failure/idempotency semantics. Measure archive size, startup time, memory, install/update/uninstall, native OS warnings and licenses. Only migrate the renderer/server incrementally if those tests prove a net user benefit.
