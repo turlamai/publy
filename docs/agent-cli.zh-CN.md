@@ -106,4 +106,4 @@ publy publish-result <requestId> --json
 
 `account add <name> --json` 返回单个 `account-add` 对象，成功码为 `ACCOUNT_SAVED`，错误码为 `ACCOUNT_NAME_INVALID`、`CONFIG_INVALID` 或 `CONFIG_WRITE_FAILED`。输出不包含 App ID、作者元数据或配置原文；未指定参数会保留原有字段。此操作修改本地配置，Agent 须事先获得用户明确授权。
 
-`publish --json` 收到 `DRAFT_OUTCOME_UNKNOWN` 时返回 `status:"unknown"`、原请求 ID 和退出码 5。服务端会在重启后继续阻止未解决的带键即时请求；请先查询并检查微信草稿箱，不要盲目重发。这是开发版契约，不代表端到端恰好一次。
+`publish --json` 收到 `DRAFT_OUTCOME_UNKNOWN` 时返回 `status:"unknown"`、原请求 ID 和退出码 5。服务端会在重启后继续阻止未解决的带键即时请求；请先查询并检查微信草稿箱，不要盲目重发。服务端返回明确的 `WECHAT_<code>` 拒绝时报告 `rejected`；无法识别的服务错误仍视为未知。这是开发版契约，不代表端到端恰好一次。

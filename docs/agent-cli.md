@@ -38,7 +38,9 @@ A `DRAFT_OUTCOME_UNKNOWN` response to `publish --json` is reported as
 `status:"unknown"` with the original request ID (exit 5). The server keeps an
 unresolved keyed immediate request blocked after restart; query its result and
 inspect WeChat drafts rather than replaying it. This is a development-source
-contract, not an exactly-once guarantee.
+contract, not an exactly-once guarantee. A specific `WECHAT_<code>` response
+from the server is an explicit rejection and is reported as `rejected`;
+unrecognized server failures remain unknown.
 
 `config set <key> <value> --json` returns a single `config-set` object (`CONFIG_SAVED`, `CONFIG_KEY_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`) without ever echoing values, including API keys or credential-bearing URLs. This is a local mutation and requires the operator's approval.
 `jobs cancel --json` and `jobs retry --json` now return structured results,

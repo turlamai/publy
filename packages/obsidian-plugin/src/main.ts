@@ -1630,9 +1630,15 @@ export default class PublyPlugin extends Plugin {
       progress.hide();
       this.status("");
       view?.setPublishing(false);
-      // A server response can itself follow a remote draft attempt. Treat
-      // errors conservatively until the original result is reconciled.
-      // network-level failure: the server may or may not have delivered the
+      const rejection = err as { safeRejection?: boolean; code?: string };
+      if (rejection.safeRejection && rejection.code) {
+        view?.setPublishResult("error", `${t("resultFail")} ·《${title}》→「${submitAccount}」 · ${rejection.code}`);
+        new Notice(t("publishFail", { msg: rejection.code }), 8000);
+        return;
+      }
+      // Other errors may occur after the remote draft attempt. Treat them
+      // conservatively until the original result is reconciled.
+      // The server may or may not have delivered the
       // draft — outcome UNKNOWN, never treated as permission to re-send (#7)
       const key = String(payload.idempotencyKey);
       this.lastAttempt = { payload, key, title, account: submitAccount };
@@ -1653,8 +1659,14 @@ export default class PublyPlugin extends Plugin {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": this.settings.apiKey },
       body: JSON.stringify(payload),
+      throw: false,
     });
     const body = res.json as PublishResponse | null;
+    const code = body && typeof body.code === "string" ? body.code : "";
+    const knownRejection = ((res.status === 400 || res.status === 403 || res.status === 409 || res.status === 429) &&
+      ["BAD_REQUEST", "ACCOUNT_NOT_FOUND", "ACCOUNT_NOT_OWNED", "QUOTA_EXCEEDED", "IDEMPOTENCY_CONFLICT"].includes(code)) ||
+      (res.status === 502 && /^WECHAT_[0-9]{1,12}$/.test(code));
+    if (knownRejection) throw Object.assign(new Error(code), { safeRejection: true, code });
     const validResult = body && typeof body === "object" &&
       (body.scheduled === true
         ? typeof payload.publishAt === "string" && typeof body.jobId === "string" && body.jobId.trim().length > 0

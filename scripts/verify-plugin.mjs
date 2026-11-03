@@ -63,6 +63,7 @@ if (communityOnly) {
 const calls = [];
 let lastSubmitted = null;
 let nextPublishResponse = null;
+let nextPublishStatus = 200;
 let nextQueryResponse = null;
 let lastPreviewHtml = "";
 
@@ -169,7 +170,9 @@ const stub = { Plugin, ItemView, WorkspaceLeaf, Notice, PluginSettingTab, App, S
     calls.push("request:publish");
     const response = nextPublishResponse ?? { mediaId: "SYNTHETIC-DRAFT", account: lastSubmitted.account, title: lastSubmitted.title, requestId: lastSubmitted.idempotencyKey };
     nextPublishResponse = null;
-    return { json: response, status: 200 };
+    const status = nextPublishStatus;
+    nextPublishStatus = 200;
+    return { json: response, status };
   }
   if (new URL(req.url).pathname.startsWith("/v1/publish-result/")) {
     const response = nextQueryResponse ?? { status: "unknown" };
@@ -340,6 +343,23 @@ if (calls.filter((c) => c.startsWith("notice:✅")).length !== confirmedBefore) 
 nextQueryResponse = { status: "confirmed" };
 await inst.queryLastAttempt();
 if (inst.lastAttempt?.key !== ambiguousKey) fail("confirmation without a media ID must remain unknown");
+
+// A clear validation rejection is not confused with a lost draft response.
+inst.lastAttempt = null;
+nextPublishResponse = { code: "ACCOUNT_NOT_OWNED" };
+nextPublishStatus = 403;
+await inst.publishCurrentNote();
+if (inst.lastAttempt !== null) fail("explicit account rejection must not become an unknown draft");
+if (!calls.some((c) => c.includes("ACCOUNT_NOT_OWNED"))) fail("explicit account rejection was not shown");
+nextPublishResponse = { code: "WECHAT_40001" };
+nextPublishStatus = 502;
+await inst.publishCurrentNote();
+if (inst.lastAttempt !== null) fail("explicit WeChat rejection must not become an unknown draft");
+nextPublishResponse = { code: "DRAFT_OUTCOME_UNKNOWN" };
+nextPublishStatus = 409;
+await inst.publishCurrentNote();
+if (!inst.lastAttempt?.key) fail("server unknown response must preserve the request identity");
+inst.lastAttempt = null;
 
 // The broken image may be previewed locally, but must never be submitted.
 const beforeBlocked = calls.filter((c) => c === "request:publish").length;

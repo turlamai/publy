@@ -951,7 +951,8 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     const code = typeof body.code === "string" && /^[A-Z0-9_]{1,64}$/.test(body.code)
       ? body.code : "SERVER_REJECTED";
     console.error(`publy: draft API returned HTTP ${res.status} (${code})`);
-    agentFailure(res.status >= 500 || code === "DRAFT_OUTCOME_UNKNOWN" ? "unknown" : "rejected", code, 5, idempotencyKey);
+    const confirmedRejection = res.status === 502 && /^WECHAT_[0-9]{1,12}$/.test(code);
+    agentFailure((res.status >= 500 && !confirmedRejection) || code === "DRAFT_OUTCOME_UNKNOWN" ? "unknown" : "rejected", code, 5, idempotencyKey);
     return;
   }
 

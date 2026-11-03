@@ -833,6 +833,9 @@ const server = http.createServer((_req, res) => {
   if (key === "bad-response") {
     res.writeHead(200); res.end('{"mediaId":'); return;
   }
+  if (key === "wechat-rejection") {
+    res.writeHead(502); res.end(JSON.stringify({ code: "WECHAT_40001" })); return;
+  }
   if (key === "unknown-claim") {
     res.writeHead(409); res.end(JSON.stringify({ code: "DRAFT_OUTCOME_UNKNOWN" })); return;
   }
@@ -872,6 +875,7 @@ server.listen(0, "127.0.0.1", () => {
       ["invalid-job", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["denied-response", "rejected", "BAD_ARGUMENT"],
       ["unknown-claim", "unknown", "DRAFT_OUTCOME_UNKNOWN"],
+      ["wechat-rejection", "rejected", "WECHAT_40001"],
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
       const runReply = spawnSync(process.execPath,
