@@ -33,7 +33,10 @@ local integration work, not a merge, release, deployed service or sales claim.
   not production integrated. A development-only shadow client signs requests
   against Commerce’s Racket framing and can observe proof responses. A
   separate SQLite quota ledger reserves atomically, holds uncertain results
-  and checks expiry before send. An independent Permit verifier and durable
+  and checks expiry before send. An independent UTC billing-window helper
+  anchors monthly usage windows to the verified paid-period start, clamps
+  end-of-month dates without drift and truncates at paid-through; it is
+  not yet used to admit paid work. An independent Permit verifier and durable
   entitlement revision fence validate synthetic credentials and reject
   rollback. These components are not wired to a user route and cannot grant
   access. The loopback-only synthetic probe
