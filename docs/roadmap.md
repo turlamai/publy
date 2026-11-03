@@ -19,9 +19,13 @@ local integration work, not a merge, release, deployed service or sales claim.
   systems, real Typora/Obsidian source-to-draft walkthrough, and a no-npm
   packaged CLI. Synthetic three-file smoke is not directory listing or a
   desktop/WeChat acceptance (#12/#14/#15/#18/#25/#26/#37).
-- Hosted admission remains closed: the authenticated, transaction-consistent
-  Commerce current-entitlement bridge and Publy's account-bound Permit
-  verification/atomic usage ledger are not production integrated. Complete
+- Hosted admission remains closed: Commerce commit
+  `61d12372f8dcfeb1a9a997f63a07bc5583c226ca` provides a development
+  authenticated proof endpoint, but transaction-consistent refund reads,
+  Publy account-bound Permit verification and its atomic usage ledger are
+  not production integrated. A Publy HMAC signing primitive is checked
+  against Commerce’s Racket output; it does not grant access or call the
+  endpoint. Complete
   #17/#44, the fixed-egress recovery pilot #7/#8, retention/backup and real
   merchant admission before enabling checkout. Free local and self-hosted
   paths stay available.
