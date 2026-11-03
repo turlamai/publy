@@ -35,6 +35,15 @@ pointed back into the source checkout; the probe removed that link and
 repeated the preview successfully. The dependency folder was approximately
 101 MiB and the Node executable 116 MiB before compression.
 
+The internal POSIX script `scripts/build-portable-probe.mjs` now reproduces
+this packaging approach using a supplied matching Node binary and its licence.
+It refuses to overwrite an existing output directory, removes only pnpm's
+known source-checkout self-link and rejects other links escaping the package.
+The launcher, card preview and capability query were exercised with an empty
+home and a system-only PATH. The runtime must be authenticated and supplied
+by the build operator; the script does not authenticate it. It does not yet
+build Windows packages or establish a clean-machine installation guarantee.
+
 The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
 `037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
 The signed manifest was not independently verified. This is a local developer
