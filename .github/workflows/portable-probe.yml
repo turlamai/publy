@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,8 @@ jobs:
           node-version: 22.23.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
-      - name: Package and exercise without a user-installed Node
+      - name: Package and exercise without a user-installed Node (POSIX)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -39,3 +40,40 @@ jobs:
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP/publy-clean-home" "$RUNNER_TEMP/publy-probe/publy" check "$RUNNER_TEMP/publy-input/测试 文章.md" --json > "$RUNNER_TEMP/article-check.json"
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP/publy-clean-home" "$RUNNER_TEMP/publy-probe/publy" preview "$RUNNER_TEMP/publy-input/测试 文章.md" --json --out "$RUNNER_TEMP/article-preview.html" > "$RUNNER_TEMP/article-preview.json"
           node -e 'const f=require("node:fs"),p=require("node:path"),c=require("node:crypto"),t=process.env.RUNNER_TEMP,d=p.join(t,"publy-input");for(const name of ["article-check.json","article-preview.json"]){const r=JSON.parse(f.readFileSync(p.join(t,name)));if(!r.ok||r.networkUsed!==false||r.submitted!==false)process.exit(1)}if(c.createHash("sha256").update(f.readFileSync(p.join(d,"测试 文章.md"))).digest("hex")!==f.readFileSync(p.join(d,"original.sha"),"utf8"))process.exit(1)'
+      - name: Package and exercise without a user-installed Node (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $runtime = (Get-Command node).Source
+          $license = Join-Path (Split-Path $runtime -Parent) "LICENSE"
+          $pnpmEntry = Join-Path (Split-Path $env:PNPM_HOME -Parent) "pnpm\bin\pnpm.cjs"
+          if (!(Test-Path $license) -or !(Test-Path $pnpmEntry)) { throw "Runtime license or pnpm entry missing" }
+          $probe = Join-Path $env:RUNNER_TEMP "Publy Probe"
+          node scripts/build-portable-probe.mjs --runtime $runtime --runtime-license $license --pnpm-entry $pnpmEntry --out $probe
+          if ($LASTEXITCODE -ne 0) { throw "Packaging failed" }
+          $cleanHome = Join-Path $env:RUNNER_TEMP "Publy Clean Home"
+          New-Item -ItemType Directory -Force $cleanHome | Out-Null
+          $inputDir = Join-Path $env:RUNNER_TEMP "Publy Input"
+          New-Item -ItemType Directory -Force (Join-Path $inputDir "素材") | Out-Null
+          [IO.File]::WriteAllBytes((Join-Path $inputDir "素材\封面 图.png"), [Convert]::FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3p8AAAAASUVORK5CYII="))
+          $article = Join-Path $inputDir "测试 文章.md"
+          [IO.File]::WriteAllText($article, "---`ntitle: 安装测试`ncover: 素材/封面 图.png`n---`n`n# 安装测试`n`n公式 `$x^2 + y^2`$。`n`n![图](素材/封面%20图.png)`n", [Text.UTF8Encoding]::new($false))
+          $before = (Get-FileHash $article -Algorithm SHA256).Hash
+          $oldPath, $oldProfile, $oldAppData, $oldLocal = $env:PATH, $env:USERPROFILE, $env:APPDATA, $env:LOCALAPPDATA
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $env:USERPROFILE = $cleanHome; $env:APPDATA = $cleanHome; $env:LOCALAPPDATA = $cleanHome
+            $launcher = Join-Path $probe "publy.cmd"
+            $caps = (& $launcher capabilities --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or $caps.destination -ne "wechat-official-account-drafts") { throw "Capabilities failed" }
+            $card = (& $launcher preview (Join-Path $probe "app\samples\card-sample.md") --json --out (Join-Path $env:RUNNER_TEMP "card-preview.html") | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$card.ok -or $card.networkUsed -or $card.submitted) { throw "Card preview failed" }
+            $check = (& $launcher check $article --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$check.ok -or $check.networkUsed -or $check.submitted) { throw "Article check failed" }
+            $preview = (& $launcher preview $article --json --out (Join-Path $env:RUNNER_TEMP "article-preview.html") | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$preview.ok -or $preview.networkUsed -or $preview.submitted) { throw "Article preview failed" }
+            if ((Get-FileHash $article -Algorithm SHA256).Hash -ne $before) { throw "Source changed" }
+          } finally {
+            $env:PATH = $oldPath; $env:USERPROFILE = $oldProfile; $env:APPDATA = $oldAppData; $env:LOCALAPPDATA = $oldLocal
+          }

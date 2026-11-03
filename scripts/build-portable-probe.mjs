@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Internal POSIX portability probe, not an installer or release pipeline.
+// Internal portability probe, not an installer or release pipeline.
 // Accept an operator-supplied Node runtime; this script does not authenticate it.
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
@@ -11,13 +11,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!["--runtime", "--runtime-license", "--out"].includes(args[i]) || !args[i + 1] || options[args[i]]) {
-    throw new Error("Usage: node scripts/build-portable-probe.mjs --runtime <node> --runtime-license <file> --out <new-directory>");
+  if (!["--runtime", "--runtime-license", "--out", "--pnpm-entry"].includes(args[i]) || !args[i + 1] || options[args[i]]) {
+    throw new Error("Usage: node scripts/build-portable-probe.mjs --runtime <node> --runtime-license <file> --out <new-directory> [--pnpm-entry <pnpm.cjs>]");
   }
   options[args[i]] = path.resolve(args[i + 1]);
 }
 if (!options["--runtime"] || !options["--runtime-license"] || !options["--out"]) throw new Error("All three arguments are required");
-if (process.platform === "win32") throw new Error("This prototype currently supports POSIX hosts only");
+if (process.platform === "win32" && !options["--pnpm-entry"]) throw new Error("Windows requires --pnpm-entry pointing to pnpm.cjs");
 const runtime = fs.realpathSync(options["--runtime"]), license = fs.realpathSync(options["--runtime-license"]);
 const output = options["--out"];
 if (fs.existsSync(output)) throw new Error("Output already exists; choose a new directory");
@@ -30,7 +30,11 @@ if (info.platform !== process.platform || info.arch !== process.arch || Number(i
 }
 fs.mkdirSync(output, { recursive: false, mode: 0o755 });
 const app = path.join(output, "app");
-const result = spawnSync("pnpm", ["--filter", "@turlamai/publy", "--prod", "deploy", "--legacy", app], { cwd: root, stdio: "inherit" });
+const deployArgs = ["--filter", "@turlamai/publy", "--prod", "deploy", "--legacy", app];
+// Invoking pnpm's JavaScript entry avoids shell interpretation of output paths.
+const result = options["--pnpm-entry"]
+  ? spawnSync(process.execPath, [fs.realpathSync(options["--pnpm-entry"]), ...deployArgs], { cwd: root, stdio: "inherit" })
+  : spawnSync("pnpm", deployArgs, { cwd: root, stdio: "inherit" });
 if (result.status !== 0) throw new Error("Dependency deployment failed; inspect the new output directory before removing it");
 // pnpm may place workspace-index links in its shared virtual-store hub.
 // Remove only hub links that resolve exactly to one of this repo's packages;
@@ -57,11 +61,16 @@ function checkLinks(dir) {
 }
 checkLinks(app);
 fs.mkdirSync(path.join(output, "runtime"));
-fs.copyFileSync(runtime, path.join(output, "runtime", "node"));
-fs.chmodSync(path.join(output, "runtime", "node"), 0o755);
+const runtimeName = process.platform === "win32" ? "node.exe" : "node";
+fs.copyFileSync(runtime, path.join(output, "runtime", runtimeName));
+fs.chmodSync(path.join(output, "runtime", runtimeName), 0o755);
 fs.copyFileSync(license, path.join(output, "runtime", "LICENSE"));
 fs.copyFileSync(path.join(root, "LICENSE"), path.join(output, "LICENSE"));
-fs.writeFileSync(path.join(output, "publy"), '#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$HERE/runtime/node" "$HERE/app/dist/index.js" "$@"\n', { mode: 0o755 });
+if (process.platform === "win32") {
+  fs.writeFileSync(path.join(output, "publy.cmd"), '@echo off\r\n"%~dp0runtime\\node.exe" "%~dp0app\\dist\\index.js" %*\r\n');
+} else {
+  fs.writeFileSync(path.join(output, "publy"), '#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$HERE/runtime/node" "$HERE/app/dist/index.js" "$@"\n', { mode: 0o755 });
+}
 const hash = crypto.createHash("sha256").update(fs.readFileSync(runtime)).digest("hex");
 fs.writeFileSync(path.join(output, "PROBE.json"), JSON.stringify({ status: "development-only", node: info, runtimeSha256: hash }, null, 2) + "\n");
 console.log("Built development-only probe:", output);
