@@ -24,16 +24,33 @@ const freePort = await new Promise((resolve, reject) => {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-commerce-shadow-"));
 const file = path.join(dir, "fixture.rkt");
 fs.writeFileSync(file, String.raw`#lang racket/base
-(require commerce/hosted-http commerce/hosted-replay/sqlite commerce/storage/sqlite
-         permit/trust permit/issuer)
+(require commerce commerce/issuer commerce/journal commerce/permit commerce/provider
+         commerce/hosted-http commerce/hosted-replay/sqlite commerce/storage commerce/storage/sqlite
+         permit/trust permit/issuer file/sha1)
 (define dir (getenv "PUBLY_FIXTURE_DIR"))
 (define store (open-sqlite-commerce-storage (build-path dir "commerce.sqlite")))
 (define nonce-path (build-path dir "nonces.sqlite"))
 (initialize-sqlite-hosted-replay-store! nonce-path)
-(define-values (_private public) (generate-ed25519-keypair))
+(define-values (private public) (generate-ed25519-keypair))
 (define trust (jsexpr->trust-store (hasheq 'protocol "permit-trust-store" 'version 1 'issuer "issuer"
   'keys (hasheq 'test (hasheq 'algorithm "Ed25519" 'public_key (public-key->base64 public)
   'status "active" 'purposes '("entitlement") 'not_before 'null 'not_after 'null)))))
+;; Entire payment/issuance fixture is synthetic and stays inside a temporary DB.
+(define amount (money "CNY" 2900))
+(define catalog (make-permit-policy-catalog
+  (list (offer "personal-monthly" "publy" 'one-time amount "publy-personal-test"))
+  (list (make-permit-entitlement-policy "publy-personal-test" 1 #:subject-type 'account
+    #:grants (list (make-permit-grant-policy #:products '("publy") #:edition "personal"))
+    #:constraints (make-permit-constraints-policy #:use-expires-at "2099-01-01T00:00:00Z")))))
+(define worker (make-issuance-worker #:catalog catalog #:issuer "issuer" #:private-key private
+  #:key-id "test" #:trust-store trust #:clock (lambda () (values 100 "2026-10-17T03:00:00Z"))))
+(define raw #"synthetic-payment")
+(journal-accept! store raw (make-verified-payment-event "mock" "payment-1"
+  (bytes->hex-string (sha256-bytes raw)) 'payment-succeeded "order-1" "personal-monthly" "customer-a" amount 98)
+  #:received-at 99)
+(storage-project-next! store #:processed-at 99)
+(unless (eq? (issuance-result-disposition (process-issuance-work! worker store)) 'completed)
+  (error 'fixture "synthetic entitlement issuance failed"))
 (define endpoint (make-hosted-proof-http-endpoint #:storage store #:trust-store trust
   #:resolve-key (lambda (id) (and (equal? id "publy-service") (make-bytes 32 107)))
   #:allow-scope (lambda (service issuer type subject offer product)
@@ -41,7 +58,6 @@ fs.writeFileSync(file, String.raw`#lang racket/base
          (equal? subject "customer-a") (equal? offer "personal-monthly") (equal? product "publy")))
   #:claim-once! (make-sqlite-hosted-replay-claimer nonce-path)))
 (serve-hosted-proof-http-endpoint endpoint #:port (string->number (getenv "PUBLY_FIXTURE_PORT")) #:listen-ip "127.0.0.1")
-(sync (make-semaphore))
 `);
 const child = spawn("racket", [file], { env: { ...process.env, PUBLY_FIXTURE_DIR: dir,
   PUBLY_FIXTURE_PORT: String(freePort), PLTCOLLECTS: commerce + path.delimiter + (process.env.PLTCOLLECTS ?? "") }, stdio: ["ignore", "pipe", "pipe"] });
@@ -64,13 +80,15 @@ try {
   const request = { endpoint, serviceId: "publy-service", secret: Buffer.alloc(32, 107), scope,
     minimumRevision: null, expectedEntitlementId: null };
   const allowedScope = await observeHostedProof(request);
+  if (allowedScope.status !== "verified-proof" || allowedScope.canAuthorize !== false) throw new Error("Synthetic signed proof was not observed");
+  const stale = await observeHostedProof({ ...request, minimumRevision: allowedScope.revision + 1, expectedEntitlementId: allowedScope.entitlementId });
   const forbiddenScope = await observeHostedProof({ ...request, scope: { ...scope, subjectId: "other-account" } });
-  if (allowedScope.status !== "no-proof" || allowedScope.canAuthorize !== false || forbiddenScope.status !== "unavailable") {
-    throw new Error("Commerce shadow interoperability or scope isolation failed");
+  if (stale.status !== "no-proof" || forbiddenScope.status !== "unavailable") {
+    throw new Error("Commerce revision fence or scope isolation failed");
   }
-  console.log("PASS — scoped synthetic Commerce request accepted; cross-account request denied; no access granted");
+  console.log("PASS — synthetic signed proof observed; stale revision and cross-account request denied; no access granted");
 } finally {
-  if (!childError) child.kill("SIGINT");
+  if (!childError) child.kill("SIGTERM");
   if (!childError && child.exitCode === null && child.signalCode === null) await new Promise((resolve) => child.once("exit", resolve));
   fs.rmSync(dir, { recursive: true, force: true });
 }

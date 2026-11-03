@@ -29,8 +29,9 @@ local integration work, not a merge, release, deployed service or sales claim.
   and checks expiry before send; neither component is wired to a user route
   or grants access. The loopback-only synthetic probe
   `COMMERCE_ROOT=<pinned-checkout> node scripts/verify-commerce-shadow.mjs`
-  verifies request authentication and cross-account denial against the real
-  Commerce HTTP listener; it does not test a paid entitlement. Billing-window policy, known-failure reconciliation,
+  uses synthetic payment and signing fixtures against the Commerce HTTP
+  listener to check signed-proof transport, stale revision and cross-account
+  denial. It does not verify a real payment or grant product access. Billing-window policy, known-failure reconciliation,
   current-entitlement rechecks and full deployment recovery remain open. Complete
   #17/#44, the fixed-egress recovery pilot #7/#8, retention/backup and real
   merchant admission before enabling checkout. Free local and self-hosted
