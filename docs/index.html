@@ -1,346 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Publy — The agent-era publishing pipeline for WeChat</title>
-    <meta name="description" content="Write in Obsidian, let your agent publish. One CLI for Markdown typesetting and image-post card rendering, offline built-in themes and a self-hosted server for WeChat draft delivery. Standalone theme bundles are not yet available.">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,500&display=swap" rel="stylesheet">
-    <script>document.documentElement.classList.add('js-anim')</script>
-    <style>
-        :root {
-            --accent: #07C160;
-            --accent-hover: #06AD56;
-            --accent-soft: rgba(7, 193, 96, 0.15);
-            --accent-tint: rgba(7, 193, 96, 0.08);
-            --accent-bright: #4ADE8C;
-        }
-
-        .showcase-img {
-            width: 100%;
-            border-radius: var(--radius-m);
-            box-shadow: var(--shadow-window);
-            border: 1px solid var(--border);
-            display: block;
-        }
-    </style>
-<script>
-var _hmt = _hmt || [];
-(function() {
-  var hm = document.createElement("script");
-  hm.src = "https://hm.baidu.com/hm.js?8e2445912635226bcba0c400bfb6079d";
-  var s = document.getElementsByTagName("script")[0];
-  s.parentNode.insertBefore(hm, s);
-})();
-</script>
-<style>
-  #product-support { display:flex; flex-wrap:wrap; justify-content:center; gap:12px 24px; padding:24px; font:inherit; border-top:1px solid var(--border, #a8a29e); }
-  #product-support a:focus-visible { outline:2px solid currentColor; outline-offset:4px; }
-  html:lang(en) #product-support .support-zh, html:lang(zh) #product-support .support-en { display:none; }
-</style>
-<style id="product-start-style">
-.product-availability{font-size:.95rem;line-height:1.65;max-width:72ch;margin:18px 0;opacity:.85} .hero .product-availability{margin-left:auto;margin-right:auto}
-.product-start{max-width:1120px;margin:64px auto;padding:32px 24px;border-top:1px solid var(--border,#aaa);font:inherit;line-height:1.65}
-.product-start h2{font-size:clamp(1.7rem,3vw,2.4rem);letter-spacing:-.025em;margin:0 0 16px}.product-start h3{font-size:1.05rem;margin:0 0 10px}.product-start p{margin:0 0 16px;max-width:74ch}.product-start-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin:28px 0}.product-start a{text-decoration:underline;text-underline-offset:4px;overflow-wrap:anywhere}.product-start a:focus-visible{outline:2px solid currentColor;outline-offset:5px}.product-start .start-links{display:flex;gap:16px 24px;flex-wrap:wrap}.product-start .start-status{font-weight:600}.product-start .start-limits{font-size:.95em}
-html:lang(en) .reader-zh,html:lang(zh) .reader-en{display:none!important}@media(max-width:700px){.product-start{margin:40px auto;padding:24px 20px}.product-start-grid{grid-template-columns:1fr;gap:18px}}
-</style>
-<style>.lang-menu li.lang-choice{padding:0}.lang-menu .lang-choice button{display:block;width:100%;padding:8px 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.lang-menu .lang-choice button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;border-radius:4px}</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Write in Obsidian or Typora, preview locally, and deliver a carefully formatted draft to your WeChat Official Account.">
+  <title>Publy — From your notes to a WeChat draft</title>
+  <style>
+    :root{color-scheme:light;--ink:#14271d;--muted:#607168;--paper:#f8f8f2;--line:#dbe3da;--green:#176842;--soft:#e5f1e6;--white:#fff;--serif:Georgia,"Songti SC","Noto Serif SC",serif;--sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.7}a{color:inherit}button,a{-webkit-tap-highlight-color:transparent}a:focus-visible,button:focus-visible{outline:3px solid #e39849;outline-offset:4px}button{font:inherit}svg{display:block}.wrap{width:min(1180px,calc(100% - 56px));margin:auto}.top{border-bottom:1px solid var(--line)}.nav{min-height:80px;display:flex;align-items:center;justify-content:space-between;gap:28px}.brand{display:inline-flex;align-items:center;gap:10px;font-weight:750;font-size:21px;letter-spacing:-.04em;text-decoration:none}.brand-mark{width:31px;height:31px;border-radius:9px;background:var(--green);display:grid;place-items:center;color:#fff;font-size:23px;line-height:1}.nav-right,.nav-links,.languages{display:flex;align-items:center;gap:26px}.nav-links a{text-decoration:none;color:#52645a;font-size:14px;font-weight:600}.nav-links a:hover,.text-link:hover{color:var(--green)}.languages{gap:4px;padding:3px;border:1px solid var(--line);border-radius:99px}.languages button{border:0;border-radius:99px;background:transparent;color:var(--muted);padding:4px 9px;font-size:12px;cursor:pointer}.languages button[aria-pressed=true]{background:var(--ink);color:#fff}
+    .hero{padding:102px 0 94px;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.14em;text-transform:uppercase;color:var(--green);display:flex;align-items:center;gap:9px}.eyebrow:before{content:"";width:8px;height:8px;background:#5ba97a;border-radius:50%}h1,h2,h3,p{margin-top:0}h1{font-family:var(--serif);font-weight:500;letter-spacing:-.055em;line-height:1.08;font-size:clamp(48px,5.6vw,76px);margin:23px 0 24px}h1 em{font-weight:400;color:var(--green)}.intro{font-size:18px;line-height:1.8;color:#52655b;max-width:510px;margin-bottom:30px}.buttons{display:flex;flex-wrap:wrap;gap:12px}.button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:11px 20px;border-radius:9px;text-decoration:none;font-size:14px;font-weight:700;border:1px solid var(--line);background:transparent}.button.primary{background:var(--green);color:white;border-color:var(--green)}.button.primary:hover{background:#0d5030}.button:not(.primary):hover{background:white}.hero-note{margin:19px 0 0;color:var(--muted);font-size:13px}
+    .preview-shell{position:relative;background:#dcebdd;border:1px solid #cbded0;border-radius:22px;padding:38px 42px 32px;min-height:492px;box-shadow:0 22px 60px #223b2510}.preview-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;font-size:11px;letter-spacing:.08em;font-weight:700;text-transform:uppercase;color:#55715c}.preview-top span:last-child{font-weight:500;letter-spacing:0;text-transform:none}.paper{background:#fff;border:1px solid #e0e9df;border-radius:12px;padding:32px 34px 28px;min-height:328px;box-shadow:0 12px 30px #1a362018}.paper-meta{font-size:10px;color:#83948a;letter-spacing:.1em;text-transform:uppercase}.paper h2{font-family:var(--serif);font-weight:500;font-size:26px;letter-spacing:-.03em;line-height:1.3;margin:16px 0 12px}.paper p{font-size:12px;color:#607067;line-height:1.8;margin-bottom:16px}.paper-line{height:6px;border-radius:9px;background:#eef2ec;margin:10px 0}.paper-line.short{width:58%}.paper-quote{padding:11px 14px;background:#f1f7ee;border-left:3px solid #a8cdb0;font-size:12px;color:#42634b;margin-top:18px}.preview-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:17px;font-size:11px;color:#587260}.pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d9e8d9;border-radius:99px;padding:5px 10px;color:#246640;font-weight:650}.pill:before{content:"";width:6px;height:6px;background:#4ba870;border-radius:50%}
+    .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.strip-inner{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:24px 0;color:#52645b;font-size:13px}.strip strong{color:var(--ink);font-size:14px}.section{padding:112px 0}.section-heading{display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:40px;margin-bottom:48px}.kicker{color:var(--green);font-size:12px;letter-spacing:.14em;font-weight:750;text-transform:uppercase}.section h2{font-family:var(--serif);font-weight:500;font-size:clamp(35px,4vw,50px);line-height:1.2;letter-spacing:-.04em;margin:12px 0 0}.section-heading p{color:var(--muted);max-width:470px;margin:0}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}.step{background:#fbfcf8;padding:32px;min-height:240px}.step-num{font-family:var(--serif);font-style:italic;font-size:15px;color:#77a285}.step h3{font-size:18px;letter-spacing:-.02em;margin:32px 0 9px}.step p{font-size:14px;color:var(--muted);margin:0;line-height:1.8}.detail{background:#edf3eb;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:100px}.detail-copy>p{color:var(--muted);max-width:480px;margin:20px 0 0}.details{display:grid;gap:0}.detail-row{padding:20px 0;border-bottom:1px solid #d1dfd2;display:grid;grid-template-columns:130px 1fr;gap:18px}.detail-row:first-child{padding-top:0}.detail-row strong{font-size:14px}.detail-row p{font-size:14px;color:var(--muted);margin:0}.availability{display:grid;grid-template-columns:1fr 1fr;gap:100px}.availability p{color:var(--muted);margin:20px 0 24px;max-width:490px}.notice{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px 30px}.notice h3{font-size:16px;margin:0 0 10px}.notice p{font-size:14px;margin:0 0 16px;line-height:1.8}.text-link{font-weight:700;font-size:14px;text-decoration:none}.text-link span{padding-left:5px}.footer{border-top:1px solid var(--line);padding:30px 0 42px}.footer-inner{display:flex;justify-content:space-between;gap:24px;align-items:center}.footer-copy{font-size:12px;color:var(--muted);margin:5px 0 0}.footer-links{display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:var(--muted)}.footer-links a{text-decoration:none}
+    [data-lang]{display:none}html[lang=en] [data-lang=en],html[lang=zh-CN] [data-lang=zh]{display:revert}@media(max-width:820px){.nav-links{display:none}.hero{grid-template-columns:1fr;gap:45px;padding:68px 0}.preview-shell{max-width:570px;min-height:0}.strip-inner{flex-wrap:wrap;gap:12px 28px}.section{padding:76px 0}.section-heading,.detail-grid,.availability{grid-template-columns:1fr;gap:24px}.steps{grid-template-columns:1fr}.step{min-height:0}.step h3{margin-top:18px}.detail-grid,.availability{gap:40px}.footer-inner{align-items:flex-start;flex-direction:column}}@media(max-width:480px){.wrap{width:calc(100% - 36px)}.nav{min-height:68px}.hero{padding:54px 0}.preview-shell{padding:25px 20px}.paper{padding:25px 22px}.detail-row{grid-template-columns:1fr;gap:4px}.button{width:100%}.footer-links{gap:14px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
 </head>
-
 <body>
-
-    <!-- Nav -->
-    <nav class="nav-container">
-        <div class="nav-wrapper">
-            <div class="nav-brand">
-                <svg class="nav-logo" width="28" height="28" viewBox="0 0 512 512" fill="none">
-                    <rect width="512" height="512" rx="115" fill="#07C160"/>
-                    <path d="M256 384 V176" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
-                    <path d="M162 270 L256 176 L350 270" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Publy
-            </div>
-            <ul class="nav-menu">
-                <li><a href="#features" class="optional" data-en="Features" data-zh="功能">Features</a></li>
-                <li><a href="#start" data-en="How it works" data-zh="工作流">How it works</a></li>
-                <li><a href="#docs" class="optional" data-en="Help" data-zh="帮助">Help</a></li>
-                <li><a href="https://github.com/turlamai/publy" class="optional">GitHub</a></li>
-                <li class="lang-dropdown-wrapper">
-                    <button class="lang-btn" onclick="void 0">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="2" y1="12" x2="22" y2="12"></line>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                        </svg>
-                        <span id="current-lang-label" data-en="English" data-zh="简体中文">English</span>
-                    </button>
-                    <ul class="lang-menu">
-                        <li class="lang-choice"><button type="button" onclick="setLanguage('en')">English</button></li>
-                        <li class="lang-choice"><button type="button" onclick="setLanguage('zh')">简体中文</button></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
-    </nav>
-
-    <!-- Hero -->
-    <section class="hero" id="overview">
-        <div class="container">
-            <span class="eyebrow animate-on-scroll" data-en="Open source · AGPL-3.0 · CLI and Obsidian workflows" data-zh="开源 · AGPL-3.0 · CLI 与 Obsidian 工作流">Open source · AGPL-3.0 · CLI and Obsidian workflows</span>
-            <h1 class="animate-on-scroll">
-                <span data-en="Write in Obsidian." data-zh="写作留在 Obsidian，">Write in Obsidian.</span>
-                <span class="accent" data-en="Publish with your agent." data-zh="发布交给 agent。">Publish with your agent.</span>
-            </h1>
-            <p class="lead animate-on-scroll"
-                data-en="Publy is the agent-era publishing pipeline for WeChat Official Accounts: a CLI for Markdown typesetting and image-post card rendering, a self-hosted server for draft delivery, and a theme gallery for distribution — no GUI, no copy-pasting into the WeChat backend."
-                data-zh="Publy 是 agent 时代的微信公众号发布管线：一个 CLI 负责排版与图片消息渲染，一个自托管服务负责草稿投递，一个主题画廊负责排版资产分发——没有 GUI，没有「复制粘贴进公众号后台」。">
-                Publy is the agent-era publishing pipeline for WeChat Official Accounts: a CLI for typesetting and card rendering, a self-hosted server for draft delivery, and a theme gallery.
-            </p>
-
-            <p class="lead" data-en="Free local tools and self-hosting. Public hosting is not open for registration or payment." data-zh="本地工具与自托管免费。公开托管尚未开放注册或付款。">Free local tools and self-hosting. Public hosting is not open for registration or payment.</p>
-            <div class="hero-buttons animate-on-scroll">
-                <a href="https://github.com/turlamai/publy/blob/main/docs/distribution.md" class="btn btn-primary" data-en="Distribution status" data-zh="发行进度">Distribution status</a>
-                <a data-en-href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md" class="btn btn-secondary" data-en="User guide" data-zh="使用手册">User guide</a>
-                <a href="https://themes.publy.jrtx.site/" class="btn btn-secondary" data-en="Theme gallery" data-zh="主题画廊">Theme gallery</a>
-            </div>
-
-            <div class="hero-visual animate-on-scroll">
-                <div class="code-window">
-                    <div class="window-header">
-                        <div class="window-controls">
-                            <div class="traffic-light close"></div>
-                            <div class="traffic-light minimize"></div>
-                            <div class="traffic-light maximize"></div>
-                        </div>
-                        <div class="window-title">terminal</div>
-                    </div>
-                    <div class="code-body"><span class="comment"># CLI source-build demo; standalone installers are in development</span>
-<span class="prompt">$</span> <span class="cmd">publy preview article.md</span>
-
-<span class="comment"># the whole publishing flow, from the editor</span>
-<span class="prompt">$</span> <span class="cmd">publy publish article.md</span>
-<span class="ok">✓</span> typeset · cover uploaded · <span class="str">draft ready</span>
-
-<span class="prompt">$</span> <span class="cmd">publy card post.md --theme naive</span>
-<span class="ok">✓</span> 6 cards · 3:4 · <span class="str">1.8s</span> · pixel-exact glyphs</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features -->
-    <section id="features">
-        <div class="container">
-            <span class="eyebrow animate-on-scroll" data-en="What Publy does" data-zh="Publy 做什么">What Publy does</span>
-            <h2 class="section-title animate-on-scroll">
-                <span data-en="One pipeline," data-zh="一条管线，">One pipeline,</span>
-                <span class="accent" data-en="three moving parts." data-zh="三个部件。">three moving parts.</span>
-            </h2>
-
-            <div class="bento-grid">
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                    </div>
-                    <h3 data-en="Publish in one command" data-zh="一条命令发布">Publish in one command</h3>
-                    <p data-en="publy publish a.md — Markdown goes in, a typeset WeChat draft comes out. No GUI, no copy-pasting into the official backend."
-                       data-zh="publy publish a.md——Markdown 进，排好版的公众号草稿出。没有 GUI，没有「复制粘贴进公众号后台」。">publy publish a.md — Markdown in, a typeset WeChat draft out. No GUI, no copy-pasting.</p>
-                </div>
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l4-4 4 4 5-5 5 5"/></svg>
-                    </div>
-                    <h3 data-en="Image posts as a first-class citizen" data-zh="图片消息是一等公民">Image posts as a first-class citizen</h3>
-                    <p data-en="publy card post.md deterministically renders themed 3:4 cards — pixel-exact CJK glyphs in seconds, not AI-generated images."
-                       data-zh="publy card post.md 确定性渲染主题化 3:4 卡片——像素级正确的汉字，秒级出图，不靠 AI 生图。">Deterministic themed 3:4 cards — pixel-exact CJK glyphs in seconds, not AI images.</p>
-                </div>
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    </div>
-                    <h3 data-en="Theme previews and styles" data-zh="主题预览与样式">Theme previews and styles</h3>
-                    <p data-en="Preview built-in article and card themes locally. A standalone, no-npm theme bundle installer is planned but not available yet."
-                       data-zh="内置文章与卡片主题可在本地预览；无需 npm 的独立主题包安装功能仍在开发中。">Built-in theme previews work offline; external theme installation is not available yet.</p>
-                </div>
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="12" cy="15" r="2"/></svg>
-                    </div>
-                    <h3 data-en="Self-hosted delivery; hosting planned" data-zh="自托管投递；托管服务规划中">Self-hosted delivery; hosting planned</h3>
-                    <p data-en="Run your own server for account credentials and draft delivery. Public hosted accounts and payment are not open."
-                       data-zh="用自己的服务器管理账号凭据与草稿投递；公开托管账号与支付尚未开放。">Self-hosted account credentials and draft delivery; public hosting is planned.</p>
-                </div>
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                    </div>
-                    <h3 data-en="Official API only" data-zh="只走官方 API">Official API only</h3>
-                    <p data-en="No account emulation, no browser automation. Publy speaks the WeChat Official Accounts API and nothing else — account permissions and deployment requirements still apply."
-                       data-zh="不做账号模拟，不做浏览器自动化。Publy 只讲微信公众号官方 API 这一种协议——仍需满足账号权限与实际部署要求。">No account emulation, no browser automation — account permissions and deployment requirements still apply.</p>
-                </div>
-                <div class="bento-card animate-on-scroll">
-                    <div class="card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-                    </div>
-                    <h3 data-en="Open core, no lock-in" data-zh="开源核心，不做锁定">Open core, no lock-in</h3>
-                    <p data-en="The CLI and a self-hostable server are AGPL-3.0 — local tools and a self-hostable server. Public hosting is planned and not open."
-                       data-zh="CLI 与自托管 server 均为 AGPL-3.0——与云服务同一份代码。今天就能自托管，在意可靠性时再升级云服务。">CLI and self-hostable server under AGPL-3.0 — the same code the cloud runs.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- How it works -->
-    <section id="start">
-        <div class="container">
-            <span class="eyebrow animate-on-scroll" data-en="How it works" data-zh="工作流">How it works</span>
-            <h2 class="section-title animate-on-scroll" data-en="Preview locally. Deliver a draft. Confirm it." data-zh="三条命令，从草稿到发表。">Preview locally. Deliver a draft. Confirm it.</h2>
-
-            <div class="hero-visual animate-on-scroll" style="margin-top: 40px;">
-                <div class="code-window">
-                    <div class="window-header">
-                        <div class="window-controls">
-                            <div class="traffic-light close"></div>
-                            <div class="traffic-light minimize"></div>
-                            <div class="traffic-light maximize"></div>
-                        </div>
-                        <div class="window-title">terminal</div>
-                    </div>
-                    <div class="code-body"><span class="comment"># article: typeset and stage a WeChat draft</span>
-<span class="prompt">$</span> <span class="cmd">publy publish article.md</span>
-<span class="ok">✓</span> cover uploaded · <span class="str">draft ready in the official backend</span>
-
-<span class="comment"># image-post: themed 3:4 cards, deterministically rendered</span>
-<span class="prompt">$</span> <span class="cmd">publy card post.md --theme naive</span>
-<span class="ok">✓</span> 6 cards · <span class="str">1.8s</span> · pixel-exact glyphs
-
-<span class="comment"># preview a bundled theme before using it</span>
-<span class="prompt">$</span> <span class="cmd">publy theme preview claude</span></div>
-                </div>
-            </div>
-
-            <div class="callout animate-on-scroll">
-                <strong data-en="Development preview." data-zh="开发预览。">Development preview.</strong><span data-en="Local rendering and self-hosted delivery components exist. Public registration, payment and reliable multi-tenant operation still need qualification." data-zh="本地渲染与自托管投递组件已存在；公开注册、支付与可靠多租户运营仍需验收。"> Local rendering and self-hosted delivery are available; public hosting is not open.</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Design docs -->
-    <section id="docs"><div class="container"><h2 class="reader-en " lang="en">Help for your first delivery</h2><h2 class="reader-zh " lang="zh">首次投递的帮助</h2><div class="bento-grid"><div class="bento-card"><a class="reader-en" lang="en" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md">Install and use</a><a class="reader-zh" lang="zh" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md">安装与使用</a></div><div class="bento-card"><a class="reader-en" lang="en" href="https://github.com/turlamai/publy/blob/main/docs/privacy.md">Data and privacy</a><a class="reader-zh" lang="zh" href="https://github.com/turlamai/publy/blob/main/docs/privacy.zh-CN.md">数据与隐私</a></div><div class="bento-card"><a class="reader-en" lang="en" href="https://github.com/turlamai/publy/blob/main/docs/terms.md">Service availability</a><a class="reader-zh" lang="zh" href="https://github.com/turlamai/publy/blob/main/docs/terms.zh-CN.md">服务可用状态</a></div></div></div></section>
-
-    <!-- Footer -->
-    <section id="start-here" class="product-start" aria-label="Get started / 开始使用">
-<h2 class="reader-en " lang="en">Start with one useful session.</h2><h2 class="reader-zh " lang="zh">从一次有效使用开始。</h2><p class="reader-en start-status" lang="en">CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.</p><p class="reader-zh start-status" lang="zh">CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。</p><p class="reader-en " lang="en">Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.</p><p class="reader-zh " lang="zh">目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。</p><div class="product-start-grid"><article><h3 class="reader-en " lang="en">01</h3><h3 class="reader-zh " lang="zh">01</h3><p class="reader-en " lang="en">Install from the source instructions and preview a non-sensitive Markdown article locally before configuring delivery.</p><p class="reader-zh " lang="zh">按源码安装说明安装，先在本地预览一篇非敏感 Markdown，再配置投递。</p></article><article><h3 class="reader-en " lang="en">02</h3><h3 class="reader-zh " lang="zh">02</h3><p class="reader-en " lang="en">Configure your own server and account, whitelist its actual outbound IP, and keep AppSecret on that server. Use HTTPS or a private tunnel for access.</p><p class="reader-zh " lang="zh">配置自己的服务器与账号，将真实出口 IP 加入白名单，AppSecret 仅放在服务端。访问使用 HTTPS 或私有隧道。</p></article><article><h3 class="reader-en " lang="en">03</h3><h3 class="reader-zh " lang="zh">03</h3><p class="reader-en " lang="en">Publish one test draft and confirm its result in the WeChat backend. A delivered draft is not a publicly published or mass-sent article.</p><p class="reader-zh " lang="zh">投递一份测试草稿，在微信后台确认结果。草稿投递成功不等于文章已公开发布或群发。</p></article></div><p class="reader-en start-limits" lang="en">Public hosted registration, payment, tenant isolation, retention/deletion and reliable job recovery are not yet qualified (<a href="https://github.com/turlamai/publy/issues/7">#7</a>, <a href="https://github.com/turlamai/publy/issues/8">#8</a>). Do not send AppSecret to an unannounced hosted endpoint or an issue.</p><p class="reader-zh start-limits" lang="zh">公开托管注册、支付、租户隔离、留存删除与可靠任务恢复尚未通过验收（<a href="https://github.com/turlamai/publy/issues/7">#7</a>、<a href="https://github.com/turlamai/publy/issues/8">#8</a>）。不要将 AppSecret 发往未公告的托管端点或 issue。</p><div class="start-links"><a class="reader-en" lang="en" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md">Installation, privacy &amp; recovery</a><a class="reader-zh" lang="zh" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md">安装、隐私与恢复</a><a href="https://github.com/turlamai/publy/issues"><span class="reader-en " lang="en">Get help</span><span class="reader-zh " lang="zh">反馈与帮助</span></a></div>
-</section>
-<footer>
-        <div class="footer-content">
-            <div class="footer-brand">
-                <svg width="22" height="22" viewBox="0 0 512 512" fill="none">
-                    <rect width="512" height="512" rx="115" fill="#07C160"/>
-                    <path d="M256 384 V176" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round"/>
-                    <path d="M162 270 L256 176 L350 270" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Publy
-            </div>
-            <div class="footer-links">
-                <a href="https://github.com/turlamai/publy">GitHub</a>
-                <a href="https://themes.publy.jrtx.site/" data-en="Theme gallery" data-zh="主题画廊">Theme gallery</a>
-                <a href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md" data-en="User guide" data-zh="使用指南">User guide</a>
-                <a href="https://github.com/turlamai/publy/blob/main/LICENSE">AGPL-3.0 License</a>
-            </div>
-            <div class="footer-note">© 2026 turlamai</div>
-        </div>
-    </footer>
-<nav id="product-support" aria-label="Support / 支持"><a href="https://github.com/turlamai/publy/issues"><span class="support-zh">反馈</span><span class="support-en" lang="en">Feedback</span></a> <a href="https://github.com/turlamai/publy/releases"><span class="support-zh">发布与更新</span><span class="support-en" lang="en">Releases</span></a> <a href="https://github.com/turlamai/publy/blob/main/LICENSE"><span class="support-zh">源码许可</span><span class="support-en" lang="en">Source license</span></a> <a class="support-zh" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md">使用与帮助</a> <a class="support-en" lang="en" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md">Usage & help</a></nav>
-
-    <script>
-        // Unified language policy for product sites:
-        // - explicit user choice persists and always wins;
-        // - otherwise follow the browser/system locale on every visit;
-        // - zh* => Simplified Chinese, other known locales => English;
-        // - if no locale is available at all, fall back to Chinese.
-        //
-        // `site-lang` is deliberately treated as legacy because older versions
-        // could not distinguish a user click from an automatically applied value.
-        var LANGUAGE_OVERRIDE_KEY = 'publy-lang-override-v2';
-        var LEGACY_LANGUAGE_KEY = 'site-lang';
-        var pageMetadata = {
-            en: {
-                title: 'Publy — The agent-era publishing pipeline for WeChat',
-                description: 'Write in Obsidian, let your agent publish. One CLI for Markdown typesetting and image-post card rendering, bundled themes and a theme gallery, and a self-hosted server for WeChat draft delivery.'
-            },
-            zh: {
-                title: 'Publy — agent 时代的公众号发布管线',
-                description: '写作留在 Obsidian，发布交给 agent。一个 CLI 负责排版与图片消息渲染，主题预览与样式，托管服务负责稳定发布。'
-            }
-        };
-
-        function readLanguageOverride() {
-            try {
-                var saved = localStorage.getItem(LANGUAGE_OVERRIDE_KEY);
-                return saved === 'zh' || saved === 'en' ? saved : null;
-            } catch (e) {
-                return null;
-            }
-        }
-
-        function detectBrowserLanguage() {
-            var locale = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-            if (!locale) return 'zh';
-            return String(locale).toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
-        }
-
-        function applyLanguage(lang, persist) {
-            if (persist) {
-                try { localStorage.setItem(LANGUAGE_OVERRIDE_KEY, lang); } catch (e) { /* private mode */ }
-            }
-
-            document.querySelectorAll('[data-en]').forEach(function (el) {
-                var text = el.getAttribute('data-' + lang);
-                if (text !== null) el.textContent = text;
-            });
-            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-            document.querySelectorAll('[data-en-href]').forEach(function(el){ el.href = el.getAttribute('data-' + lang + '-href'); });
-            document.documentElement.setAttribute('data-language', lang);
-
-            var label = document.getElementById('current-lang-label');
-            if (label) label.textContent = lang === 'zh' ? '简体中文' : 'English';
-
-            var metadata = pageMetadata[lang];
-            if (metadata) {
-                document.title = metadata.title;
-                var description = document.querySelector('meta[name="description"]');
-                if (description) description.setAttribute('content', metadata.description);
-            }
-        }
-
-        function setLanguage(lang) {
-            if (lang !== 'zh' && lang !== 'en') return;
-            applyLanguage(lang, true);
-        }
-
-        try { localStorage.removeItem(LEGACY_LANGUAGE_KEY); } catch (e) { /* private mode */ }
-        applyLanguage(readLanguageOverride() || detectBrowserLanguage(), false);
-
-        window.addEventListener('languagechange', function () {
-            if (!readLanguageOverride()) applyLanguage(detectBrowserLanguage(), false);
-        });
-
-        // Scroll-in animation.
-        var observer = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('is-visible');
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.12 });
-        document.querySelectorAll('.animate-on-scroll').forEach(function (el) { observer.observe(el); });
-    </script>
+<header class="top"><nav class="wrap nav" aria-label="Main navigation"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">↑</span>Publy</a><div class="nav-right"><div class="nav-links"><a href="#how"><span data-lang="en">How it works</span><span data-lang="zh">使用方式</span></a><a href="#details"><span data-lang="en">Why Publy</span><span data-lang="zh">产品特点</span></a><a href="#start"><span data-lang="en">Get started</span><span data-lang="zh">开始使用</span></a></div><div class="languages" aria-label="Language"><button type="button" data-switch="en" aria-pressed="true">EN</button><button type="button" data-switch="zh" aria-pressed="false">中文</button></div></div></nav></header>
+<main id="top">
+  <section class="wrap hero" aria-labelledby="hero-title"><div><div class="eyebrow"><span data-lang="en">For thoughtful publishing</span><span data-lang="zh">为认真写作的人</span></div><h1 id="hero-title"><span data-lang="en">Your words,<br><em>ready for WeChat.</em></span><span data-lang="zh">写在熟悉的地方，<br><em>从容发到公众号。</em></span></h1><p class="intro"><span data-lang="en">Write in Obsidian or Typora. Publy helps you preview your Markdown and send a formatted draft to your WeChat Official Account.</span><span data-lang="zh">继续用 Obsidian 或 Typora 写作。Publy 帮你预览排版，再将文章送到微信公众号草稿箱。</span></p><div class="buttons"><a class="button primary guide-link" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md"><span data-lang="en">Read the user guide</span><span data-lang="zh">查看使用指南</span> <span aria-hidden="true">↗</span></a><a class="button" href="#how"><span data-lang="en">See how it works</span><span data-lang="zh">了解使用方式</span> <span aria-hidden="true">↓</span></a></div><p class="hero-note"><span data-lang="en">Development preview · Public hosting is not open yet.</span><span data-lang="zh">开发预览版 · 公开托管服务尚未开放</span></p></div>
+  <div class="preview-shell" aria-label="Illustration of a formatted article"><div class="preview-top"><span>Publy / Preview</span><span data-lang="en">Illustrative preview</span><span data-lang="zh">排版示意</span></div><div class="paper"><div class="paper-meta">WECHAT ARTICLE · PREVIEW</div><h2><span data-lang="en">A little more room<br>for your ideas.</span><span data-lang="zh">给好想法，<br>留一点从容。</span></h2><p><span data-lang="en">A note becomes a clear, readable article — with its structure and images thoughtfully in place.</span><span data-lang="zh">让一篇笔记成为清晰易读的文章，标题、正文和图片各得其所。</span></p><div class="paper-line"></div><div class="paper-line"></div><div class="paper-line short"></div><div class="paper-quote"><span data-lang="en">Made for writing, ready for review.</span><span data-lang="zh">专心写作，发布前安心预览。</span></div></div><div class="preview-bottom"><span><span data-lang="en">Your original file stays yours</span><span data-lang="zh">原始文件仍在你手中</span></span><span class="pill"><span data-lang="en">Draft, not published</span><span data-lang="zh">仅投递草稿</span></span></div></div></section>
+  <div class="strip"><div class="wrap strip-inner"><span><strong>Obsidian + Typora</strong> <span data-lang="en">writing workflows</span><span data-lang="zh">熟悉的写作方式</span></span><span><strong>Markdown</strong> <span data-lang="en">files stay in place</span><span data-lang="zh">原文件留在原处</span></span><span><strong>WeChat</strong> <span data-lang="en">official account drafts</span><span data-lang="zh">微信公众号草稿箱</span></span></div></div>
+  <section class="wrap section" id="how"><div class="section-heading"><div><span class="kicker"><span data-lang="en">A simple workflow</span><span data-lang="zh">简单的使用流程</span></span><h2><span data-lang="en">From a note to a draft,<br>with you in control.</span><span data-lang="zh">从笔记到草稿，<br>每一步都清楚。</span></h2></div><p><span data-lang="en">Keep writing where you already do. Review the result locally, choose the account, and check the draft before publishing it yourself.</span><span data-lang="zh">不必迁移笔记。先在本地检查和预览，再选择公众号投递，最后到微信后台确认。</span></p></div><div class="steps"><article class="step"><span class="step-num">01 / WRITE</span><h3><span data-lang="en">Write as usual</span><span data-lang="zh">照常写作</span></h3><p><span data-lang="en">Keep your Markdown and images in their existing folders. Publy reads the file you select.</span><span data-lang="zh">Markdown 和图片留在原来的文件夹，Publy 只读取你选择的文章。</span></p></article><article class="step"><span class="step-num">02 / REVIEW</span><h3><span data-lang="en">Preview locally</span><span data-lang="zh">本地预览</span></h3><p><span data-lang="en">Check attachments and review the formatted article before anything is sent.</span><span data-lang="zh">提前检查图片与封面，在投递之前预览排版效果。</span></p></article><article class="step"><span class="step-num">03 / DELIVER</span><h3><span data-lang="en">Send to drafts</span><span data-lang="zh">投递到草稿箱</span></h3><p><span data-lang="en">Choose your account and create a draft. You decide when to review and publish in WeChat.</span><span data-lang="zh">选定公众号并创建草稿；何时检查、何时公开，由你决定。</span></p></article></div></section>
+  <section class="section detail" id="details"><div class="wrap detail-grid"><div class="detail-copy"><span class="kicker"><span data-lang="en">Made for the details</span><span data-lang="zh">把细节照顾好</span></span><h2><span data-lang="en">Less rearranging.<br>More writing.</span><span data-lang="zh">少一些搬运，<br>多一些写作。</span></h2><p><span data-lang="en">A focused path from an existing document to a WeChat draft, with the important decisions left visible.</span><span data-lang="zh">围绕一篇已有文章，做好检查、排版和草稿投递，让重要的决定始终清晰可见。</span></p></div><div class="details"><div class="detail-row"><strong><span data-lang="en">Formatting</span><span data-lang="zh">排版</span></strong><p><span data-lang="en">Built-in article themes, local images, code and math rendering.</span><span data-lang="zh">内置文章主题，处理本地图片、代码和公式。</span></p></div><div class="detail-row"><strong><span data-lang="en">Image posts</span><span data-lang="zh">图片消息</span></strong><p><span data-lang="en">Turn structured Markdown into a deck of themed cards.</span><span data-lang="zh">将结构化 Markdown 渲染为主题卡片。</span></p></div><div class="detail-row"><strong><span data-lang="en">Clear outcomes</span><span data-lang="zh">结果清楚</span></strong><p><span data-lang="en">A confirmed draft and an uncertain result are shown differently, so you can check before taking action.</span><span data-lang="zh">区分已确认和结果未知，遇到中断先核对，再决定后续操作。</span></p></div><div class="detail-row"><strong><span data-lang="en">Your files</span><span data-lang="zh">你的文件</span></strong><p><span data-lang="en">Your notes stay in your own folders; Publy is not a replacement notebook.</span><span data-lang="zh">笔记仍由你在原处管理，Publy 不替你建立另一套笔记库。</span></p></div></div></div></section>
+  <section class="wrap section availability" id="start"><div><span class="kicker"><span data-lang="en">Start at your own pace</span><span data-lang="zh">从这里开始</span></span><h2><span data-lang="en">One good draft<br>is a good start.</span><span data-lang="zh">从一篇满意的<br>草稿开始。</span></h2><p><span data-lang="en">The user guide walks through installation, local preview, self-hosted setup and recovery. Use a non-sensitive test article for your first session.</span><span data-lang="zh">使用指南覆盖安装、本地预览、自托管配置与恢复。第一次使用，建议从一篇不含敏感信息的测试文章开始。</span></p><a class="button primary guide-link" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md"><span data-lang="en">Open the guide</span><span data-lang="zh">打开使用指南</span> <span aria-hidden="true">↗</span></a></div><aside class="notice"><h3><span data-lang="en">Availability today</span><span data-lang="zh">当前可用情况</span></h3><p><span data-lang="en">Local tools and self-hosting are free under their existing licences. The current setup is for developers; a polished standalone installer is still being prepared.</span><span data-lang="zh">本地工具与自托管按现有许可证免费使用。目前仍需开发者配置，面向普通用户的独立安装包正在准备中。</span></p><p><span data-lang="en">Public hosted registration and payment are not open yet. We will share details when the service is ready.</span><span data-lang="zh">公开托管注册与付款尚未开放，服务准备就绪后再公布详情。</span></p><a class="text-link" href="https://github.com/turlamai/publy/blob/main/docs/distribution.md"><span data-lang="en">View distribution status</span><span data-lang="zh">查看发行进度</span><span aria-hidden="true">↗</span></a></aside></section>
+</main>
+<footer class="footer"><div class="wrap footer-inner"><div><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">↑</span>Publy</a><p class="footer-copy"><span data-lang="en">A calmer path from notes to drafts.</span><span data-lang="zh">让笔记到草稿的路更从容。</span></p></div><div class="footer-links"><a class="guide-link" href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md"><span data-lang="en">User guide</span><span data-lang="zh">使用指南</span></a><a href="https://github.com/turlamai/publy/issues"><span data-lang="en">Support</span><span data-lang="zh">反馈</span></a><a href="https://github.com/turlamai/publy">GitHub</a><a href="https://github.com/turlamai/publy/blob/main/LICENSE">AGPL-3.0</a></div></div></footer>
+<script>
+  const root=document.documentElement;
+  document.querySelectorAll('[data-switch]').forEach(button=>button.addEventListener('click',()=>{
+    const zh=button.dataset.switch==='zh'; root.lang=zh?'zh-CN':'en';
+    document.querySelectorAll('[data-switch]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    document.querySelectorAll('.guide-link').forEach(link=>link.href=zh?'https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md':'https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md');
+  }));
+</script>
 </body>
-
 </html>
