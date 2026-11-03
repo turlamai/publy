@@ -42,7 +42,7 @@ function checkLinks(dir) {
     if (entry.isSymbolicLink()) {
       const resolved = fs.realpathSync(name);
       const relative = path.relative(app, resolved);
-      if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) throw new Error("Dependency link escapes the package");
+      if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) throw new Error("Dependency link escapes the package: " + path.relative(app, name));
     } else if (entry.isDirectory()) checkLinks(name);
   }
 }
