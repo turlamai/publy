@@ -18,6 +18,10 @@ test("hosted quota reservations are durable, bounded and conservative for unknow
     assert.deepEqual(ledger.reserve({ ...base, requestId: "one" }), { status: "existing", state: "reserved" });
     assert.throws(() => ledger.reserve({ ...base, requestId: "one", fingerprint: "b".repeat(64) }), /QUOTA_REQUEST_CONFLICT/);
     assert.equal(ledger.beginSend(base.subject, "one", 1500), "sending");
+    db.close();
+    db = new DatabaseSync(dbPath);
+    ledger = new HostedQuotaLedger(db);
+    assert.deepEqual(ledger.reserve({ ...base, requestId: "one" }), { status: "existing", state: "sending" });
     assert.throws(() => ledger.beginSend(base.subject, "one", 1500), /QUOTA_INVALID_TRANSITION/);
     assert.throws(() => ledger.cancelBeforeSend(base.subject, "one"), /QUOTA_INVALID_TRANSITION/);
     assert.equal(ledger.markUnknown(base.subject, "one"), "unknown");
