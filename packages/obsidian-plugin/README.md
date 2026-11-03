@@ -13,7 +13,7 @@ A desktop Obsidian client for [Publy](https://github.com/turlamai/publy): previe
 ## What requires a server
 
 - Deliver to a selected WeChat Official Account **draft box** with credentials configured on your trusted Publy server.
-- Query the result of an ambiguous network failure and retry using the same request identity; a timeout alone is not evidence of failure.
+- Query the result of an ambiguous network failure using the original request identity. A timeout is not evidence of failure: inspect the WeChat draft box before deciding whether to submit again.
 - Schedule and inspect server-side drafts/jobs only when your deployment provides those capabilities.
 
 Use HTTPS or a trusted private tunnel; keep the WeChat AppSecret on the server. The plugin stores its Publy API key in local Obsidian plugin settings — secure your vault and device accordingly. The public Publy hosted subscription service is **not** open for purchase.
@@ -22,7 +22,7 @@ Use HTTPS or a trusted private tunnel; keep the WeChat AppSecret on the server. 
 
 The latest **published** GitHub plugin release is [0.8.3](https://github.com/turlamai/publy/releases/tag/0.8.3); the current source tree is 0.8.7. For manual testing of the published release, unpack its `publy-obsidian-0.8.3.zip` completely into your vault's `.obsidian/plugins/publy/` directory and enable the plugin. This side-loaded archive includes extra renderer dependencies.
 
-**Publy is not yet confirmed as listed in the official Obsidian Community directory.** The directory installer downloads only `main.js`, `manifest.json` and `styles.css`, whereas current card/math rendering uses additional sidecar assets. Do not treat a successful ZIP install as a verified community-directory install. Track the [official-install compatibility blocker](https://github.com/turlamai/publy/issues/12) and [release / directory review status](https://github.com/turlamai/publy/issues/14).
+**Publy is not yet confirmed as listed in the official Obsidian Community directory.** The directory installer downloads only `main.js`, `manifest.json` and `styles.css`. The development build embeds its rendering dependencies and passes a simulated offline three-file installation; published 0.8.3 remains a separate side-loaded release. Real clean-vault installation and upgrade acceptance are still required. Do not treat a successful ZIP install or simulated test as a verified community-directory install. Track the [official-install compatibility blocker](https://github.com/turlamai/publy/issues/12) and [release / directory review status](https://github.com/turlamai/publy/issues/14).
 
 For source development: use Node.js 22+, pnpm 11, `pnpm install --frozen-lockfile`, and `pnpm -r build`. Built plugin files are in `packages/obsidian-plugin/dist/`; the simulated smoke script is `node scripts/verify-plugin.mjs` at the repository root. This smoke script is not actual Obsidian desktop acceptance.
 

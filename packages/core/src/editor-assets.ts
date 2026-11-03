@@ -57,6 +57,13 @@ export function resolveEditorAsset(reference: string, opts: EditorAssetOptions):
   // Decode file URLs exactly once. Decoding the path first would turn %23
   // into a URL fragment and %25 into a stray percent before fileURLToPath.
   const raw = reference.trim();
+  // Fail closed only when decoding INTRODUCES a slash or backslash.
+  // %252F becomes the literal filename text %2F (safe); %25u002F
+  // becomes '/' (unsafe). Comparing separators also catches encoded
+  // spellings of the legacy %u escape without rejecting literal '%' names.
+  const source = decodeTyporaImagePath(raw);
+  const separators = (value: string): number => (value.match(/[/\\]/g) ?? []).length;
+  if (separators(source) > separators(raw)) return null;
   if (/^file:\/\//i.test(raw)) {
     try {
       return existingFile(fileURLToPath(raw));
@@ -64,7 +71,6 @@ export function resolveEditorAsset(reference: string, opts: EditorAssetOptions):
       return null;
     }
   }
-  const source = decodeTyporaImagePath(reference);
   if (!source || /^(?:https?:|data:|attachment:)/i.test(source)) return null;
 
   if (source.startsWith("/") && typeof opts.typoraRootUrl === "string") {

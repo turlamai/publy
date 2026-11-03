@@ -19,7 +19,7 @@
 
 ## 开始使用
 
-CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。 提供 CLI 与 Obsidian 工作流；不是 Rivet/Glaze 桌面应用。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
+CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。 目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
 
 [安装、首次使用、隐私与备份恢复](docs/USER-GUIDE.zh-CN.md) · [English](docs/USER-GUIDE.md)
 

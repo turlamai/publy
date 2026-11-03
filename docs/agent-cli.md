@@ -21,6 +21,7 @@ publy preview "/path/to/article.md" --json --out "/tmp/publy-review.html"
 publy render "/path/to/article.md" --json
 publy theme ls --json
 publy account list --json
+publy account add Work --theme claude --json  # explicit local mutation; user approval required
 publy quota --json
 publy jobs list --json
 publy history --json
@@ -31,11 +32,17 @@ side effects and returns a **versioned** manifest. Each command declares
 `json` support and whether it reads, writes local output, may access the
 network or performs a draft-creating/mutating action. **Do not guess** that
 every command supports `--json`: `theme preview` and some legacy commands are still human-oriented.
+`account add <name> --json` returns an `account-add` object with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or configuration contents; omitted options preserve existing fields. This local mutation requires explicit user approval.
+
 `config set <key> <value> --json` returns a single `config-set` object (`CONFIG_SAVED`, `CONFIG_KEY_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`) without ever echoing values, including API keys or credential-bearing URLs. This is a local mutation and requires the operator's approval.
 `jobs cancel --json` and `jobs retry --json` now return structured results,
 but are **mutating operations requiring explicit user approval**. If their
 network outcome is uncertain, they return `status:"unknown"` with the original
 job ID; query `jobs list --json` before deciding what to do next.
+An interrupted draft job is never blindly re-submitted: retry only reconciles
+an exact confirmed local record, or re-admits a proven pre-submission failure.
+HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` requires remote
+draft inspection; retain the original account, job and request identity.
 Those remaining commands' `json:false` entry is deliberate, not hidden implementation detail.
 
 ## Structured local review

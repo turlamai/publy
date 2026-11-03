@@ -150,7 +150,7 @@ wenyan（文颜）验证了 CLI + server 路线可行（tlai-wechat-publish 技�
 
 
 
-设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前已有 `capabilities --json`、`check --json`、`preview --json`、`card --json`、`publish --json`、`publish-result --json`、`account list --json`、`jobs list --json`、`history --json`、`quota --json`；其余命令以 `capabilities` 报告的真实 `json:false` 为准。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
+设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前已有 `capabilities --json`、`check --json`、`preview --json`、`card --json`、`publish --json`、`publish-result --json`、`account list --json`、`account add --json`、`config set --json`、`jobs list --json`、`history --json`、`quota --json`；其余命令以 `capabilities` 报告的真实 `json:false` 为准。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
 
 ```bash
 publy render a.md --theme claude -o out.html   # Markdown → 公众号 HTML（免费路径，可贴入后台）

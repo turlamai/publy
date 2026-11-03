@@ -8,11 +8,13 @@ Turn Markdown into WeChat article drafts and image-post cards, with local previe
 
 CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.
 
+The development plugin embeds its rendering assets in `main.js`. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open ([#12](https://github.com/turlamai/publy/issues/12), [#15](https://github.com/turlamai/publy/issues/15)).
+
 ## Platforms and installation
 
-CLI and Obsidian workflows; this is not a Rivet/Glaze desktop application. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.
+Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.
 
-See the [README](../README.md) for source installation and execution; release assets do not constitute a deployed service.
+Source builds require Node.js 22+, pnpm and Git; follow the [developer installation and setup](guide.md). Release assets do not constitute a deployed service.
 
 ## Write in Typora or Obsidian
 
@@ -28,6 +30,27 @@ source-build functionality, **not yet a no-setup public installer**.
 [Typora quick start](typora.md) · [Supported input paths, limitations and commercial user-experience standard](editor-workflows.md)
 · [简体中文](editor-workflows.zh-CN.md)
 
+In the development plugin, **Copy rendered rich text** stops without changing the clipboard if images or formulas are missing, fail to render, or remain as local attachments. Use draft delivery for content with attachments.
+
+## Where are my notes and drafts?
+
+Publy does not create a notebook or provide a dashboard for browsing and
+editing notes. Continue to find, edit, organize and back up your original
+Markdown and images in Typora, Obsidian or your file manager. Publy reads the
+file you choose for checking and formatting; it does not migrate your notes.
+
+After delivery, sign in to the **WeChat Official Account platform** and open
+the selected account's draft box to review, edit and manage the draft. Publy
+does not publish it publicly. If the outcome is unknown, check that draft box
+before deciding whether to submit again: a missing server record does not prove
+that WeChat did not receive the draft.
+
+A self-hosted server also has an operator page at `/admin` for service users,
+WeChat accounts, historical orders and events. It is not a note manager. This
+page is still a development-stage tool; public hosting and checkout are not
+open. Access it over HTTPS or a trusted private network and keep the admin key
+private. See [operations and backups](operations.md) for server details.
+
 ## Your first successful session
 
 1. Install from the source instructions and preview a non-sensitive Markdown article locally before configuring delivery.
@@ -38,7 +61,7 @@ source-build functionality, **not yet a no-setup public installer**.
 
 Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Restore and test on an isolated server; do not replay an unknown-outcome job before checking remote draft/history state.
 
-When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity first (`publy publish-result <key>`, or the query action in the plugin) and only then retry the same request — the server reconciles against its idempotency record instead of creating a duplicate draft. Interrupted scheduled jobs never auto-rerun after a restart; retry them explicitly with `publy jobs retry <id>`.
+When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity (`publy publish-result <key>`, or the plugin query action), then check the WeChat draft box. The server records a success only after receiving a confirmation; submitting again can create a duplicate even with the same request identity. Check the draft box before taking any action on an interrupted scheduled job too.
 
 ## Network, keys and privacy
 

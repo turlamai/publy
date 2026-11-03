@@ -579,15 +579,56 @@ async function cmdConfigSet(key: string, value: string, opts: { json?: boolean }
 }
 
 async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<void> {
-  const config = loadConfig();
+  const json = opts.json === true;
+  const report = (ok: boolean, code: string, extra: Record<string, unknown> = {}): void => {
+    if (json) console.log(JSON.stringify({
+      schemaVersion: 1, kind: "account-add", ok, code,
+      networkUsed: false, submitted: false, ...extra,
+    }));
+  };
+  // An alias is a visible identifier, not a place to store credentials.
+  // Never echo input values on JSON failures (they may contain secrets).
+  const alias = name.trim();
+  if (!alias || alias.length > 128 || /[\x00-\x1f\x7f]/.test(alias)) {
+    if (!json) console.error("publy: account name must be 1-128 characters without control characters.");
+    report(false, "ACCOUNT_NAME_INVALID");
+    process.exitCode = 1;
+    return;
+  }
+  let config: CliConfig;
+  try {
+    config = loadConfig();
+    if (config.accounts !== undefined && (!Array.isArray(config.accounts) ||
+      config.accounts.some((a) => !a || typeof a !== "object" || typeof a.name !== "string"))) {
+      throw new Error("Invalid account collection");
+    }
+  } catch {
+    if (!json) console.error("publy: invalid local configuration");
+    report(false, "CONFIG_INVALID");
+    process.exitCode = 1;
+    return;
+  }
   config.accounts ??= [];
-  const existing = config.accounts.find((a) => a.name === name);
-  const account = { name, app_id: opts.appId, author: opts.author, theme: opts.theme };
+  const existing = config.accounts.find((a) => a.name === alias);
+  // An omitted option must not erase an existing app id, theme or author.
+  const account: CliAccount = existing ? { ...existing } : { name: alias };
+  if (opts.appId !== undefined) account.app_id = opts.appId;
+  if (opts.author !== undefined) account.author = opts.author;
+  if (opts.theme !== undefined) account.theme = opts.theme;
   if (existing) Object.assign(existing, account);
   else config.accounts.push(account);
-  if (!config.default_account) config.default_account = name;
-  saveConfig(config);
-  console.log(`account ${name} saved${config.default_account === name ? " (default)" : ""}`);
+  if (!config.default_account) config.default_account = alias;
+  try { saveConfig(config); }
+  catch {
+    if (!json) console.error("publy: cannot save local configuration");
+    report(false, "CONFIG_WRITE_FAILED");
+    process.exitCode = 1;
+    return;
+  }
+  if (json) report(true, "ACCOUNT_SAVED", {
+    name: alias, created: !existing, isDefault: config.default_account === alias,
+  });
+  else console.log(`account ${alias} saved${config.default_account === alias ? " (default)" : ""}`);
 }
 
 async function cmdThemePreview(name: string): Promise<void> {
@@ -863,7 +904,14 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     const body = rawResponse as PublishResult;
-    if (res.ok && !body.mediaId && !body.jobId) {
+    // A 2xx transport response is not a delivery acknowledgement. Require
+    // exactly one nonblank, correctly typed identifier before reporting success.
+    const mediaOk = typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+    const jobOk = typeof body.jobId === "string" && body.jobId.trim().length > 0;
+    if (res.ok && mediaOk === jobOk) {
+      throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
+    }
+    if (res.ok && ((!mediaOk && body.mediaId !== undefined) || (!jobOk && body.jobId !== undefined))) {
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     return { res, body };
@@ -875,21 +923,13 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     result = await postPublish(server);
   } catch (err) {
     netErr = err;
-    /* network error — maybe the network blocks large POSTs and a tunnel is configured */
+    /* The request may have reached WeChat; do not replay through any route. */
   }
-  if (!result && config.tunnel) {
-    console.error("publy: server unreachable, bringing up the SSH tunnel…");
-    if (await ensureTunnel(config)) {
-      const tunnelServer = config.tunnel.server ?? `http://127.0.0.1:${config.tunnel.local_port}`;
-      try {
-        result = await postPublish(tunnelServer);
-      } catch (error) {
-        // Tunnel request may also have reached the remote server. Preserve
-        // the original draft identity and report an unknown outcome.
-        netErr = error;
-      }
-    }
-  }
+  // NEVER automatically replay an ambiguous publish through a tunnel.
+  // A timeout, invalid acknowledgement or dropped response can occur after
+  // WeChat accepted the draft. A second route is still a second submission.
+  // Operators can establish a tunnel explicitly before a *new* request,
+  // after independently reconciling the original request ID.
   if (!result) {
     // network-level failure: the server may or may not have delivered the
     // draft — outcome unknown, never treated as permission to re-send (#7).
@@ -899,7 +939,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       ? "server response was not valid confirmation JSON"
       : "network failed or timed out";
     console.error(`publy: cannot confirm draft delivery (${detail})`);
-    console.error(`publy: check --server / config server, or run \`publy tunnel\` when a tunnel is configured (e.g. TLS failures on the public domain)`);
+    console.error("publy: inspect the original draft outcome first. If a tunnel is needed, run `publy tunnel` before a separately reviewed submission.");
     console.error(`publy: outcome UNKNOWN — the draft may already exist. Query before retrying: publy publish-result ${idempotencyKey}`);
     agentFailure("unknown", "NETWORK_OUTCOME_UNKNOWN", 5, idempotencyKey);
     return;
@@ -1030,7 +1070,7 @@ const AGENT_USAGE: Record<string, string> = {
   history: "publy history --json",
   quota: "publy quota --json",
   "account list": "publy account list --json",
-  "account add": "publy account add <name> [--app-id <id>]",
+  "account add": "publy account add <name> --json [--app-id <id>]",
   "config set": "publy config set <key> <value> --json",
   "theme ls": "publy theme ls --json",
   "theme preview": "publy theme preview <name>",
@@ -1052,7 +1092,7 @@ const AGENT_COMMANDS = [
   { name: "history", json: true, network: true, effect: "read" },
   { name: "quota", json: true, network: true, effect: "read" },
   { name: "account list", json: true, network: false, effect: "read-local-config" },
-  { name: "account add", json: false, network: false, effect: "write-local-config" },
+  { name: "account add", json: true, network: false, effect: "write-local-config" },
   { name: "config set", json: true, network: false, effect: "write-local-config" },
   { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read" },
   { name: "theme preview", json: false, network: "font-fallback-may-download", effect: "write-preview-and-open-browser" },
@@ -1171,15 +1211,26 @@ export function createProgram(): Command {
       };
       const reply = await requestServerJson(requestConfig, `/v1/publish-result/${encodeURIComponent(key)}`);
       if (!reply.ok) { reportReadFailure(opts, "publish-result", reply.code); return; }
-      const body = reply.body as { status?: string; mediaId?: string; account?: string; title?: string } & { code?: string; message?: string };
+      const body = reply.body as { status?: unknown; mediaId?: unknown; account?: unknown; title?: unknown };
+      // A claimed "confirmed" status without a usable mediaId is still
+      // UNKNOWN. Never spread an untrusted server object over agent fields:
+      // it could override ok/schemaVersion or leak unrelated response data.
+      const confirmed = body.status === "confirmed" &&
+        typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+      const account = typeof body.account === "string" ? body.account : undefined;
+      const title = typeof body.title === "string" ? body.title : undefined;
       if (opts.json) {
-        console.log(JSON.stringify({ schemaVersion: 1, ok: body.status === "confirmed", kind: "publish-result", ...body }));
-        if (body.status !== "confirmed") process.exitCode = 4;
-      } else if (body.status === "confirmed") {
-        console.log(`已确认：《${body.title ?? "?"}》在 ${body.account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
+        console.log(JSON.stringify({
+          schemaVersion: 1, kind: "publish-result", ok: confirmed,
+          status: confirmed ? "confirmed" : "unknown",
+          mediaId: confirmed ? body.mediaId : undefined, account, title,
+        }));
+        if (!confirmed) process.exitCode = 4;
+      } else if (confirmed) {
+        console.log(`已确认：《${title ?? "?"}》在 ${account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
       } else {
-        console.log("结果未知：服务端没有这次请求的记录（超出幂等窗口或未送达）。可用原幂等键重试，或到公众号草稿箱确认。");
-        process.exit(4);
+        console.log("结果未知：服务端没有可验证的草稿 Media ID。请先在公众号草稿箱人工核对，不能据此自动重投。");
+        process.exitCode = 4;
       }
     });
 
@@ -1237,13 +1288,13 @@ export function createProgram(): Command {
         console.log("cancelled");
       }
     });
-  // interrupted jobs never auto-rerun after a crash (#8); the owner retries
-  // explicitly — the original idempotency key rides along, so a lost run that
-  // actually delivered reconciles instead of duplicating
+  // Interrupted jobs are not safe to re-send: the server may only
+  // reconcile a matching confirmed local delivery. A 409 result means no
+  // draft was re-submitted; consult WeChat drafts before taking action.
   jobsCmd
     .command("retry")
     .argument("<id>")
-    .description("re-admit an interrupted/failed job (idempotency-checked)")
+    .description("reconcile confirmed interrupted jobs or retry proven pre-publish failures; never blindly re-send")
     .option("--json", "machine-readable retry outcome (changes server state)")
     .action(async (id: string, opts: { json?: boolean }) => {
       let config: CliConfig;
@@ -1327,6 +1378,7 @@ export function createProgram(): Command {
     .option("--app-id <id>")
     .option("--author <name>")
     .option("--theme <id>")
+    .option("--json", "structured local account mutation without credentials")
     .description("add or update an account")
     .action(async (name: string, opts) => cmdAccountAdd(name, opts));
   accountCmd.command("list").description("list accounts").option("--json", "machine-readable account aliases (no secrets)").action(async (opts: {json?: boolean}) => {

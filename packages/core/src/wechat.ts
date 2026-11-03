@@ -27,7 +27,7 @@ interface TokenCache {
 
 /** File-backed token cache with in-flight dedupe (600 s buffer before expiry). */
 export class TokenManager {
-  private cache: TokenCache = {};
+  private cache: TokenCache = Object.create(null) as TokenCache;
   private inflight = new Map<string, Promise<string>>();
   private file: string;
 
@@ -35,9 +35,16 @@ export class TokenManager {
     fs.mkdirSync(cacheDir, { recursive: true });
     this.file = path.join(cacheDir, "token.json");
     try {
-      this.cache = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      const parsed: unknown = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      // A parseable JSON value is not necessarily a token dictionary.
+      // Null/array/primitive legacy files must not break credential recovery.
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        // Keep a prototype-free dictionary: app IDs must never resolve to
+        // inherited keys such as constructor or mutate __proto__ on save.
+        Object.assign(this.cache, parsed);
+      }
     } catch {
-      /* first run */
+      /* first run or unreadable cache: refresh from the API */
     }
   }
 
@@ -48,7 +55,10 @@ export class TokenManager {
   async get(appId: string, appSecret: string): Promise<string> {
     const now = Date.now() / 1000;
     const hit = this.cache[appId];
-    if (hit && hit.expireAt > now + 600) return hit.accessToken;
+    // Older versions could persist an absent or malformed token after HTTP 200.
+    // Never trust disk cache shape without validating the credential itself.
+    if (hit && typeof hit.accessToken === "string" && hit.accessToken.trim() &&
+        Number.isFinite(hit.expireAt) && hit.expireAt > now + 600) return hit.accessToken;
 
     const pending = this.inflight.get(appId);
     if (pending) return pending;
@@ -58,6 +68,12 @@ export class TokenManager {
       const res = await fetch(url);
       const data = await res.json() as any;
       assertOk(data);
+      // A successful HTTP response (even errcode: 0) is not proof that the
+      // token endpoint returned a usable credential. Never cache or return an
+      // absent/non-string token: the caller must see an explicit failure.
+      if (!data || typeof data.access_token !== "string" || !data.access_token.trim()) {
+        throw new Error("WeChat token response missing a valid access_token");
+      }
       this.cache[appId] = {
         accessToken: data.access_token,
         expireAt: now + (data.expires_in ?? 7200),

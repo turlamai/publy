@@ -136,6 +136,10 @@ test("Typora local URL decoding does not recursively turn an encoded slash into 
     put(root, "assets/a/b.png");
     assert.equal(decodeTyporaImagePath("assets/a%252Fb.png"), "assets/a%2Fb.png");
     assert.equal(resolveEditorAsset("assets/a%252Fb.png", { baseDir: root }), literal);
+    // Percent-encoded letters/digits can disguise a legacy %u002F or %u005C.
+    // Both must fail closed even when a same-name nested image exists.
+    assert.equal(resolveEditorAsset("assets/a%25%75%30%30%32%46b.png", { baseDir: root }), null);
+    assert.equal(resolveEditorAsset("assets/a%25%75%30%30%35%43b.png", { baseDir: root }), null);
     assert.equal(resolveEditorAsset("https%3A%2F%2Fexample.test%2Fsecret.png", { baseDir: root }), null);
   });
 });

@@ -157,6 +157,56 @@ try {
     '{"api_key":"' + malformedSecret + '",',
     "failed config update must preserve the original file");
 
+  // Account mutations are local, explicit and machine-readable. Never print
+  // App IDs, author metadata or private config contents to an Agent.
+  const accountConfig = path.join(dir, "agent-account-add.json");
+  const privateAppId = "wx-secret-identifier-not-for-stdout";
+  const privateAuthor = "private-author-not-for-stdout";
+  const addAccount = (...args) => spawnSync(process.execPath,
+    [entrypoint, "account", "add", ...args, "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: accountConfig },
+    });
+  const firstAccount = addAccount("Work", "--app-id", privateAppId, "--author", privateAuthor, "--theme", "claude");
+  assert.equal(firstAccount.status, 0, firstAccount.stderr);
+  const firstReport = JSON.parse(firstAccount.stdout.trim());
+  assert.equal(firstReport.schemaVersion, 1);
+  assert.equal(firstReport.kind, "account-add");
+  assert.equal(firstReport.ok, true);
+  assert.equal(firstReport.code, "ACCOUNT_SAVED");
+  assert.equal(firstReport.created, true);
+  assert.equal(firstReport.isDefault, true);
+  assert.equal(firstReport.networkUsed, false);
+  assert.equal(firstReport.submitted, false);
+  assert.ok(!firstAccount.stdout.includes(privateAppId));
+  assert.ok(!firstAccount.stdout.includes(privateAuthor));
+  const secondAccount = addAccount("Work", "--theme", "wechat");
+  assert.equal(secondAccount.status, 0, secondAccount.stderr);
+  assert.equal(JSON.parse(secondAccount.stdout).created, false);
+  const storedAccount = JSON.parse(fs.readFileSync(accountConfig, "utf8"));
+  assert.deepEqual(storedAccount.accounts, [{
+    name: "Work", app_id: privateAppId, author: privateAuthor, theme: "wechat",
+  }], "updating only a theme must not erase saved account fields");
+  assert.equal(storedAccount.default_account, "Work");
+  const invalidAccount = addAccount("  ");
+  assert.equal(invalidAccount.status, 1);
+  assert.equal(JSON.parse(invalidAccount.stdout).code, "ACCOUNT_NAME_INVALID");
+  assert.equal(fs.readFileSync(accountConfig, "utf8"), JSON.stringify(storedAccount, null, 2) + "\n");
+  const malformedAccountConfig = path.join(dir, "malformed-account-add.json");
+  const secretConfigMarker = "hidden-account-config-token";
+  fs.writeFileSync(malformedAccountConfig, '{"api_key":"' + secretConfigMarker + '", invalid}');
+  const malformedAccount = spawnSync(process.execPath,
+    [entrypoint, "account", "add", "Work", "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: malformedAccountConfig },
+    });
+  assert.equal(malformedAccount.status, 1);
+  const malformedAccountReport = JSON.parse(malformedAccount.stdout);
+  assert.equal(malformedAccountReport.kind, "account-add");
+  assert.equal(malformedAccountReport.code, "CONFIG_INVALID");
+  assert.ok(!malformedAccount.stdout.includes(secretConfigMarker));
+  assert.ok(!malformedAccount.stderr.includes(secretConfigMarker));
+
   // Agent contract discovery is offline and truthful: don't claim JSON
   // support for operations that still only offer human-oriented output.
   const cli = (...args) => spawnSync(process.execPath, [entrypoint, ...args],
@@ -214,6 +264,12 @@ try {
   }
   assert.ok(contract.commands.some((c) => c.name === "jobs list" && c.json === true));
   assert.ok(contract.commands.some((c) => c.name === "publish" && c.effect === "create-wechat-draft"));
+  const accountMutation = contract.commands.find((c) => c.name === "account add");
+  assert.equal(accountMutation.json, true);
+  assert.equal(accountMutation.network, false);
+  assert.equal(accountMutation.requiresUserApproval, true);
+  assert.match(accountMutation.usage, /account add <name> --json/);
+
   for (const operation of ["jobs cancel", "jobs retry"]) {
     const def = contract.commands.find((c) => c.name === operation);
     assert.equal(def.json, true);
@@ -558,6 +614,40 @@ try {
   assert.ok(fs.readFileSync(typoraPreviewPath, "utf8").includes("data:image/png;base64,"));
   assert.equal(fs.readFileSync(typoraFile, "utf8"), typoraSource, "Typora source must remain exactly unchanged");
 
+  // An encoded slash/backslash must not be promoted into a directory
+  // separator and silently select an existing, unrelated cover. The normal
+  // %uXXXX and %25uXXXX Chinese filename forms must keep working.
+  const doubleEscapedUnicode = path.join(project, "Typora double-escaped Unicode.md");
+  const doubleEscapedSource = [
+    "---",
+    "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
+    "cover: /blog/assets/%25u5C01%25u9762%20%25u56FE%25u7247.png",
+    "---", "", "# Local review",
+  ].join("\n");
+  fs.writeFileSync(doubleEscapedUnicode, doubleEscapedSource);
+  const doubleEscapedCheck = run(doubleEscapedUnicode);
+  assert.equal(doubleEscapedCheck.code, 0, JSON.stringify(doubleEscapedCheck.report));
+  assert.equal(doubleEscapedCheck.report.ok, true);
+  assert.equal(fs.readFileSync(doubleEscapedUnicode, "utf8"), doubleEscapedSource);
+
+  for (const encodedSeparator of ["%2F", "%5C", "%u002F", "%u005C", "%25u002F", "%25u005C"]) {
+    const unsafeFile = path.join(project, "Typora encoded separator " + encodedSeparator + ".md");
+    const unsafeSource = [
+      "---",
+      "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
+      "cover: /blog" + encodedSeparator + "assets" + encodedSeparator + "%u5C01%u9762%20%u56FE%u7247.png",
+      "---", "", "# Local review",
+    ].join("\n");
+    fs.writeFileSync(unsafeFile, unsafeSource);
+    const unsafeCheck = run(unsafeFile);
+    assert.equal(unsafeCheck.code, 4, encodedSeparator + ": " + JSON.stringify(unsafeCheck.report));
+    assert.equal(unsafeCheck.report.ok, false);
+    assert.equal(unsafeCheck.report.attachmentCount, 0);
+    assert.ok(unsafeCheck.report.problems.some((p) => p.startsWith("Cover not found:")),
+      "encoded separator must block the draft preflight: " + encodedSeparator);
+    assert.equal(fs.readFileSync(unsafeFile, "utf8"), unsafeSource);
+  }
+
   // Typora can also save absolute file:/// image links, including Chinese
   // paths. They must resolve to the exact same local bytes, without exporting
   // a clickable file:// link into the WeChat HTML.
@@ -716,13 +806,30 @@ try {
   // None may leak the server response body or lose requestId on uncertainty.
   const responseServerScript = path.join(dir, "agent-response-stub.mjs");
   const responsePortFile = path.join(dir, "agent-response-port.txt");
+  const responseCountFile = path.join(dir, "agent-response-count.txt");
+  fs.writeFileSync(responseCountFile, "");
   const privateServerMarker = "remote-secret-never-log";
   fs.writeFileSync(responseServerScript, `
 import fs from "node:fs";
 import http from "node:http";
 const server = http.createServer((_req, res) => {
   const key = _req.headers["x-api-key"];
+  if (_req.method === "POST") fs.appendFileSync(process.argv[3], String(key) + "\\n");
   res.setHeader("Content-Type", "application/json");
+  if (_req.url.startsWith("/v1/publish-result/")) {
+    if (key === "confirmed-no-media") {
+      res.end(JSON.stringify({ status: "confirmed", ok: true, mediaId: null, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "unknown-override") {
+      res.end(JSON.stringify({ status: "unknown", ok: true, schemaVersion: 999, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "confirmed-valid") {
+      res.end(JSON.stringify({ status: "confirmed", mediaId: "SYNTHETIC_MEDIA_1", account: "fixture", title: "local test" })); return;
+    }
+  }
+  if (key === "empty-success") { res.writeHead(200); res.end("{}"); return; }
+  if (key === "invalid-media") { res.writeHead(200); res.end('{"mediaId":123}'); return; }
+  if (key === "invalid-job") { res.writeHead(200); res.end('{"jobId":{"id":"bad"}}'); return; }
   if (key === "bad-response") {
     res.writeHead(200); res.end('{"mediaId":'); return;
   }
@@ -740,7 +847,7 @@ server.listen(0, "127.0.0.1", () => {
 });
 `);
   const responseServer = spawn(process.execPath,
-    [responseServerScript, responsePortFile],
+    [responseServerScript, responsePortFile, responseCountFile],
     { stdio: "ignore", windowsHide: true });
   try {
     const clock = new Int32Array(new SharedArrayBuffer(4));
@@ -757,6 +864,9 @@ server.listen(0, "127.0.0.1", () => {
     }));
     for (const [key, expectedStatus, expectedCode] of [
       ["bad-response", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["empty-success", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-media", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-job", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["denied-response", "rejected", "BAD_ARGUMENT"],
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
@@ -774,6 +884,50 @@ server.listen(0, "127.0.0.1", () => {
       assert.ok(!runReply.stdout.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes("SyntaxError:"));
+    }
+
+    // A working loopback listener stands in for the SSH tunnel: no SSH process
+    // or remote service is involved. One ambiguous POST must stay one POST.
+    const tunnelConfig = path.join(dir, "response-server-with-tunnel.json");
+    fs.writeFileSync(tunnelConfig, JSON.stringify({
+      server: "http://127.0.0.1:" + responsePort,
+      api_key: "bad-response", default_account: "fixture",
+      accounts: [{ name: "fixture" }],
+      tunnel: { ssh_target: "unused-local-test", local_port: Number(responsePort),
+        remote_port: 8081, server: "http://127.0.0.1:" + responsePort },
+    }));
+    const postCount = () => fs.readFileSync(responseCountFile, "utf8")
+      .split("\n").filter((key) => key === "bad-response").length;
+    const beforeTunnel = postCount();
+    const ambiguousTunnel = spawnSync(process.execPath,
+      [entrypoint, "publish", goodPath, "--json", "--account", "fixture"],
+      { encoding: "utf8", timeout: 25000,
+        env: { ...process.env, PUBLY_CONFIG: tunnelConfig } });
+    assert.equal(ambiguousTunnel.status, 5, ambiguousTunnel.stderr);
+    assert.equal(JSON.parse(ambiguousTunnel.stdout).status, "unknown");
+    assert.equal(postCount() - beforeTunnel, 1,
+      "an ambiguous draft response must not be replayed through a tunnel");
+
+    // A claimed confirmation without mediaId is unknown; a server response
+    // cannot override our agent JSON contract or leak unrelated fields.
+    for (const [key, expectedStatus, expectedOk, expectedExit] of [
+      ["confirmed-no-media", "unknown", false, 4],
+      ["unknown-override", "unknown", false, 4],
+      ["confirmed-valid", "confirmed", true, 0],
+    ]) {
+      const queried = spawnSync(process.execPath,
+        [entrypoint, "publish-result", "synthetic-key", "--json", "--api-key", key],
+        { encoding: "utf8", timeout: 25000,
+          env: { ...process.env, PUBLY_CONFIG: responseConfig } });
+      assert.equal(queried.status, expectedExit, key + " " + queried.stderr);
+      const report = JSON.parse(queried.stdout);
+      assert.equal(report.schemaVersion, 1);
+      assert.equal(report.kind, "publish-result");
+      assert.equal(report.ok, expectedOk);
+      assert.equal(report.status, expectedStatus);
+      assert.ok(!queried.stdout.includes(privateServerMarker));
+      assert.ok(!queried.stderr.includes(privateServerMarker));
+      assert.ok(!("secret" in report));
     }
   } finally {
     responseServer.kill();

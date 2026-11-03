@@ -1,5 +1,34 @@
 # Publy Roadmap
 
+## Integration in progress / 正在整合 — 2026-11-03
+
+Owner priority is Publy's first release. Starting repository commit:
+`67032c390ba81f62d6d30d4813c12850cc10b366`; central delivery policy read at
+`turlamai.github.io` commit `702a4c376a338d02f7ea90f459749e7a20f71b2e`;
+authorization decision `2026-10-auth-1` remains in force. The following is
+local integration work, not a merge, release, deployed service or sales claim.
+
+- Incorporate and test the existing #65/#66/#67 stack, including #51, #57,
+  #60, #61, #63 and #64; preserve those source PRs until reviewed integration
+  and exact-head CI are complete. Additional local integrations cover #48,
+  #49, #50, #52, #53, #54, #55, #56, #58 and #59; adaptations to overlapping
+  files need review against each original PR. #62 remains separate: its
+  indented-line handling has a documented active-embed regression and must
+  not be included unchanged.
+- Product proof still required: clean Obsidian install/update on target
+  systems, real Typora/Obsidian source-to-draft walkthrough, and a no-npm
+  packaged CLI. Synthetic three-file smoke is not directory listing or a
+  desktop/WeChat acceptance (#12/#14/#15/#18/#25/#26/#37).
+- Hosted admission remains closed: the authenticated, transaction-consistent
+  Commerce current-entitlement bridge and Publy's account-bound Permit
+  verification/atomic usage ledger are not production integrated. Complete
+  #17/#44, the fixed-egress recovery pilot #7/#8, retention/backup and real
+  merchant admission before enabling checkout. Free local and self-hosted
+  paths stay available.
+- Final publication requires a reviewed source and release artifact, required
+  CI and native evidence. `main:/docs` triggers a public Pages deployment;
+  resolve that release boundary with the owner before merge or publication.
+
 ## Actual release state / 当前真实发行状态 — 2026-10-30
 
 **Developer code ≠ tested release ≠ public availability.** The monorepo now

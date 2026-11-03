@@ -153,6 +153,9 @@ interface StoredJob {
   status: JobStatus;
   attempts: number;
   nextAttemptAt: number;
+  /** Only pre-publish failures may be retried. Legacy failed jobs without
+   * this marker must not be assumed safe: they may be older remote failures. */
+  safeToRetry?: boolean;
   /** admission idempotency: same key never enqueues two jobs, and a retry of
    *  an interrupted run reconciles against the same record before re-sending */
   idempotencyKey?: string;
@@ -177,6 +180,74 @@ function jobInfo(j: StoredJob): JobInfo {
 /** resolved caller: admin, or a user row */
 type Caller = { admin: true } | { admin: false; user: UserRow };
 
+interface IdempotencyRecord {
+  mediaId: string;
+  at: number;
+  account: string;
+  title: string;
+  type: string;
+  /** owning user (null = admin) — records are not visible across callers */
+  userId: string | null;
+  /** verified request body hash; absent only in pre-v2 persisted records */
+  requestFingerprint?: string;
+}
+
+/** Reject syntactically valid but damaged entries as well as broken JSON.
+ * A null job can crash boot reconciliation; an incomplete job or draft record
+ * can silently erase the ability to recover an already-submitted draft. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+function isPersistedJob(key: string, value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.body)) return false;
+  const body = value.body;
+  return typeof value.id === "string" && value.id === key &&
+    typeof value.runAt === "number" && Number.isFinite(value.runAt) &&
+    typeof value.nextAttemptAt === "number" && Number.isFinite(value.nextAttemptAt) &&
+    typeof value.attempts === "number" && Number.isInteger(value.attempts) && value.attempts >= 0 &&
+    (value.userId === null || typeof value.userId === "string") &&
+    typeof value.status === "string" &&
+    ["pending", "running", "done", "failed", "cancelled", "interrupted"].includes(value.status) &&
+    typeof body.account === "string" && body.account.length > 0 &&
+    typeof body.title === "string" && typeof body.type === "string" &&
+    (value.idempotencyKey === undefined || typeof value.idempotencyKey === "string") &&
+    (value.error === undefined || typeof value.error === "string") &&
+    (value.result === undefined || isRecord(value.result));
+}
+
+function isPersistedIdempotency(_key: string, value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.mediaId === "string" && value.mediaId.length > 0 &&
+    typeof value.at === "number" && Number.isFinite(value.at) &&
+    typeof value.account === "string" && value.account.length > 0 &&
+    typeof value.title === "string" && typeof value.type === "string" &&
+    (value.userId === null || typeof value.userId === "string") &&
+    (value.requestFingerprint === undefined || typeof value.requestFingerprint === "string");
+}
+
+/** Persistent recovery state must fail closed: missing on first run is fine,
+ * but malformed/unreadable existing files are NOT an empty queue/history.
+ * Continuing would conceal scheduled jobs or allow repeated WeChat drafts. */
+function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY", validEntry: (key: string, value: unknown) => boolean): Record<string, T> {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return Object.create(null) as Record<string, T>;
+    // Never echo raw data, filenames or parser excerpts: state may hold credentials.
+    throw new Error(`PUBLY_${kind}_STATE_READ_FAILED`);
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed) || !Object.entries(parsed).every(([key, entry]) => validEntry(key, entry))) {
+      throw new Error("invalid recovery state");
+    }
+    return Object.assign(Object.create(null) as Record<string, T>, parsed);
+  } catch {
+    throw new Error(`PUBLY_${kind}_STATE_INVALID`);
+  }
+}
+
 export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
@@ -187,6 +258,10 @@ export function buildApp(config: ServerConfig) {
   const app = Fastify({ bodyLimit: 30 * 1024 * 1024 });
   const dataDir = config.dataDir ?? path.join(os.homedir(), ".publy", "server-data");
   fs.mkdirSync(dataDir, { recursive: true });
+  // Inspect both files BEFORE opening SQLite or starting the scheduler. If
+  // either state file is corrupt, startup stops without rewriting it.
+  const persistedJobs = readPersistedMap<StoredJob>(path.join(dataDir, "jobs.json"), "JOBS", isPersistedJob);
+  const persistedIdempotency = readPersistedMap<IdempotencyRecord>(path.join(dataDir, "idempotency.json"), "IDEMPOTENCY", isPersistedIdempotency);
 
   // every unhandled error leaves this server redacted: fetch/undici messages
   // can embed full URLs with tokens/secrets (#7 — secrets stay out of logs)
@@ -261,12 +336,7 @@ export function buildApp(config: ServerConfig) {
   // --- scheduled jobs --------------------------------------------------------
 
   const jobsFile = path.join(dataDir, "jobs.json");
-  let jobs: Record<string, StoredJob> = {};
-  try {
-    jobs = JSON.parse(fs.readFileSync(jobsFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const jobs: Record<string, StoredJob> = persistedJobs;
   // crash-mid-run reconciliation (#8): a job found "running" at boot has an
   // unknown draft outcome — the process must not silently re-issue a second
   // publish. Surface it as interrupted; retry is an explicit endpoint that
@@ -275,28 +345,32 @@ export function buildApp(config: ServerConfig) {
   for (const job of Object.values(jobs)) {
     if (job.status === "running") {
       job.status = "interrupted";
-      job.error = "interrupted by restart — draft outcome unknown; retry explicitly (idempotency-checked)";
+      job.error = "interrupted by restart — draft outcome unknown; inspect WeChat drafts before any further action";
       reconciled += 1;
     }
   }
-  if (reconciled > 0) audit({ event: "jobs-reconciled", interrupted: reconciled });
   const saveJobs = () => fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), { mode: 0o600 });
+  if (reconciled > 0) {
+    // Persist the fail-closed recovery decision immediately. Otherwise a
+    // second crash leaves jobs.json saying "running" despite the in-memory
+    // state being "interrupted", and the state does not survive restart.
+    saveJobs();
+    audit({ event: "jobs-reconciled", interrupted: reconciled });
+  }
 
   async function runJob(job: StoredJob): Promise<void> {
     job.status = "running";
     saveJobs();
+    job.safeToRetry = false;
+    // Once the remote publish pipeline starts, an error might mean WeChat
+    // accepted the draft but its response was lost. No automatic re-send.
+    let publishAttempted = false;
     const body = job.body;
     const caller: Caller = job.userId ? { admin: false, user: store.findUserById(job.userId)! } : { admin: true };
     const cred = resolveAccount(body.account, caller);
     try {
       if (!cred) throw new PublishError("ACCOUNT_NOT_FOUND", `Unknown account "${body.account}"`);
-      if (!caller.admin) {
-        const user = caller.user;
-        if (user.disabledAt) throw new PublishError("USER_DISABLED", "account disabled");
-        const limit = planLimit(user);
-        const used = store.getUsage(user);
-        if (used >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
-      }
+      if (!caller.admin && caller.user.disabledAt) throw new PublishError("USER_DISABLED", "account disabled");
       // idempotency reconciliation before sending: a previous lost run (crash
       // after draft/add, before the status save) may already have delivered
       // this job's draft — a fresh hit means done, never a second draft
@@ -315,6 +389,12 @@ export function buildApp(config: ServerConfig) {
           return;
         }
       }
+      // Recovering a confirmed draft does not consume a new quota unit.
+      if (!caller.admin) {
+        const limit = planLimit(caller.user);
+        if (store.getUsage(caller.user) >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
+      }
+      publishAttempted = true;
       const result = await publishToWechat(body, cred, tokens, materials);
       job.status = "done";
       job.result = result;
@@ -328,14 +408,25 @@ export function buildApp(config: ServerConfig) {
       notifyWebhook(body.account, "publish", { title: body.title, mediaId: result.mediaId, jobId: job.id, scheduled: true });
     } catch (err) {
       job.attempts += 1;
-      job.error = (err as Error).message;
-      audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
-      if (job.attempts >= JOB_MAX_ATTEMPTS) {
-        job.status = "failed";
-        notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+      if (publishAttempted) {
+        // The failure could be after draft/add committed remotely (including a
+        // failed local state write). A server-side key cannot query an unknown
+        // WeChat draft; automatically retrying could create duplicates.
+        job.status = "interrupted";
+        job.safeToRetry = false;
+        job.error = "draft outcome unknown after publish attempt; inspect WeChat drafts before any further action";
+        audit({ event: "scheduled-outcome-unknown", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts });
       } else {
-        job.status = "pending";
-        job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        job.safeToRetry = true;
+        job.error = redactSecrets((err as Error).message);
+        audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
+        if (job.attempts >= JOB_MAX_ATTEMPTS) {
+          job.status = "failed";
+          notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+        } else {
+          job.status = "pending";
+          job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        }
       }
     }
     saveJobs();
@@ -353,25 +444,8 @@ export function buildApp(config: ServerConfig) {
 
   // --- idempotency ------------------------------------------------------------
 
-  interface IdempotencyRecord {
-    mediaId: string;
-    at: number;
-    account: string;
-    title: string;
-    type: string;
-    /** owning user (null = admin) — records are not visible across callers */
-    userId: string | null;
-    /** verified request body hash; absent only in pre-v2 persisted records */
-    requestFingerprint?: string;
-  }
-
   const idempotencyFile = path.join(dataDir, "idempotency.json");
-  let idempotency: Record<string, IdempotencyRecord> = {};
-  try {
-    idempotency = JSON.parse(fs.readFileSync(idempotencyFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const idempotency: Record<string, IdempotencyRecord> = persistedIdempotency;
   const saveIdempotency = () => fs.writeFileSync(idempotencyFile, JSON.stringify(idempotency), { mode: 0o600 });
 
   const idempotencyFresh = (key: string): IdempotencyRecord | null => {
@@ -559,6 +633,11 @@ export function buildApp(config: ServerConfig) {
       return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${limit} account(s) — upgrade to bind more` });
     }
 
+    const name = (accountName ?? appId).trim().slice(0, 40) || appId;
+    if (config.accounts.some((account) => account.name === name) || store.findAccount(name)) {
+      return reply.code(409).send({ code: "ACCOUNT_NAME_TAKEN", message: "This account name is already in use; choose another name." });
+    }
+
     // live validation from this server (surfaces the IP-whitelist step)
     const check = await checkWechatCredential(appId, appSecret);
     audit({ event: "bind-attempt", contact: user.contact, appId, ok: check.ok, errcode: check.errcode, ip: check.ip });
@@ -570,8 +649,17 @@ export function buildApp(config: ServerConfig) {
       });
     }
 
-    const name = (accountName ?? appId).trim().slice(0, 40) || appId;
-    store.upsertAccount({ name, appId, appSecret, ownerUserId: user.id });
+    // Recheck authority and allowance after the remote validation. Insert
+    // conditionally in SQLite; never overwrite another owner's account.
+    const currentUser = store.findUserById(user.id);
+    if (!currentUser || currentUser.disabledAt || currentUser.apiKey !== user.apiKey) {
+      return reply.code(403).send({ code: "USER_DISABLED", message: "account access changed during validation" });
+    }
+    const currentLimit = store.planAllowance(currentUser).accounts;
+    if (!store.insertOwnedAccount({ name, appId, appSecret, ownerUserId: user.id }, currentLimit)) {
+      if (store.findAccount(name)) return reply.code(409).send({ code: "ACCOUNT_NAME_TAKEN", message: "This account name is already in use; choose another name." });
+      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${currentLimit} account(s)` });
+    }
     audit({ event: "bound", contact: user.contact, appId, accountName: name });
     return { ok: true, accountName: name };
   });
@@ -757,10 +845,11 @@ export function buildApp(config: ServerConfig) {
     return { ok: true };
   });
 
-  // explicit retry of an interrupted/failed job: the scheduler never auto-reruns
-  // interrupted work (#8), but the owner may re-admit it. The original
-  // idempotency key rides along, so if the lost run actually created the draft
-  // the retry dedupes against it instead of making a second draft.
+  // A possibly delivered draft cannot be safely retried just because
+  // someone clicks retry: WeChat has no server-side idempotency contract.
+  // Only a *locally confirmed*, matching draft can be reconciled without
+  // sending any network request. A missing/expired record stays interrupted.
+  // Known pre-publish failures retain the existing bounded retry path.
   app.post<{ Params: { id: string } }>("/v1/jobs/:id/retry", async (req, reply) => {
     const caller = (req as unknown as { caller: Caller }).caller;
     const job = jobs[(req.params as { id: string }).id];
@@ -768,6 +857,49 @@ export function buildApp(config: ServerConfig) {
     if (!caller.admin && job.userId !== caller.user.id) return reply.code(403).send({ code: "NOT_OWNED", message: "job belongs to another user" });
     if (job.status !== "interrupted" && job.status !== "failed") {
       return reply.code(400).send({ code: "NOT_RETRYABLE", message: `job is ${job.status}` });
+    }
+    if (job.status === "interrupted") {
+      const hit = job.idempotencyKey ? idempotencyFresh(job.idempotencyKey) : null;
+      if (!hit) {
+        return reply.code(409).send({
+          code: "DRAFT_OUTCOME_UNKNOWN",
+          message: "Remote draft outcome is unknown. Inspect WeChat drafts manually; this endpoint cannot safely resend an interrupted job.",
+          jobId: job.id,
+        });
+      }
+      // A pre-v2 idempotency record with no fingerprint is insufficient
+      // evidence of byte-identical content; do not trust a title match.
+      if (!hit.requestFingerprint ||
+          hit.requestFingerprint !== draftIdempotencyKey(job.body) ||
+          !hit.mediaId ||
+          !sameDraftIdentity(hit, job.body, job.userId)) {
+        return reply.code(409).send({
+          code: "IDEMPOTENCY_CONFLICT",
+          message: "Recorded draft identity does not match this job; no retry attempted.",
+          jobId: job.id,
+        });
+      }
+      // The local delivery record already confirms this exact draft. Finish
+      // the job in place instead of enqueueing it or consuming quota again.
+      job.status = "done";
+      job.result = {
+        mediaId: hit.mediaId, deduped: true,
+        account: job.body.account, title: job.body.title,
+        requestId: job.idempotencyKey,
+      };
+      job.error = undefined;
+      saveJobs();
+      audit({ event: "job-reconciled", jobId: job.id, account: job.body.account, title: job.body.title });
+      return { ok: true, job: jobInfo(job), deduped: true };
+    }
+    if (job.safeToRetry !== true) {
+      // Older failures did not record whether draft/add was attempted.
+      // Treat missing provenance as unknown rather than risking a duplicate.
+      return reply.code(409).send({
+        code: "DRAFT_OUTCOME_UNKNOWN",
+        message: "Cannot prove that this failed job stopped before WeChat draft submission; no retry attempted.",
+        jobId: job.id,
+      });
     }
     job.status = "pending";
     job.attempts = 0;

@@ -26,7 +26,7 @@ export function adminPage(): string {
     <input id="key" type="password" style="flex:1" placeholder="粘贴后回车">
     <button class="btn" id="login-btn">进入</button>
   </div>
-  <div class="hint">key 只存本浏览器 sessionStorage，关掉标签页即清除。</div>
+  <div class="hint">仅限自托管运营者。请通过 HTTPS 或可信私有网络访问；密钥保存在本标签页的会话存储中。公开托管和收款尚未开放。</div>
 </div>
 
 <div id="app" style="display:none">
@@ -41,10 +41,11 @@ export function adminPage(): string {
   <section id="tab-overview" class="panel">
     <div class="stat-grid" id="stat-grid"></div>
     <div class="card">
-      <h3>快捷入口</h3>
+      <h3>服务管理</h3>
+      <p class="hint">笔记仍在原来的文件夹或 Obsidian 笔记库中管理；公众号草稿请在微信后台查看。此处是自托管服务的开发期管理工具，订单功能仅用于历史数据及隔离测试。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="switchTab('users')">开通 / 延期用户</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">确认收款</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">查看历史订单</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('accounts')">绑定公众号</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('feed')">实时动态</button>
       </div>
@@ -70,7 +71,7 @@ export function adminPage(): string {
   <section id="tab-orders" class="panel" style="display:none">
     <div class="card">
       <div class="card-head">
-        <h3>订单</h3>
+        <h3>历史 / 测试订单</h3>
         <select id="o-filter" style="width:auto">
           <option value="pending">待确认</option>
           <option value="paid">已支付</option>
@@ -92,7 +93,7 @@ export function adminPage(): string {
       <table><thead><tr>
         <th>账号名</th><th>AppID</th><th>归属</th><th>来源</th>
       </tr></thead><tbody id="a-rows"></tbody></table>
-      <div class="hint">AppSecret 加密存储，任何接口都不回显。</div>
+      <div class="hint">数据库账号的 AppSecret 是否加密取决于服务器密钥配置；server.json 中的账号凭据按配置文件原样保存。请保护配置和备份。</div>
     </div>
   </section>
 
@@ -125,7 +126,7 @@ var H = function (extra) {
   return Object.assign({ 'x-api-key': KEY }, extra || {});
 };
 async function api(url, opts) {
-  var r = await fetch(url, Object.assign({ headers: H(opts && opts.headers) }, opts || {}));
+  var r = await fetch(url, Object.assign({}, opts || {}, { headers: H(opts && opts.headers) }));
   if (r.status === 401) { logout(); throw new Error('key 失效，请重新登录'); }
   return r;
 }
@@ -138,17 +139,31 @@ function toast(msg, kind) {
   setTimeout(function () { t.classList.add('show'); }, 10);
   setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 300); }, 3200);
 }
+var modalOpener = null;
+function showModal() {
+  modalOpener = document.activeElement;
+  document.getElementById('modal-mask').style.display = 'flex';
+  var focusTarget = document.querySelector('#modal input, #modal select, #modal button');
+  if (focusTarget) focusTarget.focus();
+}
 function confirmBox(text, onYes) {
   var mask = document.getElementById('modal-mask'), m = document.getElementById('modal');
   m.innerHTML = '<h3>确认操作</h3><p>' + esc(text) + '</p>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     + '<button class="btn btn-ghost btn-sm" id="cf-no">取消</button>'
     + '<button class="btn btn-sm btn-danger-solid" id="cf-yes">确认</button></div>';
-  mask.style.display = 'flex';
+  showModal();
   document.getElementById('cf-no').onclick = closeModal;
   document.getElementById('cf-yes').onclick = function () { closeModal(); onYes(); };
 }
-function closeModal() { document.getElementById('modal-mask').style.display = 'none'; }
+function closeModal() {
+  document.getElementById('modal-mask').style.display = 'none';
+  if (modalOpener && modalOpener.isConnected) modalOpener.focus();
+  modalOpener = null;
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && document.getElementById('modal-mask').style.display !== 'none') closeModal();
+});
 document.getElementById('modal-mask').onclick = function (e) { if (e.target.id === 'modal-mask') closeModal(); };
 function copyText(text, tip) {
   navigator.clipboard.writeText(text).then(function () { toast(tip || '已复制', 'ok'); },
@@ -166,6 +181,7 @@ function daysLeft(ts) { return Math.ceil((ts - Date.now()) / 86400000); }
 function logout() {
   sessionStorage.removeItem('publy_admin_key'); KEY = '';
   wsDown();
+  document.getElementById('key').value = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-card').style.display = 'block';
 }
@@ -180,7 +196,7 @@ async function login() {
   if (!KEY) return toast('请输入 key', 'err');
   try {
     var r = await fetch('/v1/admin/overview', { headers: H() });
-    if (r.status === 401) return toast('key 不对', 'err');
+    if (!r.ok) return toast(r.status === 401 ? 'key 不对' : '无法登录（HTTP ' + r.status + '）', 'err');
     sessionStorage.setItem('publy_admin_key', KEY);
     enter();
   } catch (e) { toast('网络错误：' + e.message, 'err'); }
@@ -216,7 +232,7 @@ async function loadOverview() {
     ['用户', d.users.total, d.users.pro + ' 个付费套餐生效' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
     ['本月发布', d.publishes.monthTotal, '全部用户合计'],
     ['待确认订单', d.orders.pending, d.orders.paid + ' 笔已支付 · 收入 ¥' + (d.orders.revenueFen / 100).toFixed(0)],
-    ['公众号账号', d.accounts.total, 'AppSecret 加密存储'],
+    ['公众号账号', d.accounts.total, '请保护凭据与备份'],
     ['今日事件', d.eventsToday, '审计流 24h 窗口']
   ];
   var g = document.getElementById('stat-grid');
@@ -270,10 +286,11 @@ function renderUsers() {
       var target = usersCache.find(function (u) { return u.id === b.dataset.dis; });
       var toDisabled = !target.disabled;
       confirmBox('确定' + (toDisabled ? '停用' : '启用') + '用户「' + target.contact + '」？', async function () {
-        await api('/v1/admin/users/' + b.dataset.dis + '/disable', {
+        var r = await api('/v1/admin/users/' + b.dataset.dis + '/disable', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ disabled: toDisabled })
         });
+        if (!r.ok) return toast('操作未完成（HTTP ' + r.status + '）', 'err');
         toast(toDisabled ? '已停用' : '已启用', 'ok');
         loadUsers();
       });
@@ -306,7 +323,7 @@ document.getElementById('u-search').addEventListener('input', renderUsers);
 function openModal(html) {
   var mask = document.getElementById('modal-mask'), m = document.getElementById('modal');
   m.innerHTML = html;
-  mask.style.display = 'flex';
+  showModal();
 }
 function openExtend(target) {
   openModal('<h3>开通 / 延期</h3>'
@@ -318,20 +335,30 @@ function openExtend(target) {
     + '<button class="btn btn-ghost btn-sm" onclick="closeModal()">取消</button>'
     + '<button class="btn btn-sm" id="m-go">执行</button></div>');
   document.getElementById('m-go').onclick = async function () {
-    var r = await api('/v1/admin/users', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ contact: gv('m-contact'), plan: gv('m-plan'), months: +gv('m-months') })
-    });
-    var d = await r.json();
-    if (d.apiKey) {
-      document.getElementById('m-out').innerHTML =
-        '<span class="success">✅ ' + (d.extended ? '已延期，到期 ' : '已开通，key: ') + '</span>'
-        + (d.extended ? esc(d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : '') : '<span class="key" data-k2="' + esc(d.apiKey) + '">' + esc(d.apiKey) + '</span>');
-      var k = document.querySelector('[data-k2]');
-      if (k) k.onclick = function () { copyText(k.dataset.k2, '完整 key 已复制'); };
-      loadUsers();
-    } else {
-      document.getElementById('m-out').textContent = JSON.stringify(d);
+    var button = this, out = document.getElementById('m-out'), completed = false;
+    button.disabled = true;
+    out.style.display = 'block';
+    out.textContent = '处理中…';
+    try {
+      var r = await api('/v1/admin/users', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contact: gv('m-contact'), plan: gv('m-plan'), months: +gv('m-months') })
+      });
+      var d = await r.json();
+      if (r.ok && d.apiKey) {
+        completed = true;
+        out.innerHTML = '<span class="success">' + (d.extended ? '已延期，到期 ' : '已开通，key: ') + '</span>'
+          + (d.extended ? esc(d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : '') : '<span class="key" data-k2="' + esc(d.apiKey) + '">' + esc(d.apiKey) + '</span>');
+        var k = document.querySelector('[data-k2]');
+        if (k) k.onclick = function () { copyText(k.dataset.k2, '完整 key 已复制'); };
+        loadUsers();
+      } else {
+        out.textContent = '操作未完成：' + (d.message || d.code || r.status);
+      }
+    } catch (e) {
+      out.textContent = '连接中断，操作结果可能未知。请先刷新用户列表确认，再决定是否重试。';
+    } finally {
+      button.disabled = completed;
     }
   };
 }
@@ -351,20 +378,10 @@ async function loadOrders() {
       + '<td>' + esc(o.provider || '—') + '</td>'
       + '<td>' + relTime(o.createdAt) + '</td>'
       + '<td class="td-actions">'
-      + (o.status === 'paid'
-        ? '<span class="badge badge-green">已支付</span>'
-        : '<button class="btn btn-sm" data-pay="' + o.id + '" data-c="' + esc(o.contact) + '">确认收款</button>')
+      + '<span class="badge badge-gray">' + esc(o.status === 'paid' ? '已支付（历史）' : '待确认（历史/测试）') + '</span>'
       + '</td></tr>';
   }).join('');
-  tb.querySelectorAll('[data-pay]').forEach(function (b) {
-    b.onclick = function () {
-      confirmBox('确认已收到「' + b.dataset.c + '」的款项并开通所购套餐？', async function () {
-        await api('/v1/admin/orders/' + b.dataset.pay + '/complete', { method: 'POST' });
-        toast('已开通', 'ok');
-        loadOrders();
-      });
-    };
-  });
+
 }
 document.getElementById('o-filter').onchange = loadOrders;
 
@@ -375,7 +392,7 @@ async function loadAccounts() {
   if (!(d.accounts ?? []).length) { tb.innerHTML = '<tr><td colspan="4" class="empty">还没有账号</td></tr>'; return; }
   tb.innerHTML = d.accounts.map(function (a) {
     return '<tr><td><b>' + esc(a.name) + '</b></td><td class="key">' + esc(a.appId) + '</td>'
-      + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">公共</span>') + '</td>'
+      + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">管理员</span>') + '</td>'
       + '<td>' + esc(a.source === 'config' ? 'server.json' : '数据库') + '</td></tr>';
   }).join('');
 }
@@ -383,8 +400,8 @@ document.getElementById('acc-btn').onclick = function () {
   openModal('<h3>新增公众号账号</h3>'
     + '<label>账号名</label><input id="a-name">'
     + '<label>AppID</label><input id="a-appid" placeholder="wx 开头">'
-    + '<label>AppSecret</label><input id="a-secret" placeholder="重置后复制">'
-    + '<label>所属用户联系方式（留空=公共）</label><input id="a-owner">'
+    + '<label>AppSecret</label><input id="a-secret" type="password" autocomplete="off" placeholder="从公众号平台获取">'
+    + '<label>所属用户联系方式（留空=管理员账号）</label><input id="a-owner">'
     + '<div class="msg" id="a-out"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     + '<button class="btn btn-ghost btn-sm" id="a-verify">① 验证连通性</button>'
@@ -413,7 +430,7 @@ document.getElementById('acc-btn').onclick = function () {
 };
 
 /* ---------- live feed (publy-ws gateway) ---------- */
-var ws = null, wsTimer = null;
+var ws = null, wsTimer = null, wsGeneration = 0;
 var EV_CLS = { published: 'ok', failed: 'err', scheduled: '', cancelled: 'dim', deduped: 'dim', 'purchase-paid': 'gold', 'purchase-completed': 'gold', bound: 'ok' };
 function wsUrl() {
   var saved = localStorage.getItem('publy_ws_url');
@@ -428,6 +445,9 @@ function wsSetState(state, text) {
   st.textContent = text;
 }
 function wsDown() {
+  wsGeneration++;
+  var badge = document.getElementById('conn-badge');
+  if (badge) badge.style.display = 'none';
   if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
   if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
   var dot = document.getElementById('ws-dot');
@@ -439,14 +459,24 @@ function wsEnsure() {
   if (ws && (ws.readyState === 1 || ws.readyState === 0)) return;
   wsConnect();
 }
-function wsConnect() {
+async function wsConnect() {
   var url = document.getElementById('ws-url').value.trim();
   if (!url) return;
   localStorage.setItem('publy_ws_url', url);
   wsDown();
-  wsSetState('wait', '连接中…');
-  try { ws = new WebSocket(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(KEY)); }
-  catch (e) { wsSetState('err', '地址无效'); return; }
+  wsSetState('wait', '获取连接凭证…');
+  var keyAtStart = KEY, generation = wsGeneration;
+  try {
+    var response = await api('/v1/ws-ticket', { method: 'POST' });
+    if (!response.ok) throw new Error('无法获取短期凭证（HTTP ' + response.status + '）');
+    var data = await response.json();
+    if (!KEY || KEY !== keyAtStart || generation !== wsGeneration) return;
+    var target = new URL(url);
+    if (target.protocol !== 'ws:' && target.protocol !== 'wss:') throw new Error('地址必须使用 ws 或 wss');
+    target.searchParams.set('key', data.ticket);
+    wsSetState('wait', '连接中…');
+    ws = new WebSocket(target.toString());
+  } catch (e) { if (generation === wsGeneration) wsSetState('err', '连接失败：' + e.message); return; }
   ws.onopen = function () {
     wsSetState('on', '已连接');
     document.getElementById('conn-badge').style.display = 'inline-block';
@@ -507,7 +537,9 @@ const ADMIN_CSS = `
     padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .panel .card { margin-bottom: 16px; }
+  .panel .card { margin-bottom: 16px; overflow-x: auto; }
+  .tabs { overflow-x: auto; }
+  .tab { white-space: nowrap; }
   .card-head { display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .card-head h3 { border: 0; padding: 0; margin: 0; font-size: 15px; }

@@ -260,6 +260,19 @@ export class Store {
       .run(acc.name, acc.appId, this.encryptSecret(acc.appSecret), acc.ownerUserId);
   }
 
+  /** Atomically admit a new user-owned account without replacing an existing
+   * name or exceeding the user's account allowance under concurrent binds. */
+  insertOwnedAccount(acc: AccountRow, limit: number): boolean {
+    if (!acc.ownerUserId) throw new Error("owner required");
+    const result = this.db.prepare(`
+      INSERT INTO accounts (name, app_id, app_secret, owner_user_id)
+      SELECT ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM accounts WHERE owner_user_id = ?) < ?
+      ON CONFLICT(name) DO NOTHING
+    `).run(acc.name, acc.appId, this.encryptSecret(acc.appSecret), acc.ownerUserId, acc.ownerUserId, limit);
+    return Number(result.changes) === 1;
+  }
+
   findAccount(name: string): AccountRow | null {
     const row = this.db.prepare("SELECT * FROM accounts WHERE name = ?").get(name) as Record<string, unknown> | undefined;
     return row
