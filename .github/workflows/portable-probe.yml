@@ -57,14 +57,14 @@ jobs:
           $inputDir = Join-Path $env:RUNNER_TEMP "Publy Input"
           New-Item -ItemType Directory -Force (Join-Path $inputDir "素材") | Out-Null
           [IO.File]::WriteAllBytes((Join-Path $inputDir "素材\封面 图.png"), [Convert]::FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3p8AAAAASUVORK5CYII="))
-          $article = Join-Path $inputDir "测试 文章.md"
+          $article = Join-Path $inputDir "测试&文章.md"
           [IO.File]::WriteAllText($article, "---`ntitle: 安装测试`ncover: 素材/封面 图.png`n---`n`n# 安装测试`n`n公式 `$x^2 + y^2`$。`n`n![图](素材/封面%20图.png)`n", [Text.UTF8Encoding]::new($false))
           $before = (Get-FileHash $article -Algorithm SHA256).Hash
           $oldPath, $oldProfile, $oldAppData, $oldLocal = $env:PATH, $env:USERPROFILE, $env:APPDATA, $env:LOCALAPPDATA
           try {
             $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
             $env:USERPROFILE = $cleanHome; $env:APPDATA = $cleanHome; $env:LOCALAPPDATA = $cleanHome
-            $launcher = Join-Path $probe "publy.cmd"
+            $launcher = Join-Path $probe "publy.ps1"
             $caps = (& $launcher capabilities --json | ConvertFrom-Json)
             if ($LASTEXITCODE -ne 0 -or $caps.destination -ne "wechat-official-account-drafts") { throw "Capabilities failed" }
             $card = (& $launcher preview (Join-Path $probe "app\samples\card-sample.md") --json --out (Join-Path $env:RUNNER_TEMP "card-preview.html") | ConvertFrom-Json)

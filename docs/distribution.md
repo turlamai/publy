@@ -44,9 +44,10 @@ Chinese paths, local image and formula were exercised with an empty home and a
 system-only PATH. The article source hash remained unchanged. The runtime must be authenticated and supplied
 by the build operator; the script does not authenticate it. The developer
 workflow `portable-probe.yml` exercises the candidate on Linux, macOS and
-Windows CI; only an actual passing run is evidence. Windows support is a new
-candidate and has not yet passed its CI run. None of these checks establishes
-a clean-machine installation guarantee.
+Windows CI; only an actual passing run is evidence. The original Windows
+portable probe passed on integration commit `1c0b9a9`; the revised PowerShell
+launcher and metacharacter-path test require a fresh run and may be subject to
+local execution policy. None of these checks establishes a clean-machine installation guarantee.
 
 The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
 `037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.

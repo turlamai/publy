@@ -67,7 +67,9 @@ fs.chmodSync(path.join(output, "runtime", runtimeName), 0o755);
 fs.copyFileSync(license, path.join(output, "runtime", "LICENSE"));
 fs.copyFileSync(path.join(root, "LICENSE"), path.join(output, "LICENSE"));
 if (process.platform === "win32") {
-  fs.writeFileSync(path.join(output, "publy.cmd"), '@echo off\r\n"%~dp0runtime\\node.exe" "%~dp0app\\dist\\index.js" %*\r\n');
+  // PowerShell forwards arguments as an array; cmd.exe %* can reinterpret
+  // metacharacters embedded in a user-selected Markdown filename.
+  fs.writeFileSync(path.join(output, "publy.ps1"), '& "$PSScriptRoot\\runtime\\node.exe" "$PSScriptRoot\\app\\dist\\index.js" @args\r\nexit $LASTEXITCODE\r\n');
 } else {
   fs.writeFileSync(path.join(output, "publy"), '#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$HERE/runtime/node" "$HERE/app/dist/index.js" "$@"\n', { mode: 0o755 });
 }

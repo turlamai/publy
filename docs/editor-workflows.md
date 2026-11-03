@@ -93,10 +93,9 @@ browser action. `check` itself does not fetch remote resources.
 5. **Return:** The original source stays in place, remains editable by Typora,
    Obsidian, VS Code etc., and retains the same relative media paths.
 
-The companion, if built, is a **delivery shell**, not a second Markdown
-editor or database. Rivet is a candidate only if it meets cross-platform
-packaging, accessibility and installation quality gates; the core document
-contract must not depend on it.
+A future publishing companion should make delivery easier while preserving
+the original files. Any such application must meet the cross-platform
+installation and accessibility requirements before release.
 
 ## Priority and acceptance
 
