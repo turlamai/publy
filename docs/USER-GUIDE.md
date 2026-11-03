@@ -52,7 +52,7 @@ recent delivery events. The event list is limited and may be affected by log
 retention; it does not replace checking the WeChat draft box.
 It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
 open. Access it over HTTPS or a trusted private network and keep the admin key
-private. See [operations and backups](operations.md) for server details.
+private. See the [operator guide](operator-guide.md) for login and page-by-page instructions, and [operations and backups](operations.md) for server details.
 
 ## Your first successful session
 
