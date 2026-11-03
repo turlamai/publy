@@ -271,12 +271,12 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     }
     $(el).attr("src", `${ATTACHMENT_SCHEME}${name}`);
     // inline style wins over theme `img` rules — themes set display:block on
-    // images, which would tear an inline formula out of the text line
+    // images and add block-image margins, which would enlarge the text line
     $(el).attr(
       "style",
       display
         ? `display:block;margin:12px auto;width:${img.widthPx}px`
-        : `display:inline-block;width:${img.widthPx}px;vertical-align:${img.valignPx}px;border-radius:0`,
+        : `display:inline-block;margin:0;padding:0;width:${img.widthPx}px;vertical-align:${img.valignPx}px;border-radius:0`,
     );
     $(el).removeAttr("data-tex data-display data-hex");
   });

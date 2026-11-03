@@ -31,6 +31,8 @@ export interface ServerAccount {
 
 export interface ServerConfig {
   port: number;
+  /** Loopback by default; opt into an external bind explicitly. */
+  host?: string;
   /** admin key: full access, no quota (the operator) */
   apiKey: string;
   accounts: ServerAccount[];
@@ -102,6 +104,9 @@ export function loadServerConfig(configPath?: string): ServerConfig {
   const file = configPath ?? process.env.PUBLY_SERVER_CONFIG ?? DEFAULT_CONFIG_PATH;
   const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
   if (!raw.apiKey) throw new Error(`server config ${file} is missing "apiKey"`);
+  if (raw.host !== undefined && (typeof raw.host !== "string" || !raw.host.trim())) {
+    throw new Error("server config host must be a non-empty string");
+  }
   if (!Array.isArray(raw.accounts) || raw.accounts.length === 0) {
     throw new Error(`server config ${file} must declare at least one account`);
   }
@@ -112,6 +117,7 @@ export function loadServerConfig(configPath?: string): ServerConfig {
   }
   return {
     port: raw.port ?? 8081,
+    host: raw.host ?? "127.0.0.1",
     apiKey: raw.apiKey,
     accounts: raw.accounts,
     dataDir: raw.dataDir ?? path.join(path.dirname(file), "server-data"),
@@ -1150,7 +1156,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     } catch { console.error('[boot] could not persist secretKey — secrets stay encrypted only after manual key setup'); }
   }
   const app = buildApp(config);
-  await app.listen({ port: config.port, host: "0.0.0.0" });
+  await app.listen({ port: config.port, host: config.host ?? "127.0.0.1" });
   console.log(`publy-server listening on :${config.port} (purchase page: ${config.publicUrl ?? "http://localhost:" + config.port}/ )`);
 }
 

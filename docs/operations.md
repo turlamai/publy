@@ -49,6 +49,11 @@
   `"wsRequireTickets": true` in `server.json` to retire the legacy key-in-URL
   path.
 
+The development server defaults to `127.0.0.1`; set `host` explicitly only
+when a network listener is needed. This changes older direct-listener behavior:
+check reverse-proxy routing and firewall rules before an upgrade. A public
+reverse proxy requires its own HTTPS and access controls.
+
 ## Fixed-egress personal pilot runbook (issue #8) — NOT YET EXECUTED
 
 The checklist below is the acceptance contract for the first owned-account

@@ -105,6 +105,20 @@ test("renderMarkdown rasterizes inline and block TeX into attachments", () => {
   assert.match(result.html, /display:\s*block;\s*margin:\s*12px auto;\s*width:\s*\d+(\.\d+)?px/);
 });
 
+test("inline formulas override theme image margins", () => {
+  for (const theme of ["claude", "medium", "wechat", "ink", "tech", "rose", "official", "fortune", "terminal", "news"]) {
+    const result = renderMarkdown("文字 $a^2+b^2=c^2$ 继续。", { theme });
+    const $ = cheerio.load(result.html);
+    const formula = $("img.publy-math");
+    assert.equal(formula.length, 1, theme);
+    const style = formula.attr("style") ?? "";
+    assert.match(style, /(?:^|;)\s*display:\s*inline-block(?:;|$)/, theme);
+    assert.match(style, /(?:^|;)\s*margin:\s*0(?:px)?(?:;|$)/, `${theme}: inherited image margins move text lines`);
+    assert.match(style, /(?:^|;)\s*vertical-align:\s*-?[\d.]+px(?:;|$)/, theme);
+    assert.ok(formula.parent().text().includes("文字") && formula.parent().text().includes("继续"), theme);
+  }
+});
+
 test("renderMarkdown dedupes repeated formulas into one attachment", () => {
   const md = "同式两次 $E=mc^2$ 与 $E=mc^2$。";
   const result = renderMarkdown(`---\ntitle: t\n---\n\n${md}`, { theme: "claude" });

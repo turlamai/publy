@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildApp, signWsTicket, verifyWsTicket, redactSecrets, type ServerConfig } from "./index.js";
+import { buildApp, loadServerConfig, signWsTicket, verifyWsTicket, redactSecrets, type ServerConfig } from "./index.js";
 import { draftIdempotencyKey } from "@publy/core";
 import { Store } from "./store.js";
 
@@ -56,6 +56,22 @@ before(async () => {
 after(async () => {
   await app.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
+test("server configuration binds loopback by default and requires a valid explicit host", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-server-host-"));
+  const file = path.join(dir, "server.json");
+  const value = { apiKey: "synthetic", accounts: [{ name: "test", appId: "wx", appSecret: "synthetic" }] };
+  try {
+    fs.writeFileSync(file, JSON.stringify(value));
+    assert.equal(loadServerConfig(file).host, "127.0.0.1");
+    fs.writeFileSync(file, JSON.stringify({ ...value, host: "0.0.0.0" }));
+    assert.equal(loadServerConfig(file).host, "0.0.0.0");
+    for (const host of ["", " ", null, 123]) {
+      fs.writeFileSync(file, JSON.stringify({ ...value, host }));
+      assert.throws(() => loadServerConfig(file), /host must be a non-empty string/);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 // --- redaction ----------------------------------------------------------------
