@@ -49,7 +49,19 @@ test("operator requests retain authentication and live feed uses short-lived tic
   assert.match(element("j-rows").innerHTML, /结果未知，请检查草稿箱/);
   assert.match(element("j-rows").innerHTML, /&lt;script&gt;/);
   assert.doesNotMatch(element("j-rows").innerHTML, /<script>/);
+  context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ history: [
+    { event: "published", ts: "2026-11-01T00:00:00Z", title: "<img>", account: "a" },
+    { event: "outcome-unknown", ts: "2026-11-01T00:00:01Z", title: "pending", account: "b" },
+    { event: "purchase-paid", title: "not a draft" },
+  ] }) });
+  await context.loadDraftHistory();
+  assert.match(element("h-rows").innerHTML, /结果未知，请检查草稿箱/);
+  assert.match(element("h-rows").innerHTML, /&lt;img&gt;/);
+  assert.doesNotMatch(element("h-rows").innerHTML, /not a draft/);
   context.fetch = async () => { throw new Error("offline"); };
+  await context.loadDraftHistory();
+  assert.match(element("history-status").textContent, /无法读取记录/);
+  assert.equal(element("h-rows").innerHTML, "");
   await context.loadJobs();
   assert.match(element("jobs-status").textContent, /无法读取任务/);
   assert.equal(element("j-rows").innerHTML, "");

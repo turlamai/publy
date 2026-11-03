@@ -47,8 +47,9 @@ that WeChat did not receive the draft.
 
 A self-hosted server also has an operator page at `/admin` for service users,
 WeChat accounts, scheduled draft tasks, historical orders and events. The
-**Draft tasks** view shows pending, confirmed and unknown outcomes; it does
-not list all immediate submissions or replace checking the WeChat draft box.
+**Draft tasks** view shows pending, confirmed and unknown outcomes, plus
+recent delivery events. The event list is limited and may be affected by log
+retention; it does not replace checking the WeChat draft box.
 It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
 open. Access it over HTTPS or a trusted private network and keep the admin key
 private. See [operations and backups](operations.md) for server details.

@@ -65,6 +65,11 @@ export function adminPage(): string {
       <div id="jobs-status" class="hint" role="status" aria-live="polite"></div>
       <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th></tr></thead>
       <tbody id="j-rows"></tbody></table>
+      <h3 style="margin-top:28px">最近投递记录</h3>
+      <p class="hint">显示最近 100 条服务事件中的投递记录，可能受日志保留影响；请以公众号草稿箱和实际回执为准。</p>
+      <div id="history-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>时间</th><th>标题</th><th>公众号</th><th>结果</th></tr></thead>
+      <tbody id="h-rows"></tbody></table>
     </div>
   </section>
 
@@ -231,7 +236,7 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
   document.getElementById('tab-' + name).style.display = 'block';
   if (name === 'overview') loadOverview();
-  if (name === 'jobs') loadJobs();
+  if (name === 'jobs') refreshDrafts();
   if (name === 'users') loadUsers();
   if (name === 'orders') loadOrders();
   if (name === 'accounts') loadAccounts();
@@ -286,7 +291,31 @@ async function loadJobs() {
     status.textContent = '无法读取任务，请检查服务连接和权限后刷新。';
   }
 }
-document.getElementById('jobs-refresh').onclick = loadJobs;
+async function loadDraftHistory() {
+  var status = document.getElementById('history-status'), rows = document.getElementById('h-rows');
+  status.textContent = '正在读取记录…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/history?limit=100');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.history)) throw new Error('记录格式错误');
+    var labels = { published: '草稿已确认', 'scheduled-published': '排程草稿已确认',
+      failed: '失败，请核对', 'scheduled-failed': '排程失败，请核对',
+      'outcome-unknown': '结果未知，请检查草稿箱', 'scheduled-outcome-unknown': '结果未知，请检查草稿箱',
+      deduped: '重复请求已处理，请核对任务', 'scheduled-deduped': '排程草稿已确认', scheduled: '已排程', cancelled: '已取消' };
+    var records = data.history.filter(function (entry) { return entry && Object.prototype.hasOwnProperty.call(labels, entry.event); }).reverse();
+    if (!records.length) rows.innerHTML = '<tr><td colspan="4" class="empty">最近没有可显示的投递记录</td></tr>';
+    else rows.innerHTML = records.map(function (entry) {
+      var when = new Date(entry.ts);
+      return '<tr><td>' + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
+        + esc(entry.title) + '</td><td>' + esc(entry.account) + '</td><td>' + esc(labels[entry.event]) + '</td></tr>';
+    }).join('');
+    status.textContent = '显示 ' + records.length + ' 条记录';
+  } catch (error) { status.textContent = '无法读取记录，请检查服务连接和权限后刷新。'; }
+}
+function refreshDrafts() { void loadJobs(); void loadDraftHistory(); }
+document.getElementById('jobs-refresh').onclick = refreshDrafts;
 
 /* ---------- users ---------- */
 var usersCache = [];
