@@ -27,6 +27,11 @@ const suppliedPluginDir = args[0];
 // a broken release appear to pass, and would mutate the caller's vault.
 const pluginDir = suppliedPluginDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-verify-"));
 const communityFiles = ["main.js", "manifest.json", "styles.css"];
+// A supplied vault belongs to the caller. Only remove the synthetic directory
+// created by this harness, including on an explicit failure exit.
+if (suppliedPluginDir === undefined) {
+  process.once("exit", () => { try { fs.rmSync(pluginDir, { recursive: true, force: true }); } catch {} });
+}
 
 if (suppliedPluginDir === undefined) {
   // Only synthesize an installation when no directory was supplied.

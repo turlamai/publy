@@ -53,6 +53,8 @@ test("renderCards fires onCard progressively, in order", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-oncard-"));
+  const existing = path.join(outDir, ".publy-card-0.svg");
+  fs.writeFileSync(existing, "user-owned sentinel");
   const seen: number[] = [];
   let totalSeen = 0;
   const result = await renderCards(SAMPLE, {
@@ -66,6 +68,7 @@ test("renderCards fires onCard progressively, in order", async () => {
   assert.equal(totalSeen, result.cards.length);
   assert.deepEqual(seen, result.cards.map((_, i) => i));
   assert.ok(seen.length >= 2);
+  assert.equal(fs.readFileSync(existing, "utf8"), "user-owned sentinel");
   fs.rmSync(outDir, { recursive: true, force: true });
 });
 

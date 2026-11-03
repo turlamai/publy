@@ -119,6 +119,23 @@ test("inline formulas override theme image margins", () => {
   }
 });
 
+test("cleanup removes generated math and SVG intermediates without touching source assets", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cleanup-test-"));
+  try {
+    const source = path.join(dir, "original.svg");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8"/></svg>';
+    fs.writeFileSync(source, svg);
+    const result = renderMarkdown("A $x^2$ and ![sample](original.svg)", { baseDir: dir });
+    const generated = result.attachments.map((a) => a.path);
+    assert.equal(generated.length, 2);
+    assert.ok(generated.every((file) => fs.existsSync(file)));
+    result.cleanup();
+    result.cleanup();
+    assert.ok(generated.every((file) => !fs.existsSync(file)));
+    assert.equal(fs.readFileSync(source, "utf8"), svg);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("renderMarkdown dedupes repeated formulas into one attachment", () => {
   const md = "同式两次 $E=mc^2$ 与 $E=mc^2$。";
   const result = renderMarkdown(`---\ntitle: t\n---\n\n${md}`, { theme: "claude" });

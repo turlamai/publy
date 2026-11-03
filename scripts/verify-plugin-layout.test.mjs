@@ -82,3 +82,14 @@ test("side-loaded mode preserves a supplied vault and its sidecars", (t) => {
   assert.equal(fs.readFileSync(path.join(dir, "fonts", "sentinel"), "utf8"), "do not delete");
   assert.equal(fs.readFileSync(path.join(dir, "node_modules", "sentinel"), "utf8"), "do not delete");
 });
+
+test("synthetic plugin smoke removes generated intermediates from its private temp directory", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-temp-test-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, [verifier, "--community-only"], {
+    encoding: "utf8", timeout: 60000,
+    env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir },
+  });
+  assert.equal(result.status, 0, result.stderr || String(result.error));
+  assert.deepEqual(fs.readdirSync(dir), [], "synthetic plugin and rendered intermediates must be removed");
+});

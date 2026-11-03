@@ -3,6 +3,7 @@
 // seconds per deck, no AI image generation.
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
@@ -292,14 +293,21 @@ export async function renderCards(
         throw err;
       }
     }
-    const tmpSvg = path.join(outDir, `.publy-card-${i}.svg`);
-    fs.writeFileSync(tmpSvg, svg);
-    const png = svgToPng(tmpSvg, CARD_WIDTH);
-    fs.rmSync(tmpSvg, { force: true });
+    // Intermediate SVG/PNG files live in owned private temp directories,
+    // never at a predictable path in the user's chosen output folder.
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-card-svg-"));
+    let png: string | undefined;
     const name = `card-${String(i + 1).padStart(2, "0")}-${sections[i].kind}.png`;
     const file = path.join(outDir, name);
-    fs.copyFileSync(png, file);
-    fs.rmSync(path.dirname(png), { recursive: true, force: true });
+    try {
+      const tmpSvg = path.join(tempDir, "card.svg");
+      fs.writeFileSync(tmpSvg, svg);
+      png = svgToPng(tmpSvg, CARD_WIDTH);
+      fs.copyFileSync(png, file);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      if (png) fs.rmSync(path.dirname(png), { recursive: true, force: true });
+    }
     const out: CardOutput = { kind: sections[i].kind, name, file };
     cards.push(out);
     opts.onCard?.(out, i, sections.length);

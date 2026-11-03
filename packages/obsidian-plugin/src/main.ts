@@ -1165,8 +1165,10 @@ export default class PublyPlugin extends Plugin {
     if (!f) throw new Error(t("errNoActiveNote"));
     const raw = await this.app.vault.cachedRead(f);
     const rendered = renderMarkdown(raw, this.renderOptions());
-    for (const w of rendered.warnings) console.warn("[publy] " + w);
-    return this.inlineImages(rendered.html, rendered.attachments);
+    try {
+      for (const w of rendered.warnings) console.warn("[publy] " + w);
+      return this.inlineImages(rendered.html, rendered.attachments);
+    } finally { rendered.cleanup(); }
   }
 
   /** preview-only: core emits attachment://<name> refs that publishing swaps
@@ -1309,6 +1311,7 @@ export default class PublyPlugin extends Plugin {
     if (gen !== this.previewGen) return;
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
+      try {
       for (const w of rendered.warnings) console.warn("[publy] " + w);
       if (gen !== this.previewGen) return;
       const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
@@ -1318,6 +1321,7 @@ export default class PublyPlugin extends Plugin {
         author: rendered.meta.author,
         account: this.settings.account || undefined,
       });
+      } finally { rendered.cleanup(); }
     } catch (err) {
       if (gen === this.previewGen) new Notice(`Publy: ${(err as Error).message}`);
     }
@@ -1336,8 +1340,9 @@ export default class PublyPlugin extends Plugin {
     const raw = rawArg ?? (await this.app.vault.cachedRead(f));
     const stale = () => gen !== undefined && gen !== this.previewGen;
     if (stale()) return;
+    let outDir: string | undefined;
     try {
-      const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
+      outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
       view.refresh = () => this.previewCardDeck(f);
       // progressive: the panel skeleton appears immediately and each card
@@ -1363,6 +1368,8 @@ export default class PublyPlugin extends Plugin {
       }
     } catch (err) {
       new Notice(t("cardsFail", { msg: (err as Error).message }));
+    } finally {
+      if (outDir) fs.rmSync(outDir, { recursive: true, force: true });
     }
   }
 
@@ -1376,6 +1383,7 @@ export default class PublyPlugin extends Plugin {
     const raw = await this.app.vault.cachedRead(f);
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
+      try {
       for (const w of rendered.warnings) console.warn("[publy] " + w);
       // A successful copy should be directly usable in the target editor:
       // unavailable formulas/media and attachment:// placeholders are not.
@@ -1392,6 +1400,7 @@ export default class PublyPlugin extends Plugin {
       });
       await navigator.clipboard.write([item]);
       new Notice(t("copyOk"));
+      } finally { rendered.cleanup(); }
     } catch (err) {
       new Notice(`Publy: ${(err as Error).message}`);
     }
@@ -1477,6 +1486,7 @@ export default class PublyPlugin extends Plugin {
     let author: string | undefined;
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
+      try {
       for (const w of rendered.warnings) console.warn("[publy] " + w);
       const problems = rendered.warnings.filter(blockingMediaWarning);
       if (problems.length) {
@@ -1548,6 +1558,7 @@ export default class PublyPlugin extends Plugin {
         }
         html = rendered.html;
       }
+      } finally { rendered.cleanup(); }
     } catch (err) {
       progress.hide();
       this.status("");

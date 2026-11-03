@@ -178,6 +178,8 @@ publy quota                                    # 群发配额余量
 - 输入兼容 Obsidian：`![[img.png|650]]`、`[[wikilink|别名]]` 原生解析（`--media-dir` 指定资源目录）；frontmatter 的 `title` / `cover` / `type` / `theme` 直接消费
 - 密钥管理：配置文件只存环境变量名引用（`--secret-env`），与 tlai 技能的 `${VAR}` 约定一致
 
+Core callers that use `renderMarkdown` must read any generated attachment files before calling `result.cleanup()` in a `finally` block. That cleanup removes only renderer-owned intermediate files, never source assets. CLI and plugin paths do this automatically; deliberately created preview HTML remains an output for the user to remove.
+
 ### Agent theme preview (development)
 
 `theme preview <name> --json` writes a private offline sample and returns one `theme-preview` JSON object; it never opens a browser or submits a draft. Unknown themes exit 2 and rendering failures exit 3. See [the Agent CLI contract](agent-cli.md).

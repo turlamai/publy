@@ -215,6 +215,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
           footnote: opts.footnote !== false,
           footer: opts.footer,
         });
+        try {
         attachments = rendered.attachments.length;
         warnings.push(...rendered.warnings);
         for (const warning of rendered.warnings) {
@@ -228,6 +229,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
         if (type === "image_post" && attachments === 0) {
           problems.push("No local images found for the image post.");
         }
+        } finally { rendered.cleanup(); }
       }
     } catch {
       // Avoid echoing the raw YAML/parser exception: it can include snippets
@@ -318,6 +320,7 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
     return;
   }
 
+  try {
   const problems = result.warnings.filter(blockingMediaWarning);
   if (result.type === "article" && !result.cover && result.attachments.length === 0) {
     problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
@@ -361,6 +364,7 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
   } else {
     process.stdout.write(result.html);
   }
+  } finally { result.cleanup(); }
 }
 
 /** Embed private/local images inside the temporary preview, never sending
@@ -464,6 +468,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
       footnote: opts.footnote !== false,
       footer: opts.footer,
     });
+    try {
     for (const warning of result.warnings) console.error("warn: " + warning);
     preview = inlineLocalPreviewImages(result.html, result.attachments);
     problems = result.warnings.filter(blockingMediaWarning);
@@ -475,6 +480,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     } else if (publishType(parsed.meta) === "image_post" && result.attachments.length === 0) {
       problems.push("No local images found for the image post.");
     }
+    } finally { result.cleanup(); }
   }
 
   const warningPanel = problems.length
@@ -641,6 +647,8 @@ async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<
     process.exitCode = exitCode;
   };
   if (!card && !article) return failure("UNKNOWN_THEME", 2);
+  let outDir: string | undefined;
+  let complete = false;
   try {
     // Samples ship inside the package; fall back to repo layouts in development.
     const distDir = path.dirname(fileURLToPath(import.meta.url));
@@ -649,21 +657,26 @@ async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<
     const sampleDir = sampleDirs.find((d) => fs.existsSync(path.join(d, sample)));
     if (!sampleDir) throw new Error("bundled sample missing");
     const raw = fs.readFileSync(path.join(sampleDir, sample), "utf8");
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-preview-"));
+    outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-preview-"));
     const output = path.join(outDir, "preview.html");
     let html: string;
     if (card) {
       const result = await renderCards(raw, { theme: name, outDir, offline: opts.json === true });
       html = buildPreviewHtml(result);
+      // The HTML embeds each PNG; the separate card files are no longer needed.
+      for (const card of result.cards) fs.rmSync(card.file, { force: true });
     } else {
       const rendered = renderMarkdown(raw, { theme: name });
-      html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"></head><body>${rendered.html}</body></html>`;
+      try { html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"></head><body>${rendered.html}</body></html>`; } finally { rendered.cleanup(); }
     }
     fs.writeFileSync(output, html, { mode: 0o600, flag: "wx" });
     if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "theme-preview", ok: true, theme: name, type: card ? "cards" : "article", output, contentType: "text/html", networkUsed: false, submitted: false }));
     else { console.error(`preview → ${output}`); openInBrowser(output); }
+    complete = true;
   } catch {
     failure("THEME_PREVIEW_FAILED", 3);
+  } finally {
+    if (outDir && !complete) fs.rmSync(outDir, { recursive: true, force: true });
   }
 }
 
@@ -759,6 +772,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     const mode = String((parsed.meta as Record<string, unknown>).mode ?? "text").toLowerCase();
     if (mode === "cards") {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
+      try {
       const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
       if (!cardResult.lint.ok) {
         for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
@@ -772,6 +786,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       }));
       html = captionToHtml(cardResult.caption);
       coverName = images[0]?.name;
+      } finally { fs.rmSync(outDir, { recursive: true, force: true }); }
     } else {
       const rendered = renderMarkdown(raw, {
         theme: opts.theme,
@@ -782,8 +797,10 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
         footnote: false,
         footer: opts.footer,
       });
-      emitWarnings(rendered.warnings);
-      ({ html, images, coverName } = textModePayload(rendered, raw));
+      try {
+        emitWarnings(rendered.warnings);
+        ({ html, images, coverName } = textModePayload(rendered, raw));
+      } finally { rendered.cleanup(); }
     }
     title = opts.title || parsed.meta.title || path.basename(file, path.extname(file));
   } else {
@@ -796,6 +813,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       footnote: opts.footnote !== false,
       footer: opts.footer,
     });
+    try {
     emitWarnings(rendered.warnings);
     const attachments: Attachment[] = rendered.attachments.map((a) => ({
       name: a.name,
@@ -826,6 +844,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     html = rendered.html;
     images = attachments;
     title = opts.title || rendered.title || path.basename(file, path.extname(file));
+    } finally { rendered.cleanup(); }
   }
 
   // Failed image references must stop before any HTTP POST. An explicit

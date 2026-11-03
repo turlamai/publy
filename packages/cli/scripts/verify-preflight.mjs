@@ -207,6 +207,27 @@ try {
   assert.ok(!malformedAccount.stdout.includes(secretConfigMarker));
   assert.ok(!malformedAccount.stderr.includes(secretConfigMarker));
 
+  // Generated math and SVG images must be removed after the CLI has consumed
+  // them; original source assets must stay intact.
+  const cleanupDir = path.join(dir, "isolated-render-temp");
+  fs.mkdirSync(cleanupDir);
+  const cleanupSvg = path.join(dir, "source-cleanup.svg");
+  const cleanupNote = path.join(dir, "cleanup-test.md");
+  const svgSource = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8"/></svg>';
+  fs.writeFileSync(cleanupSvg, svgSource);
+  fs.writeFileSync(cleanupNote, "---\ntitle: cleanup\n---\n\nFormula $x^2$ and ![asset](source-cleanup.svg)");
+  for (const [command, extra] of [["check", []], ["preview", ["--out", path.join(dir, "cleanup-preview.html")]]]) {
+    const result = spawnSync(process.execPath, [entrypoint, command, cleanupNote, ...extra, "--json"], {
+      encoding: "utf8", timeout: 40000,
+      env: { ...process.env, TMPDIR: cleanupDir, TMP: cleanupDir, TEMP: cleanupDir,
+        PUBLY_CONFIG: path.join(dir, "no-such-config.json") },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).ok, true);
+    assert.deepEqual(fs.readdirSync(cleanupDir).filter((name) => /^publy-(math|svg)-/.test(name)), []);
+    assert.equal(fs.readFileSync(cleanupSvg, "utf8"), svgSource);
+  }
+
   // Agent contract discovery is offline and truthful: don't claim JSON
   // support for operations that still only offer human-oriented output.
   const cli = (...args) => spawnSync(process.execPath, [entrypoint, ...args],
