@@ -186,7 +186,7 @@ export function purchasePage(publicIp = "你的服务器公网 IP"): string {
   <div style="text-align:center;margin-top:28px;font-size:12px;color:var(--text-3);line-height:2">
     CLI / 自托管全功能免费 · 公开托管开售前，本页仅用于内部与试点结算<br>
     仅走微信公众号官方 API · AppSecret 加密存储永不下发<br>
-    <a href="https://github.com/turinglambdaai/publy">GitHub</a> · <a href="https://themes.publy.jrtx.site">主题画廊</a> · <a href="https://publy.jrtx.site">publy.jrtx.site</a>
+    <a href="https://github.com/turlamai/publy">GitHub</a> · <a href="https://themes.publy.jrtx.site">主题画廊</a> · <a href="https://publy.jrtx.site">publy.jrtx.site</a>
   </div>
 </div>
 <script>

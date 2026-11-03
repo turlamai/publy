@@ -28,4 +28,4 @@ export function publish(markdown: string): Promise<string> {
 
 ## 链接与脚注
 
-参考资料见 [微信官方文档](https://developers.weixin.qq.com/) 与 [Publy 设计文档](https://github.com/turinglambdaai/publy)。链接会被转换为文末脚注，正文保持干净——这是对移动端读者最基本的尊重。
+参考资料见 [微信官方文档](https://developers.weixin.qq.com/) 与 [Publy 设计文档](https://github.com/turlamai/publy)。链接会被转换为文末脚注，正文保持干净——这是对移动端读者最基本的尊重。

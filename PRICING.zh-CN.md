@@ -28,7 +28,7 @@
 
 ## 授权实施决策
 
-决策修订：`2026-10-auth-1`（2026-10-23）。这是服务设计，不表示订阅已经部署。凭据含义归 [Permit 英文规范](https://github.com/turinglambdaai/permit/blob/main/docs/entitlement-v1.md)，身份、配额和请求准入归产品服务。
+决策修订：`2026-10-auth-1`（2026-10-23）。这是服务设计，不表示订阅已经部署。凭据含义归 [Permit 英文规范](https://github.com/turlamai/permit/blob/main/docs/entitlement-v1.md)，身份、配额和请求准入归产品服务。
 
 - **托管权益：**通过 Commerce 的显式签发路径产生 Protocol v1 `entitlement`，范围仅含本产品的托管服务及所付方案。绑定已认证账户的稳定不透明主体（`subject.type="account"`）。设 `use_expires_at=paid_through`、`activation_required=false`、`installation_id=null`、`updates_through=null`、`features_through=null`；采用显式的方案/服务授权。已经在线的服务不需要桌面激活租约或硬件/设备限制。
 - **服务端执行：**托管服务验签、检查产品与主体范围、采用可信服务端时间，再检查当前权威权益修订、退款/暂停状态和原子的账户配额。新计费请求接入前及排队任务开始前都要判断。旧签名快照、客户端布尔值、结账跳转或复制的 API token 均不足以获得权益。会话负责确认调用者，不直接授予付费权限。
@@ -40,6 +40,6 @@
 
 先完成 #7 的幂等发布、防重复、凭据轮换、撤销与配额。账期按 UTC 支付周期，月配额不结转；超限停止接新任务、不静默收费。取消后已付周期继续，期满停止新托管任务，保留 30 天内容导出后删除托管副本（备份/日志另公开明确期限），不影响本地内容；托管当前不在售。
 
-执行入口：[本仓 #7](https://github.com/turinglambdaai/publy/issues/7)。先交付这个切片，再扩展商业功能。
+执行入口：[本仓 #7](https://github.com/turlamai/publy/issues/7)。先交付这个切片，再扩展商业功能。
 
-组合定位及通用边界：[PORTFOLIO 中文版](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.zh-CN.md)。
+组合定位及通用边界：[PORTFOLIO 中文版](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.zh-CN.md)。
