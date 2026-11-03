@@ -65,4 +65,7 @@ test("operator requests retain authentication and live feed uses short-lived tic
   await context.loadJobs();
   assert.match(element("jobs-status").textContent, /无法读取任务/);
   assert.equal(element("j-rows").innerHTML, "");
+  await context.loadOverview();
+  assert.match(element("overview-status").textContent, /无法读取服务概览/);
+  assert.equal(element("stat-grid").innerHTML, "");
 });

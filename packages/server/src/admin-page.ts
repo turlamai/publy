@@ -30,6 +30,7 @@ export function adminPage(): string {
 </div>
 
 <div id="app" style="display:none">
+  <div class="workspace-heading"><div><div class="workspace-eyebrow">PUBLY / SELF-HOSTED</div><h1>运营工作台</h1><p>管理公众号账号、草稿任务与服务状态。</p></div><span class="workspace-status">自托管 · 开发预览</span></div>
   <nav class="tabs" id="tabs">
     <button data-tab="overview" class="tab active">概览</button>
     <button data-tab="jobs" class="tab">草稿任务</button>
@@ -40,6 +41,7 @@ export function adminPage(): string {
   </nav>
 
   <section id="tab-overview" class="panel">
+    <div id="overview-status" class="hint" role="status" aria-live="polite"></div>
     <div class="stat-grid" id="stat-grid"></div>
     <div class="card">
       <h3>服务管理</h3>
@@ -248,19 +250,27 @@ document.querySelectorAll('.tab').forEach(function (t) {
 
 /* ---------- overview ---------- */
 async function loadOverview() {
-  var d = await (await api('/v1/admin/overview')).json();
+  var status = document.getElementById('overview-status');
+  var g = document.getElementById('stat-grid');
+  status.textContent = '正在读取服务概览…';
+  g.innerHTML = '';
+  try {
+  var response = await api('/v1/admin/overview');
+  if (!response.ok) throw new Error('overview unavailable');
+  var d = await response.json();
   var cards = [
-    ['用户', d.users.total, d.users.pro + ' 个付费套餐生效' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
-    ['本月发布', d.publishes.monthTotal, '全部用户合计'],
-    ['待确认订单', d.orders.pending, d.orders.paid + ' 笔已支付 · 收入 ¥' + (d.orders.revenueFen / 100).toFixed(0)],
+    ['用户', d.users.total, d.users.pro + ' 条旧版套餐记录' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
+    ['本月草稿', d.publishes.monthTotal, '全部用户合计'],
+    ['历史待确认订单', d.orders.pending, d.orders.paid + ' 笔历史已支付标记'],
     ['公众号账号', d.accounts.total, '请保护凭据与备份'],
     ['今日事件', d.eventsToday, '审计流 24h 窗口']
   ];
-  var g = document.getElementById('stat-grid');
   g.innerHTML = cards.map(function (c) {
     return '<div class="stat"><div class="stat-n">' + esc(c[1]) + '</div>'
       + '<div class="stat-t">' + esc(c[0]) + '</div><div class="stat-s">' + esc(c[2]) + '</div></div>';
   }).join('');
+  status.textContent = '';
+  } catch (error) { status.textContent = '无法读取服务概览，请检查连接后刷新。'; }
 }
 
 /* ---------- scheduled drafts (read only) ---------- */
@@ -598,21 +608,37 @@ if (KEY) {
 }
 
 const ADMIN_CSS = `
-  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(13,13,13,.92);
+  :root { --bg:#f6f8f3; --surface:#fff; --surface-2:#edf3ec; --border:#dce6db;
+    --border-light:#ccd9ce; --text:#172b20; --text-2:#51665a; --text-3:#6d8074;
+    --accent:#176842; --accent-hover:#0d5030; --accent-dim:#e4f2e7; --danger:#b63737;
+    --radius:14px; --radius-sm:8px; }
+  body { font-size:15px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline:3px solid #d99445; outline-offset:3px;
+  }
+  #login-card { max-width:520px; margin:72px auto; padding:32px; }
+  #login-card h3 { font-size:22px; }
+  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(248,250,246,.94);
     backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
-  .tb-inner { max-width: 1080px; margin: 0 auto; padding: 14px 20px;
+  .tb-inner { max-width: 1180px; margin: 0 auto; padding: 16px 24px;
     display: flex; align-items: center; justify-content: space-between; }
   .brand { font-size: 17px; font-weight: 700; }
   .brand span { color: var(--accent); }
   .tb-right { display: flex; gap: 10px; align-items: center; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 36px 24px 72px; }
+  .workspace-heading { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:28px; }
+  .workspace-eyebrow { color:var(--accent); font-size:11px; letter-spacing:.13em; font-weight:700; }
+  .workspace-heading h1 { font-size:28px; letter-spacing:-.03em; margin:4px 0; }
+  .workspace-heading p { color:var(--text-2); font-size:14px; }
+  .workspace-status { color:var(--accent); background:var(--accent-dim); border-radius:999px; padding:6px 12px; font-size:12px; white-space:nowrap; }
   .btn-sm { padding: 7px 14px; font-size: 13px; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
   .tab { background: transparent; border: 0; color: var(--text-2); font-size: 14px;
     padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .panel .card { margin-bottom: 16px; overflow-x: auto; }
+  .panel .card { margin-bottom: 16px; overflow-x: auto; box-shadow:0 8px 24px #1a38250a; }
+  .panel .hint { font-size:13px; }
   .tabs { overflow-x: auto; }
   .tab { white-space: nowrap; }
   .card-head { display: flex; align-items: center; justify-content: space-between;
@@ -621,10 +647,10 @@ const ADMIN_CSS = `
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px; margin-bottom: 16px; }
   .stat { background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 18px 20px; }
+    border-radius: var(--radius); padding: 22px; box-shadow:0 8px 24px #1a38250a; }
   .stat-n { font-size: 30px; font-weight: 700; line-height: 1.2; }
   .stat-t { font-size: 13px; color: var(--text-2); margin-top: 2px; }
-  .stat-s { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+  .stat-s { font-size: 12px; color: var(--text-3); margin-top: 6px; }
   .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
     margin-bottom: 4px; width: 120px; display: inline-block; vertical-align: middle; }
   .bar-in { height: 100%; background: var(--accent); border-radius: 3px; }
@@ -666,6 +692,14 @@ const ADMIN_CSS = `
   .ev-b.gold { background: rgba(234,179,8,.12); color: #eab308; }
   .ev-b.dim { background: var(--surface-2); color: var(--text-3); }
   .ev-main { flex: 1; word-break: break-all; }
+  @media (max-width:640px) {
+    .wrap { padding:24px 18px 56px; }
+    .workspace-heading { align-items:flex-start; flex-direction:column; gap:12px; }
+    .workspace-heading h1 { font-size:24px; }
+    .card-head { flex-wrap:wrap; gap:12px; }
+    #u-search, #ws-url { max-width:100%; }
+    table { min-width:620px; }
+  }
   select { width: auto; padding: 8px 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 13px; }
 `;
