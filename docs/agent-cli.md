@@ -20,6 +20,7 @@ publy check "/path/to/article.md" --json
 publy preview "/path/to/article.md" --json --out "/tmp/publy-review.html"
 publy render "/path/to/article.md" --json
 publy theme ls --json
+publy theme preview medium --json
 publy account list --json
 publy account add Work --theme claude --json  # explicit local mutation; user approval required
 publy quota --json
@@ -31,7 +32,7 @@ publy history --json
 side effects and returns a **versioned** manifest. Each command declares
 `json` support and whether it reads, writes local output, may access the
 network or performs a draft-creating/mutating action. **Do not guess** that
-every command supports `--json`: `theme preview` and some legacy commands are still human-oriented.
+every command supports `--json`: some legacy commands are still human-oriented.
 `account add <name> --json` returns an `account-add` object with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or configuration contents; omitted options preserve existing fields. This local mutation requires explicit user approval.
 
 A `DRAFT_OUTCOME_UNKNOWN` response to `publish --json` is reported as
@@ -85,8 +86,13 @@ changes, an existing output requires explicit `--force`, and the command
 never uploads or publishes anything.
 
 `theme ls --json` returns only bundled article/card theme names with
-`source:"bundled"` and `networkUsed:false`. Legacy human-readable
-`theme ls` may attempt registry lookup, but the Agent JSON command does not.
+`source:"bundled"` and `networkUsed:false`. Human-readable `theme ls` is also offline.
+
+`theme preview <name> --json` renders a private HTML sample without network
+access or opening a browser, returning `kind:"theme-preview"`, `output`, the
+theme type, and `networkUsed:false`. Unknown themes return `UNKNOWN_THEME`
+(exit 2); rendering failures return `THEME_PREVIEW_FAILED` (exit 3). If an
+article and card theme share a name, the existing card-first rule applies.
 
 ## Network submission and reconciliation
 

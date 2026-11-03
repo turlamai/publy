@@ -44,10 +44,10 @@ Chinese paths, local image and formula were exercised with an empty home and a
 system-only PATH. The article source hash remained unchanged. The runtime must be authenticated and supplied
 by the build operator; the script does not authenticate it. The developer
 workflow `portable-probe.yml` exercises the candidate on Linux, macOS and
-Windows CI; only an actual passing run is evidence. The original Windows
-portable probe passed on integration commit `1c0b9a9`; the revised PowerShell
-launcher and metacharacter-path test require a fresh run and may be subject to
-local execution policy. None of these checks establishes a clean-machine installation guarantee.
+Windows CI; only an actual passing run is evidence. The revised PowerShell launcher and metacharacter-path test passed on Windows CI;
+the Linux and macOS portable probes also passed on integration commit
+`7b9df13`. Windows PowerShell execution policy can still prevent a local
+launcher from running. None of these checks establishes a clean-machine installation guarantee.
 
 The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
 `037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
@@ -56,8 +56,8 @@ probe, not a reproducible installer or a release asset. A real package must
 eliminate external symlinks by construction, authenticate the runtime,
 include all required licences, test article/media/math/cards and failure
 paths without source/developer dependencies, and be verified on clean target
-machines including install, update, rollback and uninstall. Windows/Linux,
-x64, executable signing and notarization remain untested.
+machines including install, update, rollback and uninstall. Clean-machine
+Windows/Linux and x64 acceptance, executable signing and notarization remain untested.
 
 ## Gate before a full Racket migration
 

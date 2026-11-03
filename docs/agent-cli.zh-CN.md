@@ -19,6 +19,7 @@ publy check "D:/Notes/article.md" --json
 publy preview "D:/Notes/article.md" --json
 publy render "D:/Notes/article.md" --json
 publy theme ls --json
+publy theme preview medium --json
 publy account list --json
 publy account add Work --theme claude --json  # 本地写入，必须先得到用户授权
 publy quota --json
@@ -28,7 +29,7 @@ publy history --json
 
 `capabilities --json` 离线返回版本化的能力列表：每个命令是否
 支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿。
-**没有声明 JSON 的命令不要凭猜测去解析：**`theme preview` 等剩余命令仍偏向人类使用。
+**没有声明 JSON 的命令不要凭猜测去解析：**部分剩余命令仍偏向人类使用。
 `config set <key> <value> --json` 已支持结构化回执，不回显 API key 等配置值；这是需经操作者授权的本地修改。
 `jobs cancel <jobId> --json` 和 `jobs retry <jobId> --json` 现在能返回
 结构化回执，但**属于修改服务器状态的操作，Agent 必须先获得用户授权**。
@@ -65,7 +66,9 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 
 `theme ls --json` 仅列出随程序内置的文章/卡片主题，
 返回 `source:"bundled"`、`networkUsed:false`，不会访问主题仓库；
-旧的人工 `theme ls` 则可能联网查询注册表。
+人工 `theme ls` 也只列出内置主题，不访问注册表。
+
+`theme preview <name> --json` 离线生成私有 HTML，返回 `kind:"theme-preview"`、`output`、主题类型及 `networkUsed:false`；不会打开浏览器或创建草稿。未知主题返回 `UNKNOWN_THEME`（退出码 2），无法渲染返回 `THEME_PREVIEW_FAILED`（退出码 3）。文章与卡片同名时沿用卡片优先规则。
 
 ## 发布和“结果未知”的恢复
 

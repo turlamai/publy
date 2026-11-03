@@ -178,6 +178,10 @@ publy quota                                    # 群发配额余量
 - 输入兼容 Obsidian：`![[img.png|650]]`、`[[wikilink|别名]]` 原生解析（`--media-dir` 指定资源目录）；frontmatter 的 `title` / `cover` / `type` / `theme` 直接消费
 - 密钥管理：配置文件只存环境变量名引用（`--secret-env`），与 tlai 技能的 `${VAR}` 约定一致
 
+### Agent theme preview (development)
+
+`theme preview <name> --json` writes a private offline sample and returns one `theme-preview` JSON object; it never opens a browser or submits a draft. Unknown themes exit 2 and rendering failures exit 3. See [the Agent CLI contract](agent-cli.md).
+
 ### 3.1 从 tlai 技能继承的实战经验（内置为默认行为）
 
 这些是现有公众号推送技能踩坑沉淀，全部固化为 CLI 默认行为：

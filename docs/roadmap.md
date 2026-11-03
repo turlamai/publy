@@ -15,6 +15,9 @@ local integration work, not a merge, release, deployed service or sales claim.
   files need review against each original PR. #62's code-example handling is
   adapted using Markdown block parsing, with a regression for an indented
   paragraph continuation; it still needs cross-platform and native evidence.
+- The CLI now exposes offline `theme preview --json` with a private HTML
+  artifact, structured errors and no browser launch. It does not complete
+  every-command JSON parity or a clean native installation (#37/#18).
 - Offline restore quarantine prevents restored pending/running and previously
   retryable failed jobs from automatically resending. An old snapshot still
   cannot contain later deliveries, revoked keys or account changes; isolated

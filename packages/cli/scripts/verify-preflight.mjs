@@ -222,6 +222,7 @@ try {
   assert.ok(contract.commands.some((c) => c.name === "preview" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "render" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "theme ls" && c.json === true && c.network === false && c.jsonNetwork === false));
+  assert.ok(contract.commands.some((c) => c.name === "theme preview" && c.json === true && c.jsonNetwork === false));
   // Both human and machine theme discovery must be genuinely offline, not
   // merely reporting networkUsed:false while silently fetching a registry.
   const fetchSentinel = path.join(dir, "theme-fetch-was-called");
@@ -229,6 +230,8 @@ try {
   // Satori uses fetch for non-network resources during module initialization.
   // Preserve those operations, but fail if the CLI attempts any HTTP(S) request.
   fs.writeFileSync(preload, [
+    'require("node:child_process").spawn = () => { throw new Error("unexpected browser or child process"); };',
+    'require("node:module").syncBuiltinESMExports();',
     'const originalFetch = globalThis.fetch;',
     'globalThis.fetch = (...args) => {',
     '  const input = args[0];',
@@ -240,6 +243,31 @@ try {
     '  return originalFetch(...args);',
     '};',
   ].join("\n"));
+  // Machine theme previews must render both sample types without HTTP or a browser.
+  for (const [theme, type] of [["medium", "article"], ["naive", "cards"]]) {
+    fs.rmSync(fetchSentinel, { force: true });
+    const preview = spawnSync(process.execPath, ["--require", preload, entrypoint, "theme", "preview", theme, "--json"], {
+      encoding: "utf8", timeout: 40000,
+      env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json"), PUBLY_THEME_FETCH_SENTINEL: fetchSentinel },
+    });
+    assert.equal(preview.status, 0, preview.stderr);
+    const result = JSON.parse(preview.stdout);
+    assert.equal(result.kind, "theme-preview");
+    assert.equal(result.type, type);
+    assert.equal(result.networkUsed, false);
+    assert.equal(result.submitted, false);
+    assert.equal(fs.existsSync(fetchSentinel), false);
+    assert.match(fs.readFileSync(result.output, "utf8"), /Content-Security-Policy/);
+    if (process.platform !== "win32") assert.equal(fs.statSync(result.output).mode & 0o077, 0);
+    fs.rmSync(path.dirname(result.output), { recursive: true, force: true });
+  }
+  for (const name of ["not-a-theme", "toString", "__proto__"]) {
+    const unknown = cli("theme", "preview", name, "--json");
+    assert.equal(unknown.status, 2);
+    const report = JSON.parse(unknown.stdout);
+    assert.equal(report.code, "UNKNOWN_THEME");
+    assert.equal(report.networkUsed, false);
+  }
   for (const json of [false, true]) {
     fs.rmSync(fetchSentinel, { force: true });
     const listed = spawnSync(process.execPath,

@@ -631,35 +631,40 @@ async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<v
   else console.log(`account ${alias} saved${config.default_account === alias ? " (default)" : ""}`);
 }
 
-async function cmdThemePreview(name: string): Promise<void> {
+async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<void> {
   const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, renderMarkdown, renderCards, buildPreviewHtml } = await import("@publy/core");
-  // samples ship inside the package; fall back to repo layouts for dev checkouts
-  const distDir = path.dirname(fileURLToPath(import.meta.url));
-  const sampleDirs = [path.resolve(distDir, "../samples"), path.resolve(distDir, "../../../packages/cli/samples"), path.resolve(distDir, "../../../docs/samples")];
-  const sampleDir = sampleDirs.find((d) => fs.existsSync(path.join(d, "card-sample.md")));
-  if (!sampleDir) throw new Error("bundled theme samples not found");
-
-  if (name in BUILTIN_CARD_THEMES) {
-    const raw = fs.readFileSync(path.join(sampleDir, "card-sample.md"), "utf8");
+  const card = Object.hasOwn(BUILTIN_CARD_THEMES, name);
+  const article = (BUILTIN_THEMES as readonly string[]).includes(name);
+  const failure = (code: string, exitCode: number) => {
+    if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "theme-preview", ok: false, code, networkUsed: false, submitted: false }));
+    else console.error(`publy: ${code}; use \`publy theme ls\` to list built-in themes.`);
+    process.exitCode = exitCode;
+  };
+  if (!card && !article) return failure("UNKNOWN_THEME", 2);
+  try {
+    // Samples ship inside the package; fall back to repo layouts in development.
+    const distDir = path.dirname(fileURLToPath(import.meta.url));
+    const sampleDirs = [path.resolve(distDir, "../samples"), path.resolve(distDir, "../../../packages/cli/samples"), path.resolve(distDir, "../../../docs/samples")];
+    const sample = card ? "card-sample.md" : "article-sample.md";
+    const sampleDir = sampleDirs.find((d) => fs.existsSync(path.join(d, sample)));
+    if (!sampleDir) throw new Error("bundled sample missing");
+    const raw = fs.readFileSync(path.join(sampleDir, sample), "utf8");
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-preview-"));
-    const result = await renderCards(raw, { theme: name, outDir });
-    const previewFile = path.join(outDir, "preview.html");
-    fs.writeFileSync(previewFile, buildPreviewHtml(result));
-    console.error(`preview → ${previewFile}`);
-    openInBrowser(previewFile);
-    return;
+    const output = path.join(outDir, "preview.html");
+    let html: string;
+    if (card) {
+      const result = await renderCards(raw, { theme: name, outDir, offline: opts.json === true });
+      html = buildPreviewHtml(result);
+    } else {
+      const rendered = renderMarkdown(raw, { theme: name });
+      html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"></head><body>${rendered.html}</body></html>`;
+    }
+    fs.writeFileSync(output, html, { mode: 0o600, flag: "wx" });
+    if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "theme-preview", ok: true, theme: name, type: card ? "cards" : "article", output, contentType: "text/html", networkUsed: false, submitted: false }));
+    else { console.error(`preview → ${output}`); openInBrowser(output); }
+  } catch {
+    failure("THEME_PREVIEW_FAILED", 3);
   }
-  if ((BUILTIN_THEMES as readonly string[]).includes(name)) {
-    const raw = fs.readFileSync(path.join(sampleDir, "article-sample.md"), "utf8");
-    const rendered = renderMarkdown(raw, { theme: name });
-    const out = path.join(os.tmpdir(), `publy-theme-preview-${name}-${Date.now()}.html`);
-    fs.writeFileSync(out, rendered.html);
-    console.error(`preview → ${out}`);
-    openInBrowser(out);
-    return;
-  }
-  console.error(`publy: unknown theme "${name}". Use \`publy theme ls\` to list built-ins.`);
-  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,7 +1079,7 @@ const AGENT_USAGE: Record<string, string> = {
   "account add": "publy account add <name> --json [--app-id <id>]",
   "config set": "publy config set <key> <value> --json",
   "theme ls": "publy theme ls --json",
-  "theme preview": "publy theme preview <name>",
+  "theme preview": "publy theme preview <name> --json",
   tunnel: "publy tunnel",
 };
 
@@ -1096,7 +1101,7 @@ const AGENT_COMMANDS = [
   { name: "account add", json: true, network: false, effect: "write-local-config" },
   { name: "config set", json: true, network: false, effect: "write-local-config" },
   { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read" },
-  { name: "theme preview", json: false, network: "font-fallback-may-download", effect: "write-preview-and-open-browser" },
+  { name: "theme preview", json: true, network: "font-fallback-may-download", jsonNetwork: false, effect: "write-preview-and-open-browser", jsonEffect: "write-private-html" },
   { name: "tunnel", json: false, network: true, effect: "start-ssh-tunnel" },
 ] as const;
 
@@ -1422,7 +1427,8 @@ export function createProgram(): Command {
     .command("preview")
     .argument("<name>")
     .description("render the theme sample locally and open it in the browser")
-    .action(async (name: string) => cmdThemePreview(name));
+    .option("--json", "offline structured preview without opening a browser")
+    .action(async (name: string, opts: { json?: boolean }) => cmdThemePreview(name, opts));
 
   return program;
 }
