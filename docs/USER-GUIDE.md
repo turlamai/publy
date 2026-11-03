@@ -62,7 +62,7 @@ private. See [operations and backups](operations.md) for server details.
 
 ## Data, backup and recovery
 
-Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Restore and test on an isolated server; do not replay an unknown-outcome job before checking remote draft/history state.
+Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Before restoration, stop all writers and isolate the server. A job pending in an older backup may already have been delivered; follow the [restore procedure](operations.md#backup-and-restore-developer-self-hosted-deployments) to quarantine jobs and reconcile draft and account changes since the snapshot.
 
 When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity (`publy publish-result <key>`, or the plugin query action), then check the WeChat draft box. The server records a success only after receiving a confirmation; submitting again can create a duplicate even with the same request identity. Check the draft box before taking any action on an interrupted scheduled job too.
 

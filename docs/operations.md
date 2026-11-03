@@ -2,10 +2,10 @@
 
 ## Reliability semantics (implemented)
 
-- **Idempotent publishing**: every publish carries an `idempotencyKey`; the
-  server keeps a durable record per key for 10 minutes and answers retries
-  with the original `media_id` (`deduped: true`) instead of creating a second
-  draft. Failed attempts are not recorded — only successes dedupe.
+- **Idempotent publishing**: clients can provide an `idempotencyKey`.
+  Confirmed keyed results are retained for a ten-minute duplicate window;
+  unkeyed requests do not have this protection. An unresolved immediate
+  request is held rather than automatically retried (see below).
 - **Immediate draft claims (development source):** a keyed immediate request
   first reserves its identity in SQLite. Concurrent duplicates cannot send a
   second draft, and a possibly submitted operation stays blocked after restart.
@@ -33,12 +33,15 @@
   A remote review or controlled manual resolution procedure is still needed
   before any future re-submission; this endpoint cannot guarantee exactly-once
   delivery.
-- **Restore safety**: a restored `jobs.json` never re-publishes already
-  accepted content — only `pending` jobs execute, `done`/`cancelled`/`failed`
-  stay terminal, and `running` jobs boot as `interrupted` (see above).
-- **Quota**: per-account monthly limits on the UTC billing cycle, no
-  rollover; exhaustion returns `QUOTA_EXCEEDED` before any send. Failures,
-  retries and duplicate hits never count twice.
+- **Restoring a snapshot**: a backup reflects only its snapshot time. Jobs
+  pending in that snapshot may have run afterward; immediate request claims,
+  key rotations, account changes and cancellations after the snapshot may be
+  absent. Never start a restored server against WeChat until this gap is
+  reviewed. The offline quarantine procedure below prevents selected restored
+  jobs from running automatically; it cannot recover missing later activity
+  or guarantee exactly-once delivery.
+- **Quota**: the legacy local monthly counter is not an atomic hosted quota
+  ledger. It is not evidence of reliable concurrent commercial enforcement.
 - **Credentials**: `POST /v1/admin/users/:id/rotate-key` rotates a user key
   (old key dies immediately); disable revokes. Audit-log and error responses
   scrub credential-bearing query strings. WS clients should use short-lived
@@ -90,30 +93,50 @@ construct a parallel runbook file.
 server is `~/.publy/` — that is the customer list, the keys and the order
 book. Back it up before touching the server.
 
-## Backup (on the server)
+## Backup and restore: developer self-hosted deployments
+
+A live archive of `~/.publy` is not a consistent backup: SQLite and the JSON
+files may change while it is being copied. Stop admission, wait for in-flight
+requests to finish, and stop **all** server writers before making a snapshot.
+Back up the configured data directory and `server.json` together, including
+SQLite `-wal` and `-shm` files if present. If `dataDir` points elsewhere, the
+default directory alone is incomplete. Store the archive encrypted, restrict
+access, and test recovery on an isolated machine. The archive contains API
+keys, AppSecrets, customer data and draft content; do not post it to an issue.
+
+Recovery needs special care even after a consistent backup: the original
+server may have accepted work **after** that backup. Before starting a restored
+copy, isolate it from incoming traffic and WeChat, stop the original instance
+and all other writers, and keep the original data and backup unchanged.
+Reconcile all activity since the snapshot against independent records and the
+appropriate WeChat draft boxes. In particular, missing claims and credential
+revocations cannot be reconstructed from an older archive. Do not reconnect
+or resume delivery while that gap is unresolved.
+
+For a restored development source checkout, with **all** Publy server
+processes stopped, run this against the restored data directory before the
+first server startup:
 
 ```bash
-tar -czf publy-backup-$(date +%F).tar.gz -C ~ .publy
+node scripts/quarantine-restored-jobs.mjs --data-dir /path/to/restored/server-data
 ```
 
-Contains config + database + audit trail in one file. Copy it off the box
-(scp/oss/网盘). Automation: run it from cron daily and keep 7.
+The tool changes pending, running and previously safe-to-retry failed jobs to
+`interrupted`. It preserves the exact original as
+`jobs.json.before-restore-quarantine` with restricted permissions, and refuses
+to overwrite that file. Keep it protected: it contains draft content. If there
+is no `jobs.json`, or the file is damaged, it stops without creating an empty
+queue. The interrupted retry endpoint does not blindly resend; an operator
+must inspect the draft box. The tool does **not** recover requests absent from
+the snapshot, validate backup integrity, reconcile account/credential changes,
+or fence a still-running server. This is a development recovery aid, not a
+production-tested backup or disaster-recovery system.
 
-## Restore (new server)
-
-```bash
-# 1. node 22+ and the code
-git clone https://github.com/turlamai/publy && cd publy && pnpm -r build
-# 2. drop in the data
-tar -xzf publy-backup-YYYY-MM-DD.tar.gz -C ~
-# 3. start server + event gateway (ports default 8081 / 8082)
-node packages/server/dist/index.js &
-racket racket/publy-ws.rkt &
-```
-
-`secretKey` inside `server.json` decrypts the stored AppSecrets — restoring
-without it keeps users and orders but breaks bound accounts until secrets
-are re-entered. Never lose `server.json`.
+`secretKey` in `server.json` is needed to decrypt stored AppSecrets. Protect
+and recover it with the matching data. Validate a restored copy in isolation;
+only after the snapshot gap and credentials are reconciled may an operator
+consider reconnecting it. A full fixed-egress pilot and restore rehearsal remain
+release gates.
 
 ## Updating a running deployment
 

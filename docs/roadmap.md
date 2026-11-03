@@ -15,6 +15,10 @@ local integration work, not a merge, release, deployed service or sales claim.
   files need review against each original PR. #62's code-example handling is
   adapted using Markdown block parsing, with a regression for an indented
   paragraph continuation; it still needs cross-platform and native evidence.
+- Offline restore quarantine prevents restored pending/running and previously
+  retryable failed jobs from automatically resending. An old snapshot still
+  cannot contain later deliveries, revoked keys or account changes; isolated
+  reconciliation and a real restore rehearsal remain required (#7/#8).
 - Product proof still required: clean Obsidian install/update on target
   systems, real Typora/Obsidian source-to-draft walkthrough, and a no-npm
   packaged CLI. Synthetic three-file smoke is not directory listing or a
