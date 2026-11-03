@@ -56,9 +56,9 @@ Use explicit states: local preview, submitting, outcome unknown, draft confirmed
 
 明确区分本地预览、提交中、结果未知、草稿已确认、草稿已排程、去重跳过和失败。超时不代表失败。切换笔记/账号后仍保留原提交的内容、账号和请求身份，先查询/重试原操作再提供新提交；结果必须指向原目标，不能随当前预览漂移。现有实现仍需验收，本节是目标契约，不宣称所有状态已完成。
 
-Do one slice from [issue #7](https://github.com/turinglambdaai/publy/issues/7) at a time, with the [controlled deployment pilot #8](https://github.com/turinglambdaai/publy/issues/8) as the hosted-readiness owner. Validate no-server preview/copy, double submit, lost response, retry, note/account switching and recovery with synthetic fixtures before any real publishing. Keep CLI flags, JSON fields and exit codes unchanged in this documentation correction.
+Do one slice from [issue #7](https://github.com/turlamai/publy/issues/7) at a time, with the [controlled deployment pilot #8](https://github.com/turlamai/publy/issues/8) as the hosted-readiness owner. Validate no-server preview/copy, double submit, lost response, retry, note/account switching and recovery with synthetic fixtures before any real publishing. Keep CLI flags, JSON fields and exit codes unchanged in this documentation correction.
 
-一次只实施 [#7](https://github.com/turinglambdaai/publy/issues/7) 的一个切片，托管准备沿用[受控部署试点 #8](https://github.com/turinglambdaai/publy/issues/8)。先用合成 fixture 验证无服务器预览/复制、重复点击、丢失响应、重试、切换笔记/账号和恢复，再做真实发布验收。本次文档修正不变更 CLI 参数、JSON 字段或退出码。
+一次只实施 [#7](https://github.com/turlamai/publy/issues/7) 的一个切片，托管准备沿用[受控部署试点 #8](https://github.com/turlamai/publy/issues/8)。先用合成 fixture 验证无服务器预览/复制、重复点击、丢失响应、重试、切换笔记/账号和恢复，再做真实发布验收。本次文档修正不变更 CLI 参数、JSON 字段或退出码。
 
 The historical rationale and unshipped ideas below are context. Theme-marketplace revenue, new multi-account/mass-send surfaces and old hosted pricing are not the current implementation queue. Reuse validated rendering/theme-package mechanisms; restoring a historical idea requires a separate product decision.
 

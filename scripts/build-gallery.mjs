@@ -185,9 +185,9 @@ const page = `<!DOCTYPE html>
   </section>
 
   <footer>
-    Powered by <a href="https://github.com/turinglambdaai/publy">Publy</a> ·
+    Powered by <a href="https://github.com/turlamai/publy">Publy</a> ·
     <a href="https://publy.jrtx.site/">产品主页</a> ·
-    <a href="https://github.com/turinglambdaai/publy-themes">提交主题 (PR)</a>
+    <a href="https://github.com/turlamai/publy-themes">提交主题 (PR)</a>
   </footer>
 </div>
 

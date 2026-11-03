@@ -28,7 +28,7 @@ Hosted usage is metered by account, not device. Service within the current month
 
 ## Authorization decision for implementation
 
-Decision revision: `2026-10-auth-1` (2026-10-23). This is a service design, not evidence of a deployed subscription. Permit [owns credential semantics](https://github.com/turinglambdaai/permit/blob/main/docs/entitlement-v1.md); the product owns identity, quota and request admission.
+Decision revision: `2026-10-auth-1` (2026-10-23). This is a service design, not evidence of a deployed subscription. Permit [owns credential semantics](https://github.com/turlamai/permit/blob/main/docs/entitlement-v1.md); the product owns identity, quota and request admission.
 
 - **Hosted right:** Commerce's explicit issuer path produces a Protocol v1 `entitlement` scoped only to this hosted service and its paid plan. Bind it to the authenticated account's opaque stable subject (`subject.type="account"`). Set `use_expires_at=paid_through`, `activation_required=false`, `installation_id=null`, `updates_through=null` and `features_through=null`; use explicit plan/service grants. No desktop activation lease or hardware/device limit is needed for an already online service.
 - **Server enforcement:** the hosted service verifies the signed credential and product/subject scope against trusted server time, then checks the current authoritative entitlement revision, refund/suspension state and atomic account quota. Check before accepting a new billable request and before a queued job starts. An old signed snapshot, a client boolean, a checkout redirect or a copied API token is insufficient. A session authenticates the caller; it does not itself grant paid rights.
@@ -40,6 +40,6 @@ Decision revision: `2026-10-auth-1` (2026-10-23). This is a service design, not 
 
 Complete idempotent publishing, duplicate prevention, credential rotation, revocation and quotas in #7. Quotas follow the UTC payment billing cycle, do not roll over, and stop new jobs when exhausted without silent overage charges. Cancellation leaves the paid period available. At expiry, stop new hosted jobs, allow 30 days to export content, then delete hosted content copies; backup/log retention must be separately published with definite periods. Local content is unaffected. Hosting is not on sale.
 
-Execution entry: [issue #7](https://github.com/turinglambdaai/publy/issues/7). Complete this bounded slice before expanding commercial features.
+Execution entry: [issue #7](https://github.com/turlamai/publy/issues/7). Complete this bounded slice before expanding commercial features.
 
-Portfolio role and shared boundaries: [PORTFOLIO](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md).
+Portfolio role and shared boundaries: [PORTFOLIO](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md).
