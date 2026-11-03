@@ -96,6 +96,13 @@ export class HostedQuotaLedger {
     });
   }
 
+  /** Only a trusted, definitive rejection proving no draft was created may
+   * release a slot after send starts. A timeout or malformed response is not
+   * such evidence and must instead be marked unknown. */
+  confirmRejected(subject: string, requestId: string): ReservationState {
+    return this.transition(subject, requestId, "cancelled", ["sending"]);
+  }
+
   markUnknown(subject: string, requestId: string): ReservationState {
     return this.transition(subject, requestId, "unknown", ["sending", "unknown"]);
   }

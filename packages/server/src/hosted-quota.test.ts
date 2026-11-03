@@ -41,6 +41,11 @@ test("hosted quota reservations are durable, bounded and conservative for unknow
     assert.equal(ledger.reserve({ ...base, subject: "account-c", requestId: "late" }).status, "reserved");
     assert.throws(() => ledger.beginSend("account-c", "late", 2000), /QUOTA_PERIOD_EXPIRED/);
     assert.equal(ledger.cancelBeforeSend("account-c", "late"), "cancelled");
+    assert.equal(ledger.reserve({ ...base, subject: "account-d", requestId: "rejected", limit: 1 }).status, "reserved");
+    ledger.beginSend("account-d", "rejected", 1500);
+    assert.equal(ledger.confirmRejected("account-d", "rejected"), "cancelled");
+    assert.equal(ledger.reserve({ ...base, subject: "account-d", requestId: "next", limit: 1 }).status, "reserved", "a definitive failure releases its slot");
+    assert.throws(() => ledger.confirmRejected(base.subject, "one"), /QUOTA_INVALID_TRANSITION/);
   } finally {
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
