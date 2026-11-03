@@ -1160,7 +1160,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   console.log(`publy-server listening on :${config.port} (purchase page: ${config.publicUrl ?? "http://localhost:" + config.port}/ )`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+// systemd commonly starts the server through an atomic release symlink.
+// Node resolves import.meta.url to the real file, so compare real paths rather
+// than silently exiting when argv contains the symlinked release directory.
+const invokedServerAs = (() => {
+  try { return process.argv[1] ? pathToFileURL(fs.realpathSync(path.resolve(process.argv[1]))).href : ""; }
+  catch { return ""; }
+})();
+if (import.meta.url === invokedServerAs) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
