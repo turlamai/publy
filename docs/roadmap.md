@@ -27,7 +27,10 @@ local integration work, not a merge, release, deployed service or sales claim.
   against Commerce’s Racket framing and can observe proof responses. A
   separate SQLite quota ledger reserves atomically, holds uncertain results
   and checks expiry before send; neither component is wired to a user route
-  or grants access. Billing-window policy, known-failure reconciliation,
+  or grants access. The loopback-only synthetic probe
+  `COMMERCE_ROOT=<pinned-checkout> node scripts/verify-commerce-shadow.mjs`
+  verifies request authentication and cross-account denial against the real
+  Commerce HTTP listener; it does not test a paid entitlement. Billing-window policy, known-failure reconciliation,
   current-entitlement rechecks and full deployment recovery remain open. Complete
   #17/#44, the fixed-egress recovery pilot #7/#8, retention/backup and real
   merchant admission before enabling checkout. Free local and self-hosted
