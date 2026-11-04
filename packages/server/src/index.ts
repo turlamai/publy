@@ -4,7 +4,7 @@
 //   admin key (server.json apiKey) — full access, no quota
 //   user key (publy_…)             — publish to owned accounts, monthly quota
 //
-// Commercial loop: /purchase page → payment provider → callback → auto key
+// Historical checkout is disabled by default and is not hosted billing.
 // issuance; /admin console for the operator. See docs/business.md.
 
 import crypto from "node:crypto";
@@ -636,7 +636,7 @@ export function buildApp(config: ServerConfig) {
     // plan account limit
     const limit = store.planAllowance(user).accounts;
     if (store.countAccountsOwnedBy(user.id) >= limit) {
-      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${limit} account(s) — upgrade to bind more` });
+      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `account limit is ${limit}; contact your server operator for help` });
     }
 
     const name = (accountName ?? appId).trim().slice(0, 40) || appId;
@@ -697,7 +697,7 @@ export function buildApp(config: ServerConfig) {
     const quotaExceeded = !caller.admin && store.getUsage(caller.user) >= quotaLimit!;
     const quotaReply = () => reply.code(429).send({
       code: "QUOTA_EXCEEDED",
-      message: `monthly limit ${quotaLimit} reached — upgrade at ${publicUrl}`,
+      message: `monthly limit ${quotaLimit} reached; contact your server operator for help`,
     });
 
     const key = body.idempotencyKey;
@@ -1157,7 +1157,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
   const app = buildApp(config);
   await app.listen({ port: config.port, host: config.host ?? "127.0.0.1" });
-  console.log(`publy-server listening on :${config.port} (purchase page: ${config.publicUrl ?? "http://localhost:" + config.port}/ )`);
+  console.log(`publy-server listening on ${config.host ?? "127.0.0.1"}:${config.port}`);
 }
 
 // systemd commonly starts the server through an atomic release symlink.

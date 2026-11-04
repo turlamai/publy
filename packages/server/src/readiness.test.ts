@@ -449,9 +449,9 @@ test("lost draft/add response interrupts a scheduled job without auto-resending"
 
 // --- crash reconciliation + explicit retry ----------------------------------------
 
-const reconciliationDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-recon-test-"));
-
-test("jobs left running by a crash boot as interrupted and never auto-run", async () => {
+test("jobs left running by a crash boot as interrupted and never auto-run", async (t) => {
+  const reconciliationDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-recon-test-"));
+  t.after(() => fs.rmSync(reconciliationDir, { recursive: true, force: true }));
   const runAt = Date.now() - 1000; // already due — the scheduler must still not run it
   // account "Ghost" resolves to nothing: if the scheduler ever picked the
   // retried job up, it fails offline (ACCOUNT_NOT_FOUND) instead of making a
@@ -625,9 +625,9 @@ test("manual reconciliation refuses legacy delivery records without a content fi
 
 // --- job runner reconciles against the idempotency record ---------------------------
 
-const runnerDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-runner-test-"));
-
-test("a due job with a fresh idempotency record dedupes instead of re-publishing", async () => {
+test("a due job with a fresh idempotency record dedupes instead of re-publishing", async (t) => {
+  const runnerDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-runner-test-"));
+  t.after(() => fs.rmSync(runnerDir, { recursive: true, force: true }));
   // simulate: the draft was already delivered (crash lost the status save),
   // but the idempotency record survived — the retry must NOT create a second
   const idem = {
@@ -757,6 +757,8 @@ test("quota exhaustion returns QUOTA_EXCEEDED before any publish", async () => {
   });
   assert.equal(res.statusCode, 429);
   assert.equal(res.json().code, "QUOTA_EXCEEDED");
+  assert.match(res.json().message, /contact your server operator/i);
+  assert.doesNotMatch(res.json().message, /upgrade|purchase/i);
   const q = (await app.inject({ method: "GET", url: "/v1/quota", headers: H(userKey) })).json();
   assert.equal(q.used, 30);
   assert.equal(q.limit, 30);
