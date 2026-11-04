@@ -6,6 +6,53 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { HostedIdentityBindings } from "./hosted-identity.js";
+import { Store } from "./store.js";
+
+test("legacy user databases gain identity storage without changing user credentials", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-hosted-identity-migration-"));
+  const db = new DatabaseSync(path.join(dir, "users.db"));
+  db.exec(`CREATE TABLE users (
+    id TEXT PRIMARY KEY, contact TEXT NOT NULL UNIQUE, api_key TEXT NOT NULL UNIQUE,
+    plan TEXT NOT NULL DEFAULT 'free', expires_at INTEGER NOT NULL DEFAULT 0,
+    publish_count INTEGER NOT NULL DEFAULT 0, month_key TEXT NOT NULL DEFAULT '',
+    disabled_at INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+  ); INSERT INTO users VALUES ('legacy-user', 'fixture-contact', 'fixture-key', 'free', 0, 3, '2026-11', 0, 10)`);
+  db.close();
+  const store = new Store(dir);
+  try {
+    const user = store.findUserByKey("fixture-key");
+    assert.equal(user?.id, "legacy-user");
+    assert.equal(user?.publishCount, 3);
+    assert.equal(store.resolveHostedSubject("legacy-user"), null);
+    assert.match(store.enrollHostedSubject("legacy-user"), /^publy_account_[a-f0-9]{64}$/);
+    assert.equal(store.findUserByKey("fixture-key")?.contact, "fixture-contact");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("real user storage keeps hosted identity stable across key rotation", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-hosted-identity-store-"));
+  let store = new Store(dir);
+  try {
+    const user = store.createUser("synthetic-contact", "free", 0);
+    assert.equal(store.resolveHostedSubject(user.id), null);
+    const subject = store.enrollHostedSubject(user.id);
+    store.rotateApiKey(user.id);
+    store.close();
+    store = new Store(dir);
+    assert.equal(store.resolveHostedSubject(user.id), subject);
+    store.setDisabled(user.id, true);
+    assert.equal(store.resolveHostedSubject(user.id), null);
+    assert.throws(() => store.enrollHostedSubject(user.id), /HOSTED_IDENTITY_UNAVAILABLE/);
+    store.setDisabled(user.id, false);
+    assert.equal(store.resolveHostedSubject(user.id), subject);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("hosted subjects survive credential changes and never migrate between users", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-hosted-identity-"));

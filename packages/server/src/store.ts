@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { HostedIdentityBindings } from "./hosted-identity.js";
 
 export type Plan = "free" | "personal" | "studio";
 
@@ -71,6 +72,7 @@ export function newApiKey(): string {
 
 export class Store {
   private db: DatabaseSync;
+  private hostedIdentities: HostedIdentityBindings;
   private secretKey: string | null = null;
 
   constructor(dataDir: string) {
@@ -116,6 +118,7 @@ export class Store {
         paid_at INTEGER NOT NULL DEFAULT 0
       );
     `);
+    this.hostedIdentities = new HostedIdentityBindings(this.db);
   }
 
   /** close the sqlite handle (fastify onClose hook) */
@@ -177,6 +180,17 @@ export class Store {
 
   listUsers(): UserRow[] {
     return (this.db.prepare("SELECT * FROM users ORDER BY created_at DESC").all() as Record<string, unknown>[]).map((r) => this.toUser(r));
+  }
+
+  /** Internal enrollment only. The caller must authenticate the user and
+   * separately establish that this is a new, not restored, binding. */
+  enrollHostedSubject(userId: string): string {
+    return this.hostedIdentities.enroll(userId, Date.now());
+  }
+
+  /** Internal lookup; an absent or disabled user cannot resolve a subject. */
+  resolveHostedSubject(userId: string): string | null {
+    return this.hostedIdentities.resolve(userId);
   }
 
   /** paid expiry extension: adds months from the later of now / current expiry */
