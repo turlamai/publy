@@ -3,8 +3,10 @@
 Decision `2026-10-auth-1` binds a hosted subscription to an authenticated
 account, not a contact address or API key. `HostedIdentityBindings` is an
 internal SQLite component for that mapping, exposed only through internal
-`Store` methods. It is not connected to an HTTP route, checkout, issuance or
-admission and does not grant access.
+`Store` methods. The code-injected, sandbox-only checkout test route resolves
+this mapping for an already enrolled user. Normal server configuration cannot
+enable that route; the mapping is not connected to production checkout,
+issuance or paid admission and does not grant access.
 
 Enrollment accepts a trusted local user ID only after the future caller has
 authenticated the user. It creates a random opaque subject once for an active
