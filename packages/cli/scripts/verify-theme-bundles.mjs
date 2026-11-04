@@ -6,13 +6,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-fixture-"));
 const env = { ...process.env, PUBLY_THEME_DIR: path.join(tmp, "themes"), PUBLY_CONFIG: path.join(tmp, "config.json") };
 let previewDir;
 function cli(...args) {
-  const preload = env.PUBLY_FETCH_FIXTURE ? ["--import", env.PUBLY_FETCH_FIXTURE] : [];
+  const preload = env.PUBLY_FETCH_FIXTURE ? ["--import", pathToFileURL(env.PUBLY_FETCH_FIXTURE).href] : [];
   const result = spawnSync(process.execPath, [...preload, path.join(root, "dist", "index.js"), "theme", ...args, "--json"], { env, encoding: "utf8" });
   assert.equal(result.signal, null); assert.equal(result.stderr, "");
   const output = JSON.parse(result.stdout); return { status: result.status, output };
