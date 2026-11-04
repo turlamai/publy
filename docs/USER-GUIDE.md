@@ -32,6 +32,20 @@ source-build functionality, **not yet a no-setup public installer**.
 
 In the development plugin, **Copy rendered rich text** stops without changing the clipboard if images or formulas are missing, fail to render, or remain as local attachments. Use draft delivery for content with attachments.
 
+## Use a standalone article theme (CLI development build)
+
+Built-in themes work offline. To use a content-only theme bundle from someone you trust, run `publy theme add ./theme.json`, then `publy theme preview THEME_ID` and use `--theme THEME_ID` when rendering. `publy theme ls` lists installed article themes. To replace one, run `publy theme update ./new-theme.json`; to remove it, run `publy theme remove THEME_ID`. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. The Obsidian settings UI still lists built-in themes; these commands do not install an Obsidian theme.
+
+For an HTTPS bundle, obtain its complete-file SHA-256 independently from a trusted source and run `publy theme add https://example.com/theme.json --sha256 HASH`. A matching hash checks the downloaded bytes against that value; it does not establish who created them. Redirects are refused. These are content-only JSON files, not executable packages; they are limited to scoped `#publy` article styles and a conservative subset of CSS. Remote assets, CSS imports, scripts, and CSS escapes are rejected. This is not a signed gallery or an automatic updater.
+
+To create a bundle from your own CSS, save a file containing styles such as `#publy p { color: #123456; }`, then run:
+
+```sh
+publy theme pack my.css --id my-style --theme-version 1.0.0 --name "My style" --license MIT --output my-style.json
+```
+
+The command validates the content, refuses to overwrite an existing output and prints the bundle's SHA-256. Include a suitable licence for styles you share. The original CSS and Markdown files are not modified. Themes are stored in `~/.publy/themes`; back up any bundles you want to keep.
+
 ## Where are my notes and drafts?
 
 Publy does not create a notebook or provide a dashboard for browsing and

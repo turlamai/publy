@@ -12,3 +12,5 @@ export * from "./crop.js";
 export * from "./cover-art.js";
 export * from "./wechat.js";
 export * from "./publish.js";
+
+export { validateThemeBundle, installThemeBundle, listInstalledThemes, readInstalledTheme, removeInstalledTheme } from "./theme-bundle.js";

@@ -64,6 +64,10 @@ The historical rationale and unshipped ideas below are context. Theme-marketplac
 
 以下早期论证和未交付设想作为背景保留。主题市场收入、新多账号/群发操作面和旧托管定价不再是当前实施队列；已验证的渲染/主题包机制可继续复用。恢复历史设想需另做产品决定。
 
+### Standalone article theme CLI contract (development)
+
+`theme ls` and `theme preview` remain offline; listing includes installed content-only article bundles. `theme pack` writes a new bundle without overwriting; `theme add`, `update` and `remove` explicitly mutate the local theme directory. Local files use no network. HTTPS add/update requires the full bundle SHA-256 and refuses redirects; the digest does not authenticate the author. All four support `--json` and return a single `theme-bundle` object with `ok`, `code`, `networkUsed` and `submitted:false`; failures exit 2. Agent callers must obtain user approval before these local writes or remote fetches. No gallery, signing infrastructure or Obsidian theme installation is implied.
+
 ## 0. 一句话
 
 **Publy 是 Markdown 到微信公众号草稿的交付工具：CLI 与 Obsidian 插件负责预览、排版和卡片渲染，自托管服务负责草稿投递；公开托管服务仍需通过运营门禁。**

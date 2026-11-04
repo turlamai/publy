@@ -11,11 +11,12 @@
     "dist",
     "themes",
     "fonts",
-    "samples"
+    "samples",
+    "third-party-notices.txt"
   ],
   "scripts": {
     "build": "tsc --noEmit && node esbuild.mjs",
-    "test": "node scripts/verify-preflight.mjs"
+    "test": "node scripts/verify-preflight.mjs && node scripts/verify-theme-bundles.mjs"
   },
   "keywords": [
     "wechat",
