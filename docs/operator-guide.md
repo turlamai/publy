@@ -11,6 +11,12 @@ The current console is a **development tool**. Public hosted registration and
 payment are not open, and the legacy user-plan and order screens do not prove
 that Commerce/Permit authorization or real sales are active.
 
+Alipay Vibe Pay is the planned collection method. A sandbox payment and a
+signed order query have been verified, while callbacks, refunds, customer
+entitlements and live merchant eligibility still need acceptance. Do not use
+historical order records to enable paid service. See the
+[Alipay integration plan](alipay-vibe-pay-plan.md) for the current boundaries.
+
 ## Reach the admin page
 
 1. Start a configured Publy server on a machine you control. New development

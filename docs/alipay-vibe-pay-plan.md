@@ -40,6 +40,15 @@ The normal server configuration cannot turn it on. The synthetic loopback
 fixture exercises Publy and Commerce together with temporary keys; it does not
 contact Alipay or prove the provider's own sandbox or merchant setup.
 
+A separate owner-performed sandbox drill created a test checkout through the
+Publy and Commerce development seam. The sandbox buyer completed a simulated
+payment, and a signed Alipay query independently confirmed the same order,
+CNY 29.00 and `TRADE_SUCCESS` after applying the query-reader correction in
+[Commerce #56](https://github.com/turlamai/commerce/pull/56). The test did not
+reach a public callback endpoint, issue a customer entitlement, or exercise a
+refund. Temporary keys, local test databases and scripts were deleted. It is
+not evidence of merchant admission or permission to accept real payments.
+
 Before accepting money, finish the Commerce signer boundary, authenticated
 Publy checkout and identity binding, entitlement and quota admission,
 webhook/query reconciliation, refund and recovery flows, privacy/retention
