@@ -23,6 +23,12 @@ function bundle(version, css) {
   fs.writeFileSync(file, JSON.stringify(data)); return file;
 }
 try {
+  const discover = spawnSync(process.execPath, [path.join(root, "dist", "index.js"), "capabilities", "--json"], { env, encoding: "utf8" });
+  assert.equal(discover.status, 0); const commands = JSON.parse(discover.stdout).commands;
+  for (const name of ["theme pack", "theme add", "theme update", "theme remove"]) {
+    const command = commands.find(item => item.name === name);
+    assert.equal(command.requiresUserApproval, true); assert.ok(command.usage);
+  }
   const cssFile = path.join(tmp, "source.css"), packedFile = path.join(tmp, "packed.json");
   fs.writeFileSync(cssFile, "#publy p { color: #123456; margin: 1px 2px }");
   const pack = cli("pack", cssFile, "--id", "fixture", "--theme-version", "1.0.0", "--name", "Fixture", "--license", "MIT", "--output", packedFile);
