@@ -33,6 +33,13 @@ one-time transactions only after their exact offers and lifecycle have been
 implemented and verified; do not call them automatic subscriptions unless a
 separate provider contract actually supports and authorizes renewal.
 
+For development, Publy has an in-process sandbox-only checkout seam. It
+requires a previously enrolled user, signs the Commerce request, validates the
+returned merchant signature and expected amount, and marks the result unpaid.
+The normal server configuration cannot turn it on. The synthetic loopback
+fixture exercises Publy and Commerce together with temporary keys; it does not
+contact Alipay or prove the provider's own sandbox or merchant setup.
+
 Before accepting money, finish the Commerce signer boundary, authenticated
 Publy checkout and identity binding, entitlement and quota admission,
 webhook/query reconciliation, refund and recovery flows, privacy/retention

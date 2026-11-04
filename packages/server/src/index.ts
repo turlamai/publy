@@ -19,6 +19,7 @@ import type { JobInfo, JobStatus, PublishRequest, PublishResponse, PublishResult
 import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, type AccountCredential } from "@publy/core";
 import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
+import { requestHostedCheckout } from "./commerce-checkout-request.js";
 import { purchasePage } from "./pages.js";
 import { adminPage } from "./admin-page.js";
 
@@ -46,6 +47,12 @@ export interface ServerConfig {
   secretKey?: string;
   /** scheduler poll interval; tests shorten it to exercise the job runner */
   jobPollMs?: number;
+  /** In-process sandbox fixture only. loadServerConfig never reads this field. */
+  sandboxCheckout?: {
+    endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
+    appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
+    fetcher?: typeof fetch;
+  };
   payments?: {
     /** Old checkout is off by default. This opt-in permits only isolated tests. */
     enableLegacyCheckout?: boolean;
@@ -616,6 +623,43 @@ export function buildApp(config: ServerConfig) {
     if (caller.admin) return { admin: true, unlimited: true };
     const limit = planLimit(caller.user);
     return { plan: caller.user.plan, used: store.getUsage(caller.user), limit, expiresAt: caller.user.expiresAt || undefined };
+  });
+
+  // Sandbox-only integration seam: no configuration file can enable this
+  // route. It prepares a signed order, never confirms payment or grants rights.
+  const sandboxCheckoutAttempts = new Map<string, number[]>();
+  app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
+    const sandbox = config.sandboxCheckout;
+    if (!sandbox) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
+    const caller = (req as unknown as { caller: Caller }).caller;
+    if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).sort().join(",") !== "offer,requestId") return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
+    const value = body as Record<string, unknown>;
+    const offers: Record<string, number> = Object.freeze({
+      "publy-personal-monthly": 2900, "publy-personal-annual": 29000,
+      "publy-studio-monthly": 7900, "publy-studio-annual": 79000,
+    });
+    if (typeof value.offer !== "string" || !Object.hasOwn(offers, value.offer) ||
+        typeof value.requestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.requestId)) {
+      return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
+    }
+    const subject = store.resolveHostedSubject(caller.user.id);
+    if (!subject) return reply.code(403).send({ code: "HOSTED_IDENTITY_NOT_ENROLLED" });
+    const now = Date.now();
+    const attempts = (sandboxCheckoutAttempts.get(caller.user.id) ?? []).filter((t) => now - t < 3600_000);
+    if (attempts.length >= 20) return reply.code(429).send({ code: "RATE_LIMITED" });
+    attempts.push(now);
+    sandboxCheckoutAttempts.set(caller.user.id, attempts);
+    // Namespacing prevents one user's request ID from colliding with another's.
+    const requestId = crypto.createHash("sha256").update(subject).update("\0").update(value.requestId).digest("hex");
+    const result = await requestHostedCheckout({
+      ...sandbox, environment: "sandbox", requestId, amountFen: offers[value.offer],
+      scope: { issuer: sandbox.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
+    });
+    reply.header("cache-control", "no-store");
+    return result.status === "ready" ? result : reply.code(503).send({ code: "CHECKOUT_OUTCOME_UNKNOWN" });
   });
 
   // self-serve account binding: the customer validates their own AppID +

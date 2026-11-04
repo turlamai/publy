@@ -83,6 +83,8 @@ test("server configuration cannot enable the historical manual checkout", () => 
     assert.throws(() => loadServerConfig(file), /isolated in-process tests/);
     fs.writeFileSync(file, JSON.stringify({ ...value, payments: { enableLegacyCheckout: false, provider: "manual" } }));
     assert.equal(loadServerConfig(file).payments?.enableLegacyCheckout, false);
+    fs.writeFileSync(file, JSON.stringify({ ...value, sandboxCheckout: { endpoint: "https://untrusted.example" } }));
+    assert.equal(loadServerConfig(file).sandboxCheckout, undefined, "a configuration file must not enable the sandbox seam");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

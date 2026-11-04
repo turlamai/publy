@@ -20,6 +20,29 @@ export function signHostedProofRequest(input: {
   scope: HostedProofScope;
   body: Uint8Array;
 }): string {
+  return signHostedRequest("/v1/hosted/proof", input);
+}
+
+/** Checkout requests use the same framing with a distinct signed route. */
+export function signHostedCheckoutRequest(input: {
+  serviceId: string;
+  secret: Uint8Array;
+  timestamp: number;
+  nonce: string;
+  scope: HostedProofScope;
+  body: Uint8Array;
+}): string {
+  return signHostedRequest("/v1/hosted/alipay-checkout", input);
+}
+
+function signHostedRequest(path: string, input: {
+  serviceId: string;
+  secret: Uint8Array;
+  timestamp: number;
+  nonce: string;
+  scope: HostedProofScope;
+  body: Uint8Array;
+}): string {
   const { serviceId, secret, timestamp, nonce, scope, body } = input;
   const bounded = (value: unknown): value is string => typeof value === "string" && value.length > 0 && [...value].length <= 256;
   if (!bounded(serviceId) || !bounded(scope.issuer) || scope.subjectType !== "account" ||
@@ -30,7 +53,7 @@ export function signHostedProofRequest(input: {
   if (!Number.isSafeInteger(timestamp) || timestamp < 0) throw new Error("Invalid timestamp");
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(nonce)) throw new Error("Invalid nonce");
   if (!(body instanceof Uint8Array) || body.byteLength > 1024 * 1024) throw new Error("Invalid request body");
-  const values: Array<string | Uint8Array> = [serviceId, "POST", "/v1/hosted/proof", String(timestamp), nonce,
+  const values: Array<string | Uint8Array> = [serviceId, "POST", path, String(timestamp), nonce,
     scope.issuer, scope.subjectType, scope.subjectId, scope.offerId, scope.productId, body];
   const mac = crypto.createHmac("sha256", secret);
   mac.update("commerce-hosted-s2s-v1\n", "utf8");
