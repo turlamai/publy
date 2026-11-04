@@ -92,7 +92,7 @@ child.stderr.on("data", (chunk) => { output += chunk; });
   let ready = false;
   for (let i = 0; i < 100 && !ready; i++) {
     if (childError) throw childError;
-    if (child.exitCode !== null) throw new Error("Synthetic fixture exited: " + output.slice(-1000));
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error("Synthetic fixture exited: " + output.slice(-1000));
     try { await fetch(`http://127.0.0.1:${port}/v1/hosted/alipay-checkout`, { signal: AbortSignal.timeout(500) }); ready = true; }
     catch { await new Promise((resolve) => setTimeout(resolve, 100)); }
   }
@@ -127,10 +127,13 @@ child.stderr.on("data", (chunk) => { output += chunk; });
     if (app) await app.close();
   } finally {
     try {
-      if (child && child.exitCode === null) {
+      if (child && child.exitCode === null && child.signalCode === null) {
         child.kill("SIGTERM");
         await Promise.race([new Promise((resolve) => child.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 2000))]);
-        if (child.exitCode === null) child.kill("SIGKILL");
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL");
+          await new Promise((resolve) => child.once("exit", resolve));
+        }
       }
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
