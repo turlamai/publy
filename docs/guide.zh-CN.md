@@ -19,7 +19,7 @@ markdown 文件 → publy CLI → publy-server（你的服务器）→ 微信官
 
 ## 当前可用范围
 
-公开托管尚未开放注册、购买或付款。请先使用本地渲染与自己的服务端，不向历史托管地址发送 API key 或 AppSecret。服务端默认关闭旧版 `/purchase`、`/order/:id`、`/lookup`、`/pay/xunhupay/notify` 路由，统一返回 `CHECKOUT_NOT_AVAILABLE`。仅隔离的开发者模拟测试可以显式设置 `payments.enableLegacyCheckout: true` 与 `payments.provider: "manual"`；这**不代表允许对外收款**。配置缺失的支付宝／虎皮椒渠道不再静默降级为手工收款。托管支付需按 [#17](https://github.com/turlamai/publy/issues/17) 接入 Commerce/Permit 并完成真实商户与授权验收。完整状态、隐私和恢复说明见 [USER-GUIDE.zh-CN.md](USER-GUIDE.zh-CN.md)。
+公开托管尚未开放注册、购买或付款。请先使用本地渲染与自己的服务端，不向历史托管地址发送 API key 或 AppSecret。服务端默认关闭旧版 `/purchase`、`/order/:id`、`/lookup`、`/pay/xunhupay/notify` 路由，统一返回 `CHECKOUT_NOT_AVAILABLE`。旧版手工收款流程仅供进程内隔离模拟测试，服务端配置文件不能启用它。配置缺失的支付宝／虎皮椒渠道不再静默降级为手工收款。托管支付需按 [#17](https://github.com/turlamai/publy/issues/17) 接入 Commerce/Permit 并完成真实商户与授权验收。完整状态、隐私和恢复说明见 [USER-GUIDE.zh-CN.md](USER-GUIDE.zh-CN.md)。
 
 ## 准备工作
 

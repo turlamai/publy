@@ -103,6 +103,12 @@ export function verifyWsTicket(secretKey: string, ticket: string): string | null
 export function loadServerConfig(configPath?: string): ServerConfig {
   const file = configPath ?? process.env.PUBLY_SERVER_CONFIG ?? DEFAULT_CONFIG_PATH;
   const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+  // The historical manual checkout returns credentials and does not establish
+  // verified payment rights. It is only exercised by in-process test fixtures;
+  // no server configuration file may enable it on a listening service.
+  if (raw.payments?.enableLegacyCheckout === true) {
+    throw new Error("legacy checkout is available only to isolated in-process tests; public billing requires Commerce/Permit");
+  }
   if (!raw.apiKey) throw new Error(`server config ${file} is missing "apiKey"`);
   if (raw.host !== undefined && (typeof raw.host !== "string" || !raw.host.trim())) {
     throw new Error("server config host must be a non-empty string");

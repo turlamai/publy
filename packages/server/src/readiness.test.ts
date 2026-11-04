@@ -74,6 +74,18 @@ test("server configuration binds loopback by default and requires a valid explic
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("server configuration cannot enable the historical manual checkout", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-legacy-config-"));
+  try {
+    const file = path.join(dir, "server.json");
+    const value = { apiKey: "synthetic", accounts: [{ name: "test", appId: "wx", appSecret: "synthetic" }] };
+    fs.writeFileSync(file, JSON.stringify({ ...value, payments: { enableLegacyCheckout: true, provider: "manual" } }));
+    assert.throws(() => loadServerConfig(file), /isolated in-process tests/);
+    fs.writeFileSync(file, JSON.stringify({ ...value, payments: { enableLegacyCheckout: false, provider: "manual" } }));
+    assert.equal(loadServerConfig(file).payments?.enableLegacyCheckout, false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 // --- redaction ----------------------------------------------------------------
 
 test("redactSecrets scrubs token/secret/key query values", () => {
