@@ -145,7 +145,7 @@ Read [the current product/interaction decision](design.md#current-scope-and-inte
 - [x] **wenyan 全面退役**（2026-09-29）：服务器 tmux 停止 + npm 卸载 + 数据目录改名 `.retired-20260929` 观察；本机 npm 卸载 + 数据目录删除；`tlai-wechat-publish` 技能 v1.0.0 重写
 - [x] CLI 开发期 shim（指向已构建 dist）；历史 npm 全局命令不再作为普通用户安装路径，发行包验收仍未完成
 - [x] **强 API key 轮换**（2026-09-30：24 字节随机 hex 替换 wenyan 时代弱 key，双端同步）
-- [x] **定时发布**（2026-09-30）：`publy publish --at "..."` → 服务端 jobs.json 持久化 + 失败重试 3 次 + `publy jobs list/cancel` + webhook 通知
+- [x] **定时发布的历史实现**（2026-09-30）：`publy publish --at "..."`、服务端 jobs.json、`publy jobs list/cancel` 与 webhook；旧版自动重试策略已收紧，结果不明时不会自动重发，恢复步骤见[运营指南](operator-guide.zh-CN.md)
 - [x] **webhook**（2026-09-30）：server.json 账号级 webhook URL，publish/failed 事件推送
 - [x] **测试与 CI**（2026-09-30）：33 个单测（core 26 含真实渲染、server 7 含 fastify inject 协议测试），GitHub Actions ubuntu+windows 矩阵
 - [x] **历史 npm 打包实验（已退役，非当前发行方式）**（2026-09-30）：当时曾验证 esbuild 与打包体积；现已停止 npm Registry 发布，CLI 包标为 private。当前 Racket 原生分发属于实验状态，详见 [发行策略](distribution.md) 和 [#18](https://github.com/turlamai/publy/issues/18)
@@ -172,16 +172,14 @@ Obsidian 社区已有 **8+ 个同类公众号发布插件**（Markdown Publisher
 - [x] **设计系统与交互打磨（2026-10-12，0.6.0）**：styles.css 主题层（微信绿 token 落在 Obsidian 原生变量上，亮暗双主题）、发布状态机（按钮 spinner + 面板结果条：草稿/排期/去重/失败四态）、**390px 手机宽预览切换**（公众号读者大多在手机）、工具栏主题快切（10 主题即时重渲染）、历史面板时间线化、封面选择器 2.35:1 裁切缩略图 + hover/选中态、Lucide 图标全覆盖
 - [ ] 发布到 Obsidian 社区目录
 
-## M4 — 公开商业版（进行中）
+## M4 — 公开商业版（尚未开放）
 
-- [x] 主题注册表仓库 `publy-themes`（index schema + 内置主题登记 + 提交指南）
-- [x] **主题商店 gallery 上线并重做**（2026-09-30 v2）：themes.publy.jrtx.site/——文章主题直接内嵌**发布级真实 HTML**（同篇切主题对比 + 手机宽/文档宽切换），卡片主题按真实翻阅方式横向滑动 + 全屏翻页灯箱；废弃截图方案；生成器 scripts/build-gallery.mjs（输出到 publy-themes 仓库 D:Codespubly-themes）
-- [x] **云控制面上线**（2026-09-30）：多用户（node:sqlite 独立 API key）、配额强制（Free 30 次/月 / Pro 5000 次/月，按自然月滚动）、账号归属与计划限制（Free 1 账号 / Pro 3 账号）、购买页 + key 找回 + `publy quota`、admin 控制台（开通/延期/停用/绑定账号/用量）、支付适配器（虎皮椒已实现，凭据待运营者注册填入；当前手工开通模式）
-- [x] **支付适配器矩阵**（2026-09-30）：支付宝当面付（官方渠道、个人可申请，已实现 precreate 扫码 + 主动查单 + RSA2）/ 虎皮椒备用（PC 扫码仍可用）/ 手工开通兜底；购买页自动适配三种模式
-- [ ] 运营者申请支付宝当面付 → server.json 填 alipay 凭据 → 扫码直付上线
-- [ ] 定价页上主站 + 服务条款/隐私政策
-- [ ] 外部主题提交流程开放（独立、受签名和版本约束的主题包；不依赖 npm Registry）— [#21](https://github.com/turlamai/publy/issues/21)
-- [ ] jrtx.site 产品页（已上线 publy.jrtx.site）+ 开源发布文
+2026 年 9 月曾试验购买页、手工开通、虎皮椒和支付宝当面付。这些是历史实验，不代表当前可收款；旧购买入口默认关闭，也不能通过服务器配置启用手工售卖。
+
+- [x] 建立主题注册表与主题展示的初版；外部主题分发仍需签名、版本约束和验收（[#21](https://github.com/turlamai/publy/issues/21)）。
+- [ ] 完成 Commerce / Permit 的支付凭据、账号权益、额度、退款和恢复集成，并验收异常情况（[#17](https://github.com/turlamai/publy/issues/17)、[#44](https://github.com/turlamai/publy/issues/44)）。
+- [ ] 根据[支付宝 Vibe Pay 接入计划](alipay-vibe-pay-plan.md)完成官方沙箱和商户资格验收；普通服务器配置目前无法开启该实验性支付入口。
+- [ ] 与产品负责人共同核对销售页面、价格、服务条款、隐私政策和最终上架；在此之前不开放公开购买。
 
 ## Later（不承诺时间表）
 
