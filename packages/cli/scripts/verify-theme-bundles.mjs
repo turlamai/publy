@@ -56,7 +56,7 @@ try {
   env.PUBLY_FETCH_STATUS = "302";
   assert.equal(cli("add", "https://themes.example.test/a", "--sha256", digest).output.ok, false);
   env.PUBLY_FETCH_STATUS = "200";
-  const remote = cli("add", "https://themes.example.test/a", "--sha256", digest).output;
+  const remote = cli("add", "https://themes.example.test/a", "--sha256", digest.toUpperCase()).output;
   assert.equal(remote.ok, true); assert.equal(remote.networkUsed, true);
   fs.writeFileSync(path.join(env.PUBLY_THEME_DIR, "fixture.json"), "corrupt");
   const invalidList = cli("ls"); assert.equal(invalidList.status, 2); assert.equal(invalidList.output.code, "THEME_LIST_FAILED");

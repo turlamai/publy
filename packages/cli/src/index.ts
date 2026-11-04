@@ -675,7 +675,7 @@ async function cmdThemeBundle(action: "add" | "update" | "remove", source: strin
       let bytes: Uint8Array;
       if (/^https?:\/\//i.test(source)) {
         const url = new URL(source);
-        if (url.protocol !== "https:" || url.username || url.password || !opts.sha256 || !/^[a-f0-9]{64}$/.test(opts.sha256)) throw new Error("invalid remote source");
+        if (url.protocol !== "https:" || url.username || url.password || !opts.sha256 || !/^[a-f0-9]{64}$/i.test(opts.sha256)) throw new Error("invalid remote source");
         networkUsed = true;
         const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
         if (!response.ok || !response.body) throw new Error("download failed");
@@ -695,7 +695,7 @@ async function cmdThemeBundle(action: "add" | "update" | "remove", source: strin
           bytes = buffer.subarray(0, length);
         } finally { fs.closeSync(fd); }
       }
-      if (opts.sha256 && (!/^[a-f0-9]{64}$/.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256)) throw new Error("checksum mismatch");
+      if (opts.sha256 && (!/^[a-f0-9]{64}$/i.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256.toLowerCase())) throw new Error("checksum mismatch");
       const raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       const bundle = installThemeBundle(raw, action, [...BUILTIN_THEMES, ...Object.keys(BUILTIN_CARD_THEMES)]);
       source = bundle.id;
