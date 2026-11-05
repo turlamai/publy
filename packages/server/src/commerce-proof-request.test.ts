@@ -45,6 +45,13 @@ test("hosted proof observation signs the exact bytes and never grants access", a
   assert.equal(requests, 1, "invalid configuration must not make a network request");
   const denied = await observeHostedProof({ ...input, fetcher: async () => new Response('{"status":"refund-pending"}', { status: 200 }) });
   assert.deepEqual(denied, { kind: "shadow-observation", canAuthorize: false, status: "no-proof" });
+  const withdrawal = await observeHostedProof({ ...input, fetcher: async () => new Response(JSON.stringify({
+    status: "recorded-withdrawal", entitlement_id: "ent-test", revision: 5, credential: { synthetic: true },
+  }), { status: 200 }) });
+  assert.deepEqual(withdrawal, { kind: "shadow-observation", canAuthorize: false, status: "recorded-withdrawal",
+    entitlementId: "ent-test", revision: 5, credential: { synthetic: true } });
+  const malformedWithdrawal = await observeHostedProof({ ...input, fetcher: async () => new Response('{"status":"recorded-withdrawal"}', { status: 200 }) });
+  assert.equal(malformedWithdrawal.status, "unavailable");
   const malformed = await observeHostedProof({ ...input, fetcher: async () => new Response('{"status":"verified-proof"}', { status: 200 }) });
   assert.equal(malformed.status, "unavailable");
   const oversized = await observeHostedProof({ ...input, fetcher: async () => new Response("x".repeat(1024 * 1024 + 1), { status: 200 }) });
