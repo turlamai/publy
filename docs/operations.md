@@ -68,12 +68,16 @@ or point a public proxy to it before the deployment and release gates pass.
 Staging with synthetic credentials does not verify production backup/restore,
 merchant admission, egress policy, TLS, proxy access controls or hosted billing.
 
-## Fixed-egress personal pilot runbook (issue #8) — NOT YET EXECUTED
+## Fixed-egress personal pilot runbook (issue #8) — IN PROGRESS
 
-The checklist below is the acceptance contract for the first owned-account
-deployment. It proves a fixed-egress pilot; it does **not** prove hosted
-commercial readiness, and it is not authorization to purchase infrastructure,
-change DNS or accept paid customers (those gates stay with PRICING).
+An owner-controlled fixed-egress test has delivered synthetic article and
+image-and-caption drafts, and the owner checked their appearance. A separate
+isolated synthetic backup rehearsal verified authenticated encryption, key
+recovery, SQLite integrity and restored-job quarantine. These are partial
+checks, not a production backup system or hosted commercial acceptance. See
+[issue #8](https://github.com/turlamai/publy/issues/8) for the evidence and
+remaining limitations. The checklist below is not yet complete; public sales
+remain closed pending the gates in PRICING.
 
 Prerequisites: a small managed Linux host with a stable outbound IP, the
 operator's own WeChat account bound, synthetic content only.

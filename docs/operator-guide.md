@@ -86,6 +86,10 @@ before restarting or restoring a service.
 - Back up the configured data directory and server configuration together,
   with all writers stopped, into encrypted, access-controlled storage. Verify
   recovery in an isolated environment before relying on the backup.
+- A small synthetic recovery exercise has checked encryption, recovery-key
+  use and restored-job quarantine. It did not establish an automated backup,
+  independent key custody or recovery of activity after a snapshot; follow
+  the [recovery runbook](operations.md) for the remaining work.
 - Treat administrator keys, AppSecrets, draft data and logs as confidential.
   Do not post them in public support requests.
 - The source server template defaults to loopback; expose a service only via
