@@ -1346,6 +1346,9 @@ export default class PublyPlugin extends Plugin {
       const rendered = renderMarkdown(raw, this.renderOptions());
       try {
         for (const w of rendered.warnings) console.warn("[publy] " + w);
+        if (format === "image" && (!rendered.attachments.length || rendered.warnings.some(blockingMediaWarning))) {
+          throw new Error(t("mediaNotReady"));
+        }
         if (gen !== this.previewGen) return;
         const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
         view.notePath = f.path;

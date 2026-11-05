@@ -408,7 +408,7 @@ try {
     fail("frontmatter-only cover was not included as exact PNG material");
   }
   const pathKey = "samples/format-choice.md";
-  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + coverPath.split(path.sep).join("/") + ")";
+  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + path.basename(coverPath) + ")";
   app.vaultContentByPath[pathKey] = source;
   app.workspace.activeFile = { path: pathKey, basename: "format-choice", extension: "md", stat: { mtime: Date.now() } };
   inst.chooseFormat(pathKey, "image");

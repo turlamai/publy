@@ -16,6 +16,7 @@
 
 .publy-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   padding: 8px 12px;
@@ -24,10 +25,19 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  overflow-x: auto;
+  overflow-x: visible;
 }
 .publy-spacer {
-  flex: 1;
+  flex: 1 1 0;
+}
+.publy-toolbar .publy-btn-primary {
+  max-width: 100%;
+}
+.publy-toolbar .publy-btn-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
 }
 
 .publy-btn {
