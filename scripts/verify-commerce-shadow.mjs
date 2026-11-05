@@ -38,7 +38,7 @@ const file = path.join(dir, "fixture.rkt");
 fs.writeFileSync(file, String.raw`#lang racket/base
 (require commerce commerce/issuer commerce/journal commerce/permit commerce/provider
          commerce/hosted-http commerce/hosted-replay/sqlite commerce/storage commerce/storage/sqlite
-         permit/trust permit/issuer file/sha1 json)
+         permit/trust permit/issuer permit/envelope file/sha1 json)
 (define dir (getenv "PUBLY_FIXTURE_DIR"))
 (define store (open-sqlite-commerce-storage (build-path dir "commerce.sqlite")))
 (define nonce-path (build-path dir "nonces.sqlite"))
@@ -58,6 +58,19 @@ fs.writeFileSync(file, String.raw`#lang racket/base
     #:constraints (make-permit-constraints-policy #:use-expires-at "2099-01-01T00:00:00Z")))))
 (define worker (make-issuance-worker #:catalog catalog #:issuer "issuer" #:private-key private
   #:key-id "test" #:trust-store trust #:clock (lambda () (values 100 "2026-10-17T03:00:00Z"))))
+;; A separate lineage tests Commerce's signed successor withdrawal without
+;; mutating the loopback service's synthetic live grant.
+(define (intent action) (rights-intent (format "snapshot/~a" action) action "mock" "snapshot-order"
+  "personal-monthly" "customer-a" 1793692800))
+(define snapshot-initial (prepare-permit-snapshot catalog (intent 'grant) #:issuer "issuer"
+  #:credential-id "snapshot-c0" #:entitlement-id "snapshot-entitlement" #:issued-at "2026-10-01T00:00:00Z"))
+(define snapshot-withdrawal (prepare-permit-snapshot catalog (intent 'withdraw) #:issuer "issuer"
+  #:credential-id "snapshot-c1" #:entitlement-id "snapshot-entitlement" #:issued-at "2026-11-01T00:00:00Z"
+  #:previous (permit-snapshot-request-payload snapshot-initial)))
+(for ([name '("grant" "withdrawal")] [snapshot (list snapshot-initial snapshot-withdrawal)])
+  (define envelope (issue-credential (permit-snapshot-request-payload-bytes snapshot) private "test" trust))
+  (call-with-output-file (build-path dir (string-append name ".json")) #:exists 'error
+    (lambda (out) (write-json (envelope->jsexpr envelope) out))))
 (define raw #"synthetic-payment")
 (journal-accept! store raw (make-verified-payment-event "mock" "payment-1"
   (bytes->hex-string (sha256-bytes raw)) 'payment-succeeded "order-1" "personal-monthly" "customer-a" amount 98)
@@ -117,6 +130,36 @@ try {
   }
   const tampered = verify({ ...allowedScope.credential, payload: "dGFtcGVyZWQ=" });
   if (tampered.status !== "denied") throw new Error("Tampered signed proof was accepted");
+  const snapshotFile = path.join(dir, "inspect-snapshot.rkt");
+  fs.writeFileSync(snapshotFile, String.raw`#lang racket/base
+(require json permit/trust)
+(define inspect (dynamic-require (string->path (getenv "PUBLY_SNAPSHOT_MODULE")) 'inspect-publy-hosted-snapshot))
+(define input (read-json))
+(write-json (inspect (hash-ref input 'credential) (read-trust-store (getenv "PUBLY_FIXTURE_TRUST"))
+  #:account "customer-a" #:plan "personal" #:entitlement-id "snapshot-entitlement"
+  #:revision (hash-ref input 'revision)))
+`);
+  const inspectSnapshot = (credential, revision) => {
+    const run = spawnSync("racket", [snapshotFile], { input: JSON.stringify({ credential, revision }), encoding: "utf8",
+      env: { ...process.env, PUBLY_SNAPSHOT_MODULE: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../racket/publy-hosted-snapshot.rkt"),
+        PUBLY_FIXTURE_TRUST: path.join(dir, "trust.json"), PLTCOLLECTS: collects } });
+    if (run.status !== 0) throw new Error("Snapshot verification failed: " + run.stderr.slice(-1000));
+    return JSON.parse(run.stdout);
+  };
+  const grantEnvelope = JSON.parse(fs.readFileSync(path.join(dir, "grant.json"), "utf8"));
+  const withdrawalEnvelope = JSON.parse(fs.readFileSync(path.join(dir, "withdrawal.json"), "utf8"));
+  const withdrawalObservation = await observeHostedProof({ ...request, fetcher: async () => new Response(JSON.stringify({
+    status: "recorded-withdrawal", entitlement_id: "snapshot-entitlement", revision: 1, credential: withdrawalEnvelope,
+  }), { status: 200 }) });
+  if (withdrawalObservation.status !== "recorded-withdrawal" || withdrawalObservation.canAuthorize !== false) {
+    throw new Error("Withdrawal observation was lost or granted access");
+  }
+  const snapshotGrant = inspectSnapshot(grantEnvelope, 0);
+  const snapshotWithdrawal = inspectSnapshot(withdrawalObservation.credential, withdrawalObservation.revision);
+  if (snapshotGrant.status !== "verified-snapshot" || snapshotWithdrawal.status !== "verified-snapshot" ||
+      snapshotGrant.authorizes_use !== false || snapshotWithdrawal.authorizes_use !== false ||
+      snapshotWithdrawal.payload_sha256 !== crypto.createHash("sha256").update(Buffer.from(withdrawalEnvelope.payload, "base64")).digest("hex") ||
+      inspectSnapshot(withdrawalEnvelope, 0).status !== "denied") throw new Error("Signed snapshot validation failed");
   // Exercise durable product-side fences and quota with synthetic inputs only.
   const productDb = new DatabaseSync(path.join(dir, "product-fixture.sqlite"));
   try {
@@ -132,6 +175,21 @@ try {
     let conflictRejected = false;
     try { fence.record({ ...recorded, payloadSha256: "f".repeat(64) }, false); } catch { conflictRejected = true; }
     if ((recorded.revision > 0 && !staleRejected) || !conflictRejected) throw new Error("Entitlement rollback fence failed");
+    const snapshotPath = path.join(dir, "snapshot-fixture.sqlite");
+    const snapshotRecord = (checked) => ({ subject: scope.subjectId, offer: scope.offerId,
+      entitlementId: checked.entitlement_id, revision: checked.revision, payloadSha256: checked.payload_sha256 });
+    const snapshotDb = new DatabaseSync(snapshotPath);
+    try {
+      const snapshotFence = new HostedEntitlementFence(snapshotDb);
+      if (snapshotFence.record(snapshotRecord(snapshotGrant), true) !== "enrolled" ||
+          snapshotFence.record(snapshotRecord(snapshotWithdrawal), false) !== "advanced") throw new Error("Signed withdrawal fence did not advance");
+    } finally { snapshotDb.close(); }
+    const reopenedDb = new DatabaseSync(snapshotPath);
+    try {
+      let replayRejected = false;
+      try { new HostedEntitlementFence(reopenedDb).record(snapshotRecord(snapshotGrant), false); } catch { replayRejected = true; }
+      if (!replayRejected) throw new Error("Older signed grant replay was accepted after withdrawal");
+    } finally { reopenedDb.close(); }
     const quota = new HostedQuotaLedger(productDb);
     const now = Date.now(), periodStart = now - 1000, periodEnd = now + 60000;
     const admission = { subject: scope.subjectId, requestId: "synthetic-request", fingerprint: "a".repeat(64), periodStart, periodEnd, limit: 1, now };
@@ -145,7 +203,7 @@ try {
   if (stale.status !== "no-proof" || forbiddenScope.status !== "unavailable") {
     throw new Error("Commerce revision fence or scope isolation failed");
   }
-  console.log("PASS — synthetic proof verified; tampering, stale revision and cross-account denied; quota/fence persisted; no access granted");
+  console.log("PASS — synthetic proof verified; signed withdrawal fenced and older grant rejected; quota/fence persisted; no access granted");
 } finally {
   if (!childError) child.kill("SIGTERM");
   if (!childError && child.exitCode === null && child.signalCode === null) await new Promise((resolve) => child.once("exit", resolve));

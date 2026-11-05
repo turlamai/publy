@@ -1,5 +1,5 @@
 #lang racket/base
-(require rackunit permit/issuer permit/envelope "publy-hosted-proof.rkt")
+(require rackunit permit/issuer permit/envelope "publy-hosted-proof.rkt" "publy-hosted-snapshot.rkt")
 
 (define-values (private public) (generate-ed25519-keypair))
 (define trust (jsexpr->trust-store
@@ -37,5 +37,26 @@
                              (inspect (fixture #:activation #t))
                              (inspect (fixture #:channel "trial"))
                              (inspect (hash-set valid 'payload "dGFtcGVyZWQ="))))])
+  (check-equal? (hash-ref result 'status) "denied")
+  (check-false (hash-ref result 'authorizes_use)))
+
+;; An expired signed snapshot can advance an anti-rollback fence, but is
+;; never admission. The response metadata must match the signed bytes.
+(define expired (fixture #:expires "2026-10-02T00:00:00Z"))
+(define (inspect-snapshot proof #:account [account "account-a"] #:plan [plan "personal"]
+                          #:id [id "entitlement-1"] #:revision [revision 3])
+  (inspect-publy-hosted-snapshot proof trust #:account account #:plan plan
+                                  #:entitlement-id id #:revision revision))
+(define signed-expired (inspect-snapshot expired))
+(check-equal? (hash-ref signed-expired 'status) "verified-snapshot")
+(check-false (hash-ref signed-expired 'authorizes_use))
+(check-true (regexp-match? #px"^[a-f0-9]{64}$" (hash-ref signed-expired 'payload_sha256)))
+(for ([result (in-list (list (inspect-snapshot expired #:account "other")
+                             (inspect-snapshot expired #:plan "studio")
+                             (inspect-snapshot expired #:id "other")
+                             (inspect-snapshot expired #:revision 4)
+                             (inspect-snapshot (fixture #:product "other"))
+                             (inspect-snapshot (fixture #:activation #t))
+                             (inspect-snapshot (hash-set expired 'payload "dGFtcGVyZWQ="))))])
   (check-equal? (hash-ref result 'status) "denied")
   (check-false (hash-ref result 'authorizes_use)))

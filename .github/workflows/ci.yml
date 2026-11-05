@@ -13,6 +13,43 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  commerce-shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: Bogdanp/setup-racket@v1.2
+        with:
+          architecture: x64
+          distribution: full
+          variant: CS
+          version: stable
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/permit
+          ref: 4ac89f540bf6ddc3f337239d974a198612f8e705
+          path: .deps/permit
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/commerce
+          ref: 61d12372f8dcfeb1a9a997f63a07bc5583c226ca
+          path: .deps/commerce
+      - run: raco pkg install --auto --batch --no-docs --name permit .deps/permit
+      - run: raco pkg install --auto --batch --no-docs --name commerce .deps/commerce
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Verify synthetic signed withdrawal and replay fence
+        run: node scripts/verify-commerce-shadow.mjs
+        env:
+          COMMERCE_ROOT: ${{ github.workspace }}/.deps/commerce
+          PERMIT_ROOT: ${{ github.workspace }}/.deps/permit
+
   test:
     strategy:
       fail-fast: false
