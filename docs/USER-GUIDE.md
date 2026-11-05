@@ -46,6 +46,8 @@ publy theme pack my.css --id my-style --theme-version 1.0.0 --name "My style" --
 
 The command validates the content, refuses to overwrite an existing output and prints the bundle's SHA-256. Include a suitable licence for styles you share. The original CSS and Markdown files are not modified. Themes are stored in `~/.publy/themes`; back up any bundles you want to keep.
 
+To migrate an older local theme, keep a backup of its CSS and licence, then use `theme pack` on a copy. Adapt unsupported selectors or declarations explicitly; Publy rejects them rather than silently weakening validation. A CSS file you personally trust can still be used for a one-off render with `--custom-theme /path/to/theme.css`; that older path reads CSS as trusted input and is not the bundle safety boundary. Do not run an old package's install scripts. The bundle flow does not import npm packages automatically.
+
 ## Where are my notes and drafts?
 
 Publy does not create a notebook or provide a dashboard for browsing and
