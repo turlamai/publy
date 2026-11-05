@@ -24,7 +24,7 @@ CLI, default themes, Obsidian and self-hosting remain free under their existing 
 
 [Installation, first use, privacy, backup and recovery](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
-The [Publy publishing skill](skills/publy-publish/SKILL.md) helps compatible agents check, preview and create authorized WeChat drafts.
+The [Publy publishing skill](skills/publy-publish/SKILL.md) helps compatible agents check, preview and create authorized WeChat drafts. · [Agent skill setup](skills/README.md)
 
 ## Quick start
 

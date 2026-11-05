@@ -23,7 +23,7 @@ CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公�
 
 [安装、首次使用、隐私与备份恢复](docs/USER-GUIDE.zh-CN.md) · [English](docs/USER-GUIDE.md)
 
-[Publy 发布技能](skills/publy-publish/SKILL.md)帮助兼容的 Agent 检查、预览并在授权后创建公众号草稿。
+[Publy 发布技能](skills/publy-publish/SKILL.md)帮助兼容的 Agent 检查、预览并在授权后创建公众号草稿。 · [Agent 技能配置](skills/README.zh-CN.md)
 
 ## 三分钟上手
 
