@@ -42,7 +42,7 @@ PowerShell 请将 `"$PUBLY_API_KEY"` 换成 `"$env:PUBLY_API_KEY"`。CLI 会通�
 
 设计文档：
 
-- [docs/design.md](docs/design.md) — 产品设计：定位、形态、CLI 契约、图片消息管线、主题商店、架构
+- [docs/design.md](docs/design.md) — 产品设计：定位、形态、CLI 契约、图片消息管线、主题机制、架构
 - [docs/business.md](docs/business.md) — 开源边界、定价、GTM
 - [docs/roadmap.md](docs/roadmap.md) — 当前交付与商业门禁
 
