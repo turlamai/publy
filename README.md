@@ -6,10 +6,10 @@ Editor-independent Markdown-to-WeChat draft publishing: local rendering and pref
 
 **English** · [中文](README.zh-CN.md)
 
-- **Keep writing in Typora or Obsidian.** Use the same source file; `publy check a.md` reports missing images before any draft is sent. The current CLI remains a developer source build.
+- **Keep your Markdown wherever you write.** Typora and Obsidian are optional; an agent or the CLI can use the same source file directly. `publy check a.md` reports missing images before any draft is sent. The current CLI remains a developer source build.
 - **The Obsidian plugin renders and delivers the current note to WeChat drafts in place**: in-app article preview, image-post card deck preview, rich-text copy, publish progress — no browser needed.
 - **Image posts as a first-class citizen.** `publy card post.md` renders themed 3:4 card PNGs deterministically — pixel-perfect Chinese text, seconds per deck, no AI image generation.
-- **Use themes without registry packages.** Built-in themes work offline; the development CLI can also pack, add, preview, update and remove content-only article theme bundles. HTTPS downloads require a user-supplied SHA-256. Obsidian can select validated local bundles; signed themes and a gallery are not available; see the [user guide](docs/USER-GUIDE.md#use-a-standalone-article-theme-cli-development-build).
+- **Use themes without registry packages.** Built-in themes work offline; the development CLI can also pack, add, preview, update and remove content-only article theme bundles. HTTPS downloads require a user-supplied SHA-256. Obsidian can select validated local bundles; signed theme downloads and an installation catalogue are not available; see the [user guide](docs/USER-GUIDE.md#use-a-standalone-article-theme-cli-development-build).
 - **Open core, no lock-in.** The CLI and a self-hostable server are open source (AGPL-3.0) and speak the same protocol as the hosted cloud. The future hosted service would provide: stable egress IP for the WeChat API whitelist, AppSecret custody, token lifecycle, scheduling, multi-account.
 
 Compliance: Publy only uses official WeChat MP APIs. No account simulation, no browser automation.
