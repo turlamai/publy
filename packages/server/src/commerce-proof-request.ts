@@ -65,11 +65,12 @@ function signHostedRequest(path: string, input: {
   return mac.digest("hex");
 }
 
-/** A shadow observation is not proof that a customer is entitled to use Publy.
+/** Status and credential are unverified observations, including withdrawals.
+ * A shadow observation is not proof that a customer is entitled to use Publy.
  * Independent Permit verification, current-state fencing and quota admission
  * remain mandatory before any hosted feature can be enabled. */
 export type HostedProofObservation =
-  | { kind: "shadow-observation"; canAuthorize: false; status: "verified-proof"; entitlementId: string; revision: number; credential: object }
+  | { kind: "shadow-observation"; canAuthorize: false; status: "verified-proof" | "recorded-withdrawal"; entitlementId: string; revision: number; credential: object }
   | { kind: "shadow-observation"; canAuthorize: false; status: "no-proof" | "unavailable" };
 
 export async function observeHostedProof(input: {
@@ -114,11 +115,11 @@ export async function observeHostedProof(input: {
     const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
     if (!value || typeof value !== "object" || Array.isArray(value)) return unavailable();
     const result = value as Record<string, unknown>;
-    if (result.status !== "verified-proof") return { kind: "shadow-observation", canAuthorize: false, status: "no-proof" };
+    if (result.status !== "verified-proof" && result.status !== "recorded-withdrawal") return { kind: "shadow-observation", canAuthorize: false, status: "no-proof" };
     if (typeof result.entitlement_id !== "string" || result.entitlement_id.length === 0 || result.entitlement_id.length > 256 ||
         !Number.isSafeInteger(result.revision) || (result.revision as number) < 0 ||
         !result.credential || typeof result.credential !== "object" || Array.isArray(result.credential)) return unavailable();
-    return { kind: "shadow-observation", canAuthorize: false, status: "verified-proof", entitlementId: result.entitlement_id,
+    return { kind: "shadow-observation", canAuthorize: false, status: result.status, entitlementId: result.entitlement_id,
       revision: result.revision as number, credential: result.credential as object };
   } catch {
     // Never propagate provider bodies, URLs, headers or key material.
