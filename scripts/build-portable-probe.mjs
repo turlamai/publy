@@ -67,9 +67,12 @@ fs.chmodSync(path.join(output, "runtime", runtimeName), 0o755);
 fs.copyFileSync(license, path.join(output, "runtime", "LICENSE"));
 fs.copyFileSync(path.join(root, "LICENSE"), path.join(output, "LICENSE"));
 if (process.platform === "win32") {
-  // PowerShell forwards arguments as an array; cmd.exe %* can reinterpret
-  // metacharacters embedded in a user-selected Markdown filename.
-  fs.writeFileSync(path.join(output, "publy.ps1"), '& "$PSScriptRoot\\runtime\\node.exe" "$PSScriptRoot\\app\\dist\\index.js" @args\r\nexit $LASTEXITCODE\r\n');
+  // Build a native console launcher; forwarding through cmd.exe can interpret
+  // metacharacters, while a .ps1 is blocked by the default execution policy.
+  const compiler = path.join(process.env.SystemRoot ?? "C:\\Windows", "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe");
+  const launcher = spawnSync(compiler, ["/nologo", "/target:exe", "/out:" + path.join(output, "publy.exe"),
+    path.join(root, "scripts", "windows-launcher.cs")], { encoding: "utf8" });
+  if (launcher.status !== 0) throw new Error("Windows launcher compilation failed: " + (launcher.stderr || launcher.stdout).slice(0, 1000));
 } else {
   fs.writeFileSync(path.join(output, "publy"), '#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$HERE/runtime/node" "$HERE/app/dist/index.js" "$@"\n', { mode: 0o755 });
 }
