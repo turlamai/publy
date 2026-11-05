@@ -64,9 +64,7 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 原文绝不修改；覆盖现有 HTML 必须显式 `--force`。
 命令不会上传文章，也不会创建公众号草稿。
 
-`theme ls --json` 仅列出随程序内置的文章/卡片主题，
-返回 `source:"bundled"`、`networkUsed:false`，不会访问主题仓库；
-人工 `theme ls` 也只列出内置主题，不访问注册表。
+`theme ls --json` 返回内置文章/卡片主题及已安装文章主题元数据 `installedArticleThemes`，保留 `source:"bundled"`、`networkUsed:false`；列出时不访问网络。`theme pack`、`add`、`update`、`remove` 会写入本地文件，必须先得到用户授权；pack 不覆盖已有文件。HTTPS 添加或更新必须提供完整文件的 `--sha256`，不跟随重定向，并通过 `networkUsed` 报告联网情况；本地来源保持离线。成功返回 `kind:"theme-bundle"`、`ok:true` 和稳定 `code`；包无效或写入失败返回 具体的 `THEME_*` 错误码（退出码 2），包括 `THEME_HASH_MISMATCH`、`THEME_UNSAFE_CSS`、`THEME_EXISTS` 与 `THEME_NOT_FOUND`。摘要不能证明作者身份。使用方法见[主题说明](USER-GUIDE.zh-CN.md#使用独立文章主题cli-开发版)。
 
 `theme preview <name> --json` 离线生成私有 HTML，返回 `kind:"theme-preview"`、`output`、主题类型及 `networkUsed:false`；不会打开浏览器或创建草稿。未知主题返回 `UNKNOWN_THEME`（退出码 2），无法渲染返回 `THEME_PREVIEW_FAILED`（退出码 3）。文章与卡片同名时沿用卡片优先规则。
 

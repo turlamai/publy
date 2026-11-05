@@ -30,6 +30,22 @@ Typora 可直接把 `.md` 原文件交给 Publy；Obsidian 可以使用已有插
 
 开发版插件的「复制排版内容」遇到缺失、渲染失败或仍需本地附件的图片和公式时，会停止复制并保留原剪贴板。含附件的内容可使用草稿投递流程。
 
+## 使用独立文章主题（CLI 开发版）
+
+内置主题可以离线使用。要使用来自可信来源的纯内容主题包，运行 `publy theme add ./theme.json`，再用 `publy theme preview 主题ID` 预览，并在渲染时指定 `--theme 主题ID`。`publy theme ls` 会列出已安装的文章主题；替换时运行 `publy theme update ./new-theme.json`，删除时运行 `publy theme remove 主题ID`。如需回退，请保留旧主题包，先移除当前版本再添加旧文件。同一系统用户运行的 Obsidian 可以选择通过校验的已安装文章主题：安装后重新打开插件设置或预览面板即可。CLI 管理本机共享主题包，插件本身不会下载主题。
+
+通过 HTTPS 获取主题包时，先从可信渠道单独核实完整文件的 SHA-256，再运行 `publy theme add https://example.com/theme.json --sha256 校验值`。摘要只能核对下载内容与该值是否一致，不能证明作者身份；下载不跟随重定向。主题包是纯内容 JSON，不是可执行软件包，只接受限定在 `#publy` 下的一小部分文章 CSS；远程资源、CSS 导入、脚本与 CSS 转义会被拒绝。目前没有签名主题广场或自动更新功能。
+
+要将自己的 CSS 制作为主题包，可先保存类似 `#publy p { color: #123456; }` 的样式文件，再运行：
+
+```sh
+publy theme pack my.css --id my-style --theme-version 1.0.0 --name "我的主题" --license MIT --output my-style.json
+```
+
+命令会校验内容、拒绝覆盖已有输出，并打印主题包的 SHA-256。分享主题时请附上合适的许可证；原 CSS 和 Markdown 文件不会被修改。主题保存在 `~/.publy/themes`，请自行备份需要保留的主题包。
+
+迁移旧的本地主题时，请先备份它的 CSS 和许可证，再对副本运行 `theme pack`。不受支持的选择器或声明需要你明确调整；Publy 会拒绝，而不会悄悄降低校验要求。你本人信任的 CSS 文件仍可通过 `--custom-theme /path/to/theme.css` 临时用于一次渲染；这是旧的可信输入路径，不具备主题包的安全边界。不要运行旧包的安装脚本；主题包流程不会自动导入 npm 包。
+
 ## 我的笔记和草稿在哪里？
 
 Publy 不建立笔记库，也没有用来浏览或编辑笔记的后台。你仍然在

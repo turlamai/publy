@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { readInstalledTheme } from "./theme-bundle.js";
 
 export interface Theme {
   id: string;
@@ -82,7 +83,8 @@ export function loadTheme(id: string): Theme {
   // Built-in IDs must never be interpreted as filesystem paths. Custom CSS
   // is an explicit separate operation via loadThemeFromCss.
   if (!(BUILTIN_THEMES as readonly string[]).includes(id)) {
-    throw new Error(`Unknown theme id. Built-in themes: ${BUILTIN_THEMES.join(", ")}`);
+    try { const bundle = readInstalledTheme(id); return { id: bundle.id, css: bundle.css }; }
+    catch { throw new Error(`Unknown theme id or invalid installed bundle. Built-in themes: ${BUILTIN_THEMES.join(", ")}`); }
   }
   const dir = builtinThemesDir();
   const file = dir ? path.join(dir, `${id}.css`) : null;
