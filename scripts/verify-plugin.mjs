@@ -72,11 +72,13 @@ let nextPublishResponse = null;
 let nextPublishStatus = 200;
 let nextQueryResponse = null;
 let lastPreviewHtml = "";
+let settingTab;
+const dropdownOptions = [];
 
 class Component {
   replaceChildren(...children) { this.children = children; }
   empty() { this.children = []; }
-  createEl() { return { children: [], style: {} }; }
+  createEl() { const el = new Component(); el.style = {}; el.setText = () => {}; return el; }
   appendChild() {}
 }
 
@@ -110,7 +112,7 @@ class Plugin {
   async saveData() {}
   addRibbonIcon() { calls.push("ribbon"); }
   addCommand(cmd) { calls.push("command:" + cmd.id); this.app.commands.commands[cmd.id] = { callback: cmd.callback }; }
-  addSettingTab() { calls.push("settingsTab"); }
+  addSettingTab(tab) { calls.push("settingsTab"); settingTab = tab; }
   registerView() {}
   registerEvent() {}
   addStatusBarItem() { calls.push("statusbar"); return { setText: (t) => calls.push("status:" + t) }; }
@@ -148,7 +150,16 @@ class Setting {
   setName() { return this; }
   setDesc() { return this; }
   addText() { return this; }
-  addDropdown() { return this; }
+  addToggle() { return this; }
+  addDropdown(callback) {
+    const drop = {
+      addOption(key, label) { dropdownOptions.push([key, label]); return this; },
+      addOptions(options) { for (const key in options) if (options.hasOwnProperty(key)) this.addOption(key, options[key]); return this; },
+      setValue() { return this; }, onChange() { return this; },
+    };
+    callback(drop);
+    return this;
+  }
   addButton() { return this; }
 }
 class Modal {
@@ -301,6 +312,11 @@ if (suppliedPluginDir === undefined) {
     const bundle = { format: "publy-theme-v1", id: "fixture", version: "1.0.0", name: "Fixture", license: "MIT", css,
       cssSha256: crypto.createHash("sha256").update(css).digest("hex") };
     fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    dropdownOptions.length = 0;
+    settingTab.display();
+    if (!dropdownOptions.some(([id, label]) => id === "fixture" && label.includes("Fixture"))) {
+      fail("installed theme is missing from Obsidian settings");
+    }
     inst.settings.theme = "fixture"; lastPreviewHtml = "";
     await inst.previewCurrentNote();
     if (!lastPreviewHtml.includes("#123456")) fail("installed theme did not affect the plugin article preview");

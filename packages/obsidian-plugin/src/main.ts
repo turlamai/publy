@@ -1871,17 +1871,18 @@ class PublySettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }),
     );
-    new Setting(containerEl).setName(t("setTheme")).setDesc(t("setThemeDesc")).addDropdown((drop) =>
-      drop
-        .addOptions(availableArticleThemes())
-        .setValue(this.plugin.settings.theme || "claude")
+    new Setting(containerEl).setName(t("setTheme")).setDesc(t("setThemeDesc")).addDropdown((drop) => {
+      // Obsidian's addOptions calls hasOwnProperty on its argument; our
+      // null-prototype lookup deliberately does not inherit that method.
+      for (const [id, label] of Object.entries(availableArticleThemes())) drop.addOption(id, label);
+      drop.setValue(this.plugin.settings.theme || "claude")
         .onChange(async (v) => {
           this.plugin.settings.theme = v;
           await this.plugin.saveSettings();
           // live re-render if the preview is open
-          void this.plugin.previewCurrentNote();
-        }),
-    );
+          if (this.plugin.app.workspace.getActiveFile()) void this.plugin.previewCurrentNote();
+        });
+    });
     const connResult = containerEl.createEl("div");
     connResult.style.cssText = "font-size:13px;padding:2px 0 10px";
     new Setting(containerEl)
