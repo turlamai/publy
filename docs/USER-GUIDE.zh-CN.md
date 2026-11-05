@@ -16,10 +16,10 @@ CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公�
 
 源码构建需要 Node.js 22+、pnpm 和 Git；步骤见[开发版安装与配置](guide.zh-CN.md#准备工作)。发布附件不等于完整部署服务。
 
-## 从 Typora 或 Obsidian 使用
+## 使用任意 Markdown 编辑器或 Agent
 
-Typora 可直接把 `.md` 原文件交给 Publy；Obsidian 可以使用已有插件
-或原始 Markdown，不需要复制整个笔记库。不再开发其他编辑器专用适配。当前开发版可以运行
+任何编辑器或 Agent 都可以把 `.md` 原文件交给 Publy；Obsidian 的插件只是可选入口，
+不需要复制整个笔记库。当前开发版可以运行
 `publy check "D:/Notes/article.md" --json` 做**离线**图片、封面和卡片结构
 预检查，再运行 `publy preview` 预览；这两项都不会投递草稿。
 支持 Typora 的本地 `typora-root-url` 和嵌套图片目录，缺图会明确报告，

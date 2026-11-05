@@ -16,10 +16,10 @@ Use the developer CLI or the Obsidian plugin. Published release assets currently
 
 Source builds require Node.js 22+, pnpm and Git; follow the [developer installation and setup](guide.md). Release assets do not constitute a deployed service.
 
-## Write in Typora or Obsidian
+## Use any Markdown editor or agent
 
-For Typora, choose the **original Markdown file**. For Obsidian, use the
-plugin or the same underlying Markdown. No other editor integrations are planned. In the current
+Choose the **original Markdown file** from any editor or agent. For Obsidian, use the optional
+plugin or the same underlying Markdown. In the current
 developer CLI, run `publy check "/path/to/your-note.md" --json` to inspect
 images, covers and card structure **locally**, then `publy preview` before
 considering delivery. Neither command sends a draft. Typora's local
