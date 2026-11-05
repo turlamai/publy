@@ -637,19 +637,40 @@ async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<v
   else console.log(`account ${alias} saved${config.default_account === alias ? " (default)" : ""}`);
 }
 
+const THEME_ERRORS: Record<string, string> = {
+  THEME_INVALID_BUNDLE: "Bundle metadata or format is invalid.",
+  THEME_UNSAFE_CSS: "CSS is outside the supported, scoped article-theme subset.",
+  THEME_CSS_HASH_MISMATCH: "The CSS content does not match the bundle checksum.",
+  THEME_HASH_MISMATCH: "The bundle does not match the supplied SHA-256.",
+  THEME_CHECKSUM_REQUIRED: "HTTPS themes require a valid full-file SHA-256.",
+  THEME_HTTPS_REQUIRED: "Remote themes require an HTTPS URL without embedded credentials.",
+  THEME_DOWNLOAD_FAILED: "Could not download the theme; redirects are not supported.",
+  THEME_INVALID_SOURCE: "The source must be a regular file within the size limit.",
+  THEME_RESERVED_ID: "That ID belongs to a built-in theme.",
+  THEME_VERSION_UNCHANGED: "The installed theme already has that version.",
+  THEME_EXISTS: "The output or installed theme already exists.",
+  THEME_NOT_FOUND: "The source or installed theme was not found.",
+};
+function themeError(error: unknown, fallback: string): string {
+  const err = error as NodeJS.ErrnoException;
+  if (err?.code === "ENOENT") return "THEME_NOT_FOUND";
+  if (err?.code === "EEXIST") return "THEME_EXISTS";
+  return typeof err?.message === "string" && Object.hasOwn(THEME_ERRORS, err.message) ? err.message : fallback;
+}
+
 async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; json?: boolean }): Promise<void> {
   const { validateThemeBundle, BUILTIN_THEMES, BUILTIN_CARD_THEMES } = await import("@publy/core");
   try {
-    if ((BUILTIN_THEMES as readonly string[]).includes(opts.id) || Object.hasOwn(BUILTIN_CARD_THEMES, opts.id)) throw new Error("reserved theme id");
+    if ((BUILTIN_THEMES as readonly string[]).includes(opts.id) || Object.hasOwn(BUILTIN_CARD_THEMES, opts.id)) throw new Error("THEME_RESERVED_ID");
     const stat = fs.lstatSync(cssFile);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 128 * 1024) throw new Error("invalid CSS source");
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 128 * 1024) throw new Error("THEME_INVALID_SOURCE");
     const fd = fs.openSync(cssFile, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
     let css: string;
     try {
       const opened = fs.fstatSync(fd);
-      if (!opened.isFile() || opened.size > 128 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("invalid CSS source");
+      if (!opened.isFile() || opened.size > 128 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("THEME_INVALID_SOURCE");
       const data = Buffer.alloc(128 * 1024 + 1); const length = fs.readSync(fd, data, 0, data.length, 0);
-      if (length > 128 * 1024) throw new Error("CSS too large");
+      if (length > 128 * 1024) throw new Error("THEME_INVALID_SOURCE");
       css = new TextDecoder("utf-8", { fatal: true }).decode(data.subarray(0, length));
     } finally { fs.closeSync(fd); }
     const bundle = { format: "publy-theme-v1", id: opts.id, version: opts.themeVersion, name: opts.name, license: opts.license,
@@ -659,9 +680,10 @@ async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: s
     const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: "THEME_PACK_OK", id: opts.id,
       sha256: crypto.createHash("sha256").update(raw, "utf8").digest("hex"), networkUsed: false, submitted: false };
     if (opts.json) console.log(JSON.stringify(result)); else console.log(`Created ${opts.output}\nSHA-256: ${result.sha256}`);
-  } catch {
-    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code: "THEME_PACK_FAILED", networkUsed: false, submitted: false };
-    if (opts.json) console.log(JSON.stringify(result)); else console.error("publy: could not create theme bundle; check the CSS, metadata and output path.");
+  } catch (error) {
+    const code = themeError(error, "THEME_PACK_FAILED");
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code, networkUsed: false, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.error(`publy: ${THEME_ERRORS[code] ?? "Could not create the theme bundle."}`);
     process.exitCode = 2;
   }
 }
@@ -669,42 +691,45 @@ async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: s
 async function cmdThemeBundle(action: "add" | "update" | "remove", source: string, opts: { json?: boolean; sha256?: string }): Promise<void> {
   const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, installThemeBundle, removeInstalledTheme } = await import("@publy/core");
   let networkUsed = false;
+  let downloading = false;
   try {
     if (action === "remove") { removeInstalledTheme(source); }
     else {
       let bytes: Uint8Array;
       if (/^https?:\/\//i.test(source)) {
         const url = new URL(source);
-        if (url.protocol !== "https:" || url.username || url.password || !opts.sha256 || !/^[a-f0-9]{64}$/i.test(opts.sha256)) throw new Error("invalid remote source");
-        networkUsed = true;
+        if (url.protocol !== "https:" || url.username || url.password) throw new Error("THEME_HTTPS_REQUIRED");
+        if (!opts.sha256 || !/^[a-f0-9]{64}$/i.test(opts.sha256)) throw new Error("THEME_CHECKSUM_REQUIRED");
+        networkUsed = true; downloading = true;
         const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
-        if (!response.ok || !response.body) throw new Error("download failed");
+        if (!response.ok || !response.body) throw new Error("THEME_DOWNLOAD_FAILED");
         const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let length = 0;
-        try { while (true) { const { done, value } = await reader.read(); if (done) break; length += value.length; if (length > 256 * 1024) throw new Error("bundle too large"); chunks.push(value); } }
+        try { while (true) { const { done, value } = await reader.read(); if (done) break; length += value.length; if (length > 256 * 1024) throw new Error("THEME_INVALID_SOURCE"); chunks.push(value); } }
         finally { await reader.cancel().catch(() => {}); }
-        bytes = Buffer.concat(chunks);
+        bytes = Buffer.concat(chunks); downloading = false;
       } else {
         const stat = fs.lstatSync(source);
-        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256 * 1024) throw new Error("invalid local source");
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256 * 1024) throw new Error("THEME_INVALID_SOURCE");
         const fd = fs.openSync(source, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
         try {
           const opened = fs.fstatSync(fd);
-          if (!opened.isFile() || opened.size > 256 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("invalid local source");
+          if (!opened.isFile() || opened.size > 256 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("THEME_INVALID_SOURCE");
           const buffer = Buffer.alloc(256 * 1024 + 1); const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
-          if (length > 256 * 1024) throw new Error("bundle too large");
+          if (length > 256 * 1024) throw new Error("THEME_INVALID_SOURCE");
           bytes = buffer.subarray(0, length);
         } finally { fs.closeSync(fd); }
       }
-      if (opts.sha256 && (!/^[a-f0-9]{64}$/i.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256.toLowerCase())) throw new Error("checksum mismatch");
+      if (opts.sha256 && (!/^[a-f0-9]{64}$/i.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256.toLowerCase())) throw new Error("THEME_HASH_MISMATCH");
       const raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       const bundle = installThemeBundle(raw, action, [...BUILTIN_THEMES, ...Object.keys(BUILTIN_CARD_THEMES)]);
       source = bundle.id;
     }
     const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: `THEME_${action.toUpperCase()}_OK`, id: source, networkUsed, submitted: false };
     if (opts.json) console.log(JSON.stringify(result)); else console.log(`${action}: ${source}`);
-  } catch {
-    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code: "THEME_BUNDLE_FAILED", networkUsed, submitted: false };
-    if (opts.json) console.log(JSON.stringify(result)); else console.error("publy: theme operation failed; check the bundle, checksum and installed theme.");
+  } catch (error) {
+    const code = themeError(error, downloading ? "THEME_DOWNLOAD_FAILED" : "THEME_BUNDLE_FAILED");
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code, networkUsed, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.error(`publy: ${THEME_ERRORS[code] ?? "Theme operation failed."}`);
     process.exitCode = 2;
   }
 }

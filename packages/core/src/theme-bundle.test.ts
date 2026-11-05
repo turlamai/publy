@@ -13,7 +13,8 @@ test("content-only bundles accept scoped styles and reject active or malformed C
   for (const css of ["body { color: red }", "#publy p { background: url(https://evil.test/x) }", "@import url(x);", "#publy p { color: red; } </style><script>x</script>", "#publy p { color: r\\65d }", "#publy p { color: expression(x) }", "#publy p { color: red; broken }", "#publy p, body { color: red }"]) {
     assert.throws(() => validateThemeBundle(make(css)), Error, css);
   }
-  assert.throws(() => validateThemeBundle(make("#publy p {color:red}", { cssSha256: "0".repeat(64) })));
+  assert.throws(() => validateThemeBundle(make("#publy p {color:red}", { cssSha256: "0".repeat(64) })), /THEME_CSS_HASH_MISMATCH/);
+  assert.throws(() => validateThemeBundle(make("#publy p {background: url(https://evil.test/x)}")), /THEME_UNSAFE_CSS/);
   assert.throws(() => validateThemeBundle(make("#publy p {color:red}", { id: "../escape" })));
   assert.throws(() => validateThemeBundle(make("#publy p {color:red}", { script: "malicious" })));
 });

@@ -36,15 +36,15 @@ try {
   assert.equal(cli("pack", cssFile, "--id", "fixture", "--theme-version", "1.0.0", "--name", "Fixture", "--license", "MIT", "--output", packedFile).output.ok, false);
   let source = packedFile;
   assert.equal(cli("add", source).output.ok, true);
-  assert.equal(cli("add", source).output.ok, false);
+  assert.equal(cli("add", source).output.code, "THEME_EXISTS");
   assert.equal(cli("ls").output.installedArticleThemes[0].id, "fixture");
   const preview = cli("preview", "fixture"); assert.equal(preview.output.ok, true);
   previewDir = path.dirname(preview.output.output);
   assert.match(fs.readFileSync(preview.output.output, "utf8"), /#123456/i);
   source = bundle("1.0.1", "#publy p { color: blue }");
   assert.equal(cli("update", source).output.ok, true);
-  assert.equal(cli("update", source, "--sha256", "0".repeat(64)).output.ok, false);
-  assert.equal(cli("add", "https://example.test/theme.json").output.ok, false); // Requires pin before network.
+  assert.equal(cli("update", source, "--sha256", "0".repeat(64)).output.code, "THEME_HASH_MISMATCH");
+  assert.equal(cli("add", "https://example.test/theme.json").output.code, "THEME_CHECKSUM_REQUIRED"); // Requires pin before network.
   assert.equal(cli("remove", "fixture").output.ok, true);
   assert.deepEqual(fs.readdirSync(env.PUBLY_THEME_DIR), []);
   const hook = path.join(tmp, "fetch-fixture.mjs");
@@ -52,7 +52,7 @@ try {
   env.PUBLY_FETCH_FIXTURE = hook;
   env.PUBLY_FETCH_BYTES = fs.readFileSync(packedFile).toString("base64");
   const digest = crypto.createHash("sha256").update(fs.readFileSync(packedFile)).digest("hex");
-  assert.equal(cli("add", "https://themes.example.test/a", "--sha256", "0".repeat(64)).output.ok, false);
+  assert.equal(cli("add", "https://themes.example.test/a", "--sha256", "0".repeat(64)).output.code, "THEME_HASH_MISMATCH");
   env.PUBLY_FETCH_STATUS = "302";
   assert.equal(cli("add", "https://themes.example.test/a", "--sha256", digest).output.ok, false);
   env.PUBLY_FETCH_STATUS = "200";

@@ -12,7 +12,7 @@ const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const SAFE_PROPERTIES = new Set(["color", "background-color", "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-align", "text-decoration", "text-indent", "white-space", "word-break", "overflow-wrap", "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left", "border", "border-top", "border-right", "border-bottom", "border-left", "border-color", "border-style", "border-width", "border-radius", "width", "max-width", "min-width", "height", "max-height", "min-height", "display", "vertical-align", "list-style-type", "box-sizing"]);
 const VALUE_NODES = new Set(["Value", "Identifier", "Number", "Dimension", "Percentage", "Hash", "String", "Operator", "Function"]);
 const SAFE_FUNCTIONS = new Set(["rgb", "rgba", "hsl", "hsla"]);
-function invalid(): never { throw new Error("INVALID_THEME_BUNDLE"); }
+function invalid(code = "THEME_INVALID_BUNDLE"): never { throw new Error(code); }
 export function themeBundleDirectory(): string { return process.env.PUBLY_THEME_DIR || path.join(os.homedir(), ".publy", "themes"); }
 export function validateThemeBundle(raw: string): ThemeBundle {
   if (Buffer.byteLength(raw, "utf8") > MAX_BYTES) invalid();
@@ -25,33 +25,33 @@ export function validateThemeBundle(raw: string): ThemeBundle {
   if (b.format !== "publy-theme-v1" || typeof b.id !== "string" || !ID.test(b.id) || typeof b.version !== "string" || b.version.length > 40 || !VERSION.test(b.version) ||
       typeof b.name !== "string" || b.name.trim() !== b.name || !b.name.length || b.name.length > 80 || /[\x00-\x1f<>]/.test(b.name) ||
       typeof b.license !== "string" || !/^[A-Za-z0-9.+-]{1,80}$/.test(b.license) || typeof b.css !== "string" ||
-      typeof b.cssSha256 !== "string" || !/^[a-f0-9]{64}$/.test(b.cssSha256) ||
-      crypto.createHash("sha256").update(b.css, "utf8").digest("hex") !== b.cssSha256) invalid();
+      typeof b.cssSha256 !== "string" || !/^[a-f0-9]{64}$/.test(b.cssSha256)) invalid();
+  if (crypto.createHash("sha256").update(b.css as string, "utf8").digest("hex") !== b.cssSha256) invalid("THEME_CSS_HASH_MISMATCH");
   const css = b.css as string;
   // Reject escaping and markup before parsing: they can disguise resource URLs
   // or terminate a style element when rendered into an HTML preview.
-  if (!css.trim() || /[\\<>@\x00-\x08\x0b\x0c\x0e-\x1f]/.test(css) || css.includes("/*")) invalid();
+  if (!css.trim() || /[\\<>@\x00-\x08\x0b\x0c\x0e-\x1f]/.test(css) || css.includes("/*")) invalid("THEME_UNSAFE_CSS");
   let ast: cssTree.CssNode;
-  try { ast = cssTree.parse(css, { onParseError: () => invalid() }); } catch { return invalid(); }
-  if (ast.type !== "StyleSheet" || ast.children.isEmpty) invalid();
+  try { ast = cssTree.parse(css, { onParseError: () => invalid("THEME_UNSAFE_CSS") }); } catch { return invalid("THEME_UNSAFE_CSS"); }
+  if (ast.type !== "StyleSheet" || ast.children.isEmpty) invalid("THEME_UNSAFE_CSS");
   ast.children.forEach(rule => {
-    if (rule.type !== "Rule" || rule.prelude.type !== "SelectorList") invalid();
+    if (rule.type !== "Rule" || rule.prelude.type !== "SelectorList") invalid("THEME_UNSAFE_CSS");
     rule.prelude.children.forEach(selector => {
-      if (selector.type !== "Selector" || selector.children.isEmpty) invalid();
+      if (selector.type !== "Selector" || selector.children.isEmpty) invalid("THEME_UNSAFE_CSS");
       let first = true;
       selector.children.forEach(node => {
-        if (first) { if (node.type !== "IdSelector" || node.name !== "publy") invalid(); first = false; }
+        if (first) { if (node.type !== "IdSelector" || node.name !== "publy") invalid("THEME_UNSAFE_CSS"); first = false; }
         else if (!(["Combinator", "TypeSelector", "ClassSelector"] as string[]).includes(node.type) ||
-          (node.type === "Combinator" && ![" ", ">"].includes(node.name))) invalid();
+          (node.type === "Combinator" && ![" ", ">"].includes(node.name))) invalid("THEME_UNSAFE_CSS");
       });
     });
-    if (rule.block.children.isEmpty) invalid();
+    if (rule.block.children.isEmpty) invalid("THEME_UNSAFE_CSS");
     rule.block.children.forEach(decl => {
-      if (decl.type !== "Declaration" || !SAFE_PROPERTIES.has(decl.property.toLowerCase()) || decl.important || decl.value.type !== "Value") invalid();
+      if (decl.type !== "Declaration" || !SAFE_PROPERTIES.has(decl.property.toLowerCase()) || decl.important || decl.value.type !== "Value") invalid("THEME_UNSAFE_CSS");
       cssTree.walk(decl.value, node => {
-        if (!VALUE_NODES.has(node.type) || (node.type === "Function" && !SAFE_FUNCTIONS.has(node.name.toLowerCase()))) invalid();
+        if (!VALUE_NODES.has(node.type) || (node.type === "Function" && !SAFE_FUNCTIONS.has(node.name.toLowerCase()))) invalid("THEME_UNSAFE_CSS");
       });
-      if (cssTree.lexer.matchProperty(decl.property, decl.value).error) invalid();
+      if (cssTree.lexer.matchProperty(decl.property, decl.value).error) invalid("THEME_UNSAFE_CSS");
     });
   });
   return b as unknown as ThemeBundle;
