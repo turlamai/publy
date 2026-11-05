@@ -46,8 +46,10 @@ by the build operator; the script does not authenticate it. The developer
 workflow `portable-probe.yml` exercises the candidate on Linux, macOS and
 Windows CI; only an actual passing run is evidence. The revised PowerShell launcher and metacharacter-path test passed on Windows CI;
 the Linux and macOS portable probes also passed on integration commit
-`7b9df13`. Windows PowerShell execution policy can still prevent a local
-launcher from running. None of these checks establishes a clean-machine installation guarantee.
+`7b9df13`. A Windows VM later showed that the PowerShell launcher is blocked
+by the default execution policy. The next development candidate uses a native
+console launcher and must be revalidated on Windows before it is treated as
+an installation path. None of these checks establishes a clean-machine installation guarantee.
 
 The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
 `037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
