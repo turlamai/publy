@@ -8,7 +8,7 @@
 
 - **继续使用 Typora 或 Obsidian 写作。** 用原始文件做 `publy check a.md` 检查图片与封面，再决定是否预览和投递草稿。当前 CLI 仍是开发者源码构建版本。
 - **图片消息是一等公民。** `publy card post.md` 确定性渲染主题化 3:4 卡片——像素级正确的汉字，秒级出图，不靠 AI 生图。
-- **无需 npm 主题发布。** 内置主题可直接预览；独立签名/版本化主题包仍在规划，不能把 `theme add` 当作已经交付的功能。
+- **无需 npm 主题发布。** 内置主题可离线使用；CLI 开发版支持创建、添加、预览、更新和删除纯内容文章主题包，HTTPS 下载必须提供 SHA-256。Obsidian 可选择通过校验的本地主题；目前没有签名主题或主题广场，详见[使用指南](docs/USER-GUIDE.zh-CN.md#使用独立文章主题cli-开发版)。
 - **开源核心，不做锁定。** CLI 与自托管 server 开源（AGPL-3.0），与云服务同一协议。未来托管服务的价值是：IP 白名单稳定出口、AppSecret 托管、token 生命周期、定时、多账号。
 
 合规：只走微信公众号官方 API，不做账号模拟，不做浏览器自动化。
@@ -44,7 +44,7 @@ PowerShell 请将 `"$PUBLY_API_KEY"` 换成 `"$env:PUBLY_API_KEY"`。CLI 会通�
 
 设计文档：
 
-- [docs/design.md](docs/design.md) — 产品设计：定位、形态、CLI 契约、图片消息管线、主题商店、架构
+- [docs/design.md](docs/design.md) — 产品设计：定位、形态、CLI 契约、图片消息管线、主题机制、架构
 - [docs/business.md](docs/business.md) — 开源边界、定价、GTM
 - [docs/roadmap.md](docs/roadmap.md) — 当前交付与商业门禁
 

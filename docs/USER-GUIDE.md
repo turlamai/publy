@@ -35,6 +35,21 @@ In the development plugin, **Copy rendered rich text** stops without changing th
 ### Choose a draft format
 
 Choose article, images with a caption, or text cards for each draft. In the development CLI, use the same `--format article`, `--format image`, or `--format cards` for `check`, `preview`, and `publish`; in the Obsidian preview use the format selector. A choice applies to the current operation or plugin session and takes precedence over optional document metadata; the file is not changed. With no choice, legacy metadata applies and otherwise the default is article. Image posts need images; cards need the supported section structure. Review the resulting preview before delivery. These capabilities are still under acceptance and not a released installer.
+## Use a standalone article theme (CLI development build)
+
+Built-in themes work offline. To use a content-only theme bundle from someone you trust, run `publy theme add ./theme.json`, then `publy theme preview THEME_ID` and use `--theme THEME_ID` when rendering. `publy theme ls` lists installed article themes. To replace one, run `publy theme update ./new-theme.json`; to remove it, run `publy theme remove THEME_ID`. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. Obsidian running as the same system user can select validated installed article themes: reopen the plugin settings or preview panel after installation. The CLI manages the shared local bundle; the plugin does not download themes itself.
+
+For an HTTPS bundle, obtain its complete-file SHA-256 independently from a trusted source and run `publy theme add https://example.com/theme.json --sha256 HASH`. A matching hash checks the downloaded bytes against that value; it does not establish who created them. Redirects are refused. These are content-only JSON files, not executable packages; they are limited to scoped `#publy` article styles and a conservative subset of CSS. Remote assets, CSS imports, scripts, and CSS escapes are rejected. This is not a signed gallery or an automatic updater.
+
+To create a bundle from your own CSS, save a file containing styles such as `#publy p { color: #123456; }`, then run:
+
+```sh
+publy theme pack my.css --id my-style --theme-version 1.0.0 --name "My style" --license MIT --output my-style.json
+```
+
+The command validates the content, refuses to overwrite an existing output and prints the bundle's SHA-256. Include a suitable licence for styles you share. The original CSS and Markdown files are not modified. Themes are stored in `~/.publy/themes`; back up any bundles you want to keep.
+
+To migrate an older local theme, keep a backup of its CSS and licence, then use `theme pack` on a copy. Adapt unsupported selectors or declarations explicitly; Publy rejects them rather than silently weakening validation. A CSS file you personally trust can still be used for a one-off render with `--custom-theme /path/to/theme.css`; that older path reads CSS as trusted input and is not the bundle safety boundary. Do not run an old package's install scripts. The bundle flow does not import npm packages automatically.
 
 ## Where are my notes and drafts?
 

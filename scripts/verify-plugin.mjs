@@ -7,6 +7,7 @@
 // With an argument, the prepared plugin dir is used as-is (vault layout).
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import Module from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -71,11 +72,13 @@ let nextPublishResponse = null;
 let nextPublishStatus = 200;
 let nextQueryResponse = null;
 let lastPreviewHtml = "";
+let settingTab;
+const dropdownOptions = [];
 
 class Component {
   replaceChildren(...children) { this.children = children; }
   empty() { this.children = []; }
-  createEl() { return { children: [], style: {} }; }
+  createEl() { const el = new Component(); el.style = {}; el.setText = () => {}; return el; }
   appendChild() {}
 }
 
@@ -109,7 +112,7 @@ class Plugin {
   async saveData() {}
   addRibbonIcon() { calls.push("ribbon"); }
   addCommand(cmd) { calls.push("command:" + cmd.id); this.app.commands.commands[cmd.id] = { callback: cmd.callback }; }
-  addSettingTab() { calls.push("settingsTab"); }
+  addSettingTab(tab) { calls.push("settingsTab"); settingTab = tab; }
   registerView() {}
   registerEvent() {}
   addStatusBarItem() { calls.push("statusbar"); return { setText: (t) => calls.push("status:" + t) }; }
@@ -147,7 +150,16 @@ class Setting {
   setName() { return this; }
   setDesc() { return this; }
   addText() { return this; }
-  addDropdown() { return this; }
+  addToggle() { return this; }
+  addDropdown(callback) {
+    const drop = {
+      addOption(key, label) { dropdownOptions.push([key, label]); return this; },
+      addOptions(options) { for (const key in options) if (options.hasOwnProperty(key)) this.addOption(key, options[key]); return this; },
+      setValue() { return this; }, onChange() { return this; },
+    };
+    callback(drop);
+    return this;
+  }
   addButton() { return this; }
 }
 class Modal {
@@ -287,6 +299,42 @@ if (!calls.some((c) => c.startsWith("command:"))) fail("commands not registered"
 app.workspace.activeFile = { path: "samples/article-sample.md", basename: "article-sample", extension: "md" };
 await inst.previewCurrentNote(); // smart dispatch -> article
 if (!calls.some((c) => c.startsWith("view.setHtml("))) fail("article preview did not render — calls: " + calls.join(" | "));
+
+// Only the synthetic run owns this theme directory. Never touch a supplied vault
+// or the user's actual installed theme store.
+if (suppliedPluginDir === undefined) {
+  const themeDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-theme-"));
+  const original = process.env.PUBLY_THEME_DIR; process.env.PUBLY_THEME_DIR = themeDir;
+  const cleanupTheme = () => { try { fs.rmSync(themeDir, { recursive: true, force: true }); } catch {} };
+  process.once("exit", cleanupTheme);
+  try {
+    const css = "#publy p { color: #123456 }";
+    const bundle = { format: "publy-theme-v1", id: "fixture", version: "1.0.0", name: "Fixture", license: "MIT", css,
+      cssSha256: crypto.createHash("sha256").update(css).digest("hex") };
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    dropdownOptions.length = 0;
+    settingTab.display();
+    if (!dropdownOptions.some(([id, label]) => id === "fixture" && label.includes("Fixture"))) {
+      fail("installed theme is missing from Obsidian settings");
+    }
+    inst.settings.theme = "fixture"; lastPreviewHtml = "";
+    await inst.previewCurrentNote();
+    if (!lastPreviewHtml.includes("#123456")) fail("installed theme did not affect the plugin article preview");
+    bundle.css = "#publy p { color: red }"; // digest no longer matches
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    const count = calls.filter(c => c.startsWith("view.setHtml(")).length;
+    const notices = calls.filter(c => c.startsWith("notice:Publy:")).length;
+    await inst.previewCurrentNote();
+    if (calls.filter(c => c.startsWith("view.setHtml(")).length !== count ||
+        calls.filter(c => c.startsWith("notice:Publy:")).length !== notices + 1) {
+      fail("tampered installed theme must not render or silently fall back");
+    }
+  } finally {
+    inst.settings.theme = "claude";
+    if (original === undefined) delete process.env.PUBLY_THEME_DIR; else process.env.PUBLY_THEME_DIR = original;
+    cleanupTheme(); process.removeListener("exit", cleanupTheme);
+  }
+}
 
 // Valid TeX must become real PNGs, not a raw-TeX fallback that merely makes
 // article preview appear successful when MathJax is absent.
