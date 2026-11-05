@@ -16,10 +16,10 @@ CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公�
 
 源码构建需要 Node.js 22+、pnpm 和 Git；步骤见[开发版安装与配置](guide.zh-CN.md#准备工作)。发布附件不等于完整部署服务。
 
-## 从 Typora 或 Obsidian 使用
+## 使用任意 Markdown 编辑器或 Agent
 
-Typora 可直接把 `.md` 原文件交给 Publy；Obsidian 可以使用已有插件
-或原始 Markdown，不需要复制整个笔记库。不再开发其他编辑器专用适配。当前开发版可以运行
+任何编辑器或 Agent 都可以把 `.md` 原文件交给 Publy；Obsidian 的插件只是可选入口，
+不需要复制整个笔记库。当前开发版可以运行
 `publy check "D:/Notes/article.md" --json` 做**离线**图片、封面和卡片结构
 预检查，再运行 `publy preview` 预览；这两项都不会投递草稿。
 支持 Typora 的本地 `typora-root-url` 和嵌套图片目录，缺图会明确报告，
@@ -30,6 +30,9 @@ Typora 可直接把 `.md` 原文件交给 Publy；Obsidian 可以使用已有插
 
 开发版插件的「复制排版内容」遇到缺失、渲染失败或仍需本地附件的图片和公式时，会停止复制并保留原剪贴板。含附件的内容可使用草稿投递流程。
 
+### 选择草稿形式
+
+每次可选择文章、图片配文或文字卡片。开发版命令行在 `check`、`preview`、`publish` 中使用相同的 `--format article`、`--format image` 或 `--format cards`；Obsidian 预览中也可选择。选择只作用于本次操作或插件会话，优先于可选的文档字段，不改原文。未选择时兼容旧字段，无声明则默认文章。图片消息需要图片，卡片需要符合要求的分节；投递前请检查预览。这些能力仍在验收，不代表安装包已发布。
 ## 使用独立文章主题（CLI 开发版）
 
 内置主题可以离线使用。要使用来自可信来源的纯内容主题包，运行 `publy theme add ./theme.json`，再用 `publy theme preview 主题ID` 预览，并在渲染时指定 `--theme 主题ID`。`publy theme ls` 会列出已安装的文章主题；替换时运行 `publy theme update ./new-theme.json`，删除时运行 `publy theme remove 主题ID`。如需回退，请保留旧主题包，先移除当前版本再添加旧文件。同一系统用户运行的 Obsidian 可以选择通过校验的已安装文章主题：安装后重新打开插件设置或预览面板即可。CLI 管理本机共享主题包，插件本身不会下载主题。

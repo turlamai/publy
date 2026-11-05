@@ -12,10 +12,10 @@ Decision `2026-10-auth-1`: Online hosted-service entitlement, verified on the se
 
 ## Editor-independent product contract (2026-10-30)
 
-**Typora and Obsidian are our two customer-facing writing entry points.**
-Both use the same source-neutral Markdown render, preflight, preview and
-WeChat-draft protocol. Other files compatible with Markdown can still be
-read, but do not build, advertise or maintain separate editor integrations. A future slim publishing companion
+**Markdown is the product input; no editor or agent is required.** Typora and Obsidian are supported writing entry points, not prerequisites.
+All Markdown inputs use the same source-neutral render, preflight, preview and
+WeChat-draft protocol. Do not build separate editor integrations without a
+concrete customer need. A future slim publishing companion
 may accept drag/drop or open-with, but must not become a second editor or
 copy/index the user's notebook by default. The original Markdown/assets stay
 in place; local preview/check must not call a hosted service or require an
@@ -35,8 +35,8 @@ Preserve the family authorization decision `2026-10-auth-1`.
 ## Scope discipline for an independent developer (2026-10-30)
 
 WeChat Official Account **draft delivery is the only supported publishing
-destination**. Typora and Obsidian are the two first-class writing entry
-points; generic Markdown stays an internal/shared file capability. Do not
+destination**. Generic Markdown and agent workflows are first-class; Typora
+and Obsidian are supported optional writing entry points. Do not
 add new publishing destinations, including Zhihu, Toutiao, WordPress, Ghost,
 Xiaohongshu, Douyin or others. No provider abstraction, future-platform
 backlog, API research or platform-specific placeholders. Preserve the focused customer journey:

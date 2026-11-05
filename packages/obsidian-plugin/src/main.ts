@@ -8,6 +8,10 @@ import {
   renderMarkdown,
   renderCards,
   captionToHtml,
+  imagePostCaption,
+  parseSource,
+  resolvePublication,
+  type PublicationFormat,
   blockingMediaWarning,
   draftIdempotencyKey,
   setPngRenderer,
@@ -172,6 +176,11 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   cancelFail: { zh: "取消失败：{msg}", en: "Cancel failed: {msg}" },
   typeImagePost: { zh: "图片消息", en: "image post" },
   typeArticle: { zh: "文章", en: "article" },
+  formatLabel: { zh: "本次发布形式", en: "Format for this draft" },
+  formatAuto: { zh: "跟随文档（{format}）", en: "Follow document ({format})" },
+  formatArticle: { zh: "文章", en: "Article" },
+  formatImage: { zh: "图片与配文", en: "Images and caption" },
+  formatCards: { zh: "文字卡片", en: "Text cards" },
   acctFetchFail: { zh: "获取账号列表失败：{msg}", en: "Failed to list accounts: {msg}" },
   acctNone: { zh: "这个 key 名下没有公众号账号——请先在自托管服务端绑定（publy account add）", en: "No WeChat accounts under this key — bind one on your self-hosted server (publy account add)" },
   acctSwitched: { zh: "已切换到「{name}」", en: "Switched to [{name}]" },
@@ -316,6 +325,8 @@ interface JobEntry {
  *  not a dead end. */
 class PublyPreviewView extends ItemView {
   plugin: PublyPlugin;
+  notePath = "";
+  documentFormat: PublicationFormat = "article";
   /** re-renders the current preview; set on every render by the plugin */
   refresh: (() => Promise<void>) | null = null;
   private publishBtn: HTMLButtonElement | null = null;
@@ -441,6 +452,23 @@ class PublyPreviewView extends ItemView {
 
     const spacer = bar.createEl("div");
     spacer.addClass("publy-spacer");
+
+    const format = bar.createEl("select");
+    format.addClass("publy-select");
+    format.setAttribute("aria-label", t("formatLabel"));
+    format.setAttribute("title", t("formatLabel"));
+    const label = (id: PublicationFormat) => t(id === "article" ? "formatArticle" : id === "image" ? "formatImage" : "formatCards");
+    for (const [id, labelText] of [["auto", t("formatAuto", { format: label(this.documentFormat) })], ["article", label("article")], ["image", label("image")], ["cards", label("cards")]]) {
+      const option = format.createEl("option"); option.value = id; option.textContent = labelText;
+    }
+    format.value = this.plugin.formatForNote(this.notePath) ?? "auto";
+    format.addEventListener("change", () => {
+      const value = format.value;
+      if (value === "auto" || value === "article" || value === "image" || value === "cards") {
+        this.plugin.chooseFormat(this.notePath, value);
+        void this.refresh?.();
+      }
+    });
 
     // theme quick switch — re-renders instantly, same as the setting page
     const sel = bar.createEl("select");
@@ -949,6 +977,12 @@ class ScheduleModal extends Modal {
 
 export default class PublyPlugin extends Plugin {
   settings: PublySettings;
+  private readonly formatChoices = new Map<string, PublicationFormat>();
+  formatForNote(path: string): PublicationFormat | undefined { return this.formatChoices.get(path); }
+  chooseFormat(path: string, value: PublicationFormat | "auto"): void {
+    if (!path) return;
+    if (value === "auto") this.formatChoices.delete(path); else this.formatChoices.set(path, value);
+  }
   wasmOk = false;
   statusBarItem: HTMLElement | null = null;
   /** session-local registry of images picked from this computer for covers
@@ -1141,17 +1175,6 @@ export default class PublyPlugin extends Plugin {
     }
   }
 
-  /** frontmatter peek: explicit `type` wins, `mode: cards` fills the gap —
-   *  same precedence as core's publishType() */
-  private detectIsCards(raw: string): boolean {
-    const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    if (!m) return false;
-    const fm = m[1];
-    const t = fm.match(/^type:\s*(\S+)/m)?.[1];
-    if (t) return t === "image" || t === "image_post";
-    return (fm.match(/^mode:\s*(\S+)/m)?.[1] ?? "").toLowerCase() === "cards";
-  }
-
   /** publish needs server + key; everything else (preview/copy) is local-only.
    *  When unconfigured, open the settings tab right at the guide. */
   private ensureConfigured(): boolean {
@@ -1325,7 +1348,17 @@ export default class PublyPlugin extends Plugin {
     const raw = await this.app.vault.cachedRead(f);
     if (gen !== this.previewGen) return; // user moved on while we read
     this.livePreviewPath = f.path;
-    if (this.detectIsCards(raw)) {
+    let docFormat: PublicationFormat;
+    let format: PublicationFormat;
+    try {
+      const meta = parseSource(raw).meta;
+      docFormat = resolvePublication(meta).format;
+      format = resolvePublication(meta, this.formatForNote(f.path)).format;
+    } catch {
+      new Notice(t("renderFail", { msg: "Invalid document metadata" }));
+      return;
+    }
+    if (format === "cards") {
       await this.previewCardDeck(f, raw, gen);
       return;
     }
@@ -1336,10 +1369,18 @@ export default class PublyPlugin extends Plugin {
       const rendered = renderMarkdown(raw, this.renderOptions());
       try {
         for (const w of rendered.warnings) console.warn("[publy] " + w);
+        if (format === "image" && (!rendered.attachments.length || rendered.warnings.some(blockingMediaWarning))) {
+          throw new Error(t("mediaNotReady"));
+        }
         if (gen !== this.previewGen) return;
         const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
+        view.notePath = f.path;
+        view.documentFormat = docFormat;
         view.refresh = () => this.previewCurrentNote(f);
-        view.setHtml(this.inlineImages(rendered.html, rendered.attachments), {
+        const html = format === "image"
+          ? `<div>${rendered.attachments.map((a) => `<img alt="" src="data:${a.contentType};base64,${fs.readFileSync(a.path).toString("base64")}">`).join("")}${captionToHtml(imagePostCaption(raw))}</div>`
+          : this.inlineImages(rendered.html, rendered.attachments);
+        view.setHtml(html, {
           title: rendered.title || f.basename,
           author: rendered.meta.author,
           account: this.settings.account || undefined,
@@ -1367,7 +1408,9 @@ export default class PublyPlugin extends Plugin {
     try {
       outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
-      view.refresh = () => this.previewCardDeck(f);
+      view.notePath = f.path;
+      view.documentFormat = resolvePublication(parseSource(raw).meta).format;
+      view.refresh = () => this.previewCurrentNote(f);
       // progressive: the panel skeleton appears immediately and each card
       // pops in as its rasterization lands — 9-card decks stop feeling
       // like a 9x wait
@@ -1515,10 +1558,11 @@ export default class PublyPlugin extends Plugin {
         if (problems.length) {
           throw new Error(t("mediaNotReady") + " " + problems.join("; "));
         }
-        type = rendered.type;
+        const selection = resolvePublication(rendered.meta, this.formatForNote(f.path));
+        type = selection.type;
         title = rendered.title || f.basename;
         author = rendered.meta.author;
-        if (type === "image_post" && rendered.meta.mode?.toLowerCase() === "cards") {
+        if (selection.format === "cards") {
           if (!this.wasmOk) throw new Error(t("wasmDown"));
           const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
           try {
@@ -1550,7 +1594,10 @@ export default class PublyPlugin extends Plugin {
           if (type === "image_post" && !payloadAttachments.length) {
             throw new Error(t("mediaNotReady") + " No local images found for image post.");
           }
-          if (rendered.cover) {
+          if (type === "image_post") {
+            coverName = payloadAttachments[0]?.name;
+            html = captionToHtml(imagePostCaption(raw));
+          } else if (rendered.cover) {
             const existing = rendered.attachments.find((a) => a.path === rendered.cover);
             if (existing) {
               coverName = existing.name;
@@ -1579,7 +1626,7 @@ export default class PublyPlugin extends Plugin {
               explicitCover = true;
             }
           }
-          html = rendered.html;
+          if (type === "article") html = rendered.html;
         }
       } finally { rendered.cleanup(); }
     } catch (err) {

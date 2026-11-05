@@ -54,6 +54,10 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 仍可生成带错误提示的预览，但 JSON 中 `ok:false`、退出码为 4。
 检查和预览都不会创建公众号草稿。
 
+### 发布形式
+
+当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 区分本次选择、既有 frontmatter 和默认文章。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
+
 ## HTML 导出与离线主题列表
 
 `render --json` 生成权限受限的本地 HTML，stdout 返回

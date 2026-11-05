@@ -10,8 +10,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const entrypoint = path.resolve(here, "..", "dist", "index.js");
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-check-smoke-"));
-const run = (file) => {
-  const result = spawnSync(process.execPath, [entrypoint, "check", file, "--json"], {
+const run = (file, ...extra) => {
+  const result = spawnSync(process.execPath, [entrypoint, "check", file, "--json", ...extra], {
     encoding: "utf8",
     env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json") },
     timeout: 25000,
@@ -47,6 +47,25 @@ try {
   assert.equal(good.report.attachmentCount, 1);
   assert.equal(good.report.title, "User Article");
   assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "preflight must not change source");
+
+  const imageChoice = run(goodPath, "--format", "image");
+  assert.equal(imageChoice.code, 0);
+  assert.equal(imageChoice.report.type, "image_post");
+  assert.equal(imageChoice.report.format, "image");
+  assert.equal(imageChoice.report.formatSource, "choice");
+  const invalidChoice = spawnSync(process.execPath, [entrypoint, "publish", goodPath, "--format", "bogus", "--json"], { encoding: "utf8", timeout: 25000 });
+  assert.equal(invalidChoice.status, 2);
+  assert.equal(JSON.parse(invalidChoice.stdout).code, "FORMAT_INVALID");
+  const imagePreviewPath = path.join(dir, "image-preview.html");
+  const imagePreview = spawnSync(process.execPath, [entrypoint, "preview", goodPath, "--format", "image", "--out", imagePreviewPath, "--json"], { encoding: "utf8", timeout: 25000 });
+  assert.equal(imagePreview.status, 0, imagePreview.stderr);
+  const imagePreviewReport = JSON.parse(imagePreview.stdout);
+  assert.equal(imagePreviewReport.type, "image_post");
+  assert.equal(imagePreviewReport.format, "image");
+  const imagePreviewHtml = fs.readFileSync(imagePreviewPath, "utf8");
+  assert.match(imagePreviewHtml, /WeChat image post preview/);
+  assert.match(imagePreviewHtml, /data:image\/png;base64/);
+  assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "selection must not modify the source");
 
   // Config may contain a server API key. New files must be private, and
   // updating a pre-existing permissive file must tighten its permissions.

@@ -2,6 +2,12 @@
 
 > 当前决策：2026-10-23 interaction review。本文件负责产品形态与交互，商业权益以 `PRICING.md` / `PRICING.zh-CN.md` 为准，实际可用性以用户指南和发行/运营证据为准。下述当前范围优先于早期设想；旧里程碑勾选不是公开上线证明。
 
+## Publication format decision / 发布形式决定 — 2026-11-05
+
+Markdown is the product input; a particular editor or agent is never required. For each operation, an explicit article, image-and-caption, or card choice overrides optional frontmatter; otherwise retain the declared legacy format and default to article. Do not silently switch format based on length or pictures. The CLI, agent skill and Obsidian preview use the same decision; preview and submission must agree. The choice is session/operation scoped and never modifies the source. This is a development candidate, not evidence of a released installer or a public service.
+
+Markdown 是产品输入，不要求用户依赖特定编辑器或 Agent。本次明确选择文章、图片配文或文字卡片时覆盖可选 frontmatter；否则沿用现有字段，无声明时默认文章。不能根据字数或是否含图悄悄切换。CLI、Agent 技能和 Obsidian 预览共享规则，预览与投递须一致；本次选择不改原文。此决定不代表安装包或公开服务已发布。
+
 ## Editor-independent commercial product decision / 跨编辑器商业产品决定 — 2026-10-30
 
 **The editor is a source, not the product.** Obsidian is one integration,

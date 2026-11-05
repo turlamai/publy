@@ -16,10 +16,10 @@ Use the developer CLI or the Obsidian plugin. Published release assets currently
 
 Source builds require Node.js 22+, pnpm and Git; follow the [developer installation and setup](guide.md). Release assets do not constitute a deployed service.
 
-## Write in Typora or Obsidian
+## Use any Markdown editor or agent
 
-For Typora, choose the **original Markdown file**. For Obsidian, use the
-plugin or the same underlying Markdown. No other editor integrations are planned. In the current
+Choose the **original Markdown file** from any editor or agent. For Obsidian, use the optional
+plugin or the same underlying Markdown. In the current
 developer CLI, run `publy check "/path/to/your-note.md" --json` to inspect
 images, covers and card structure **locally**, then `publy preview` before
 considering delivery. Neither command sends a draft. Typora's local
@@ -32,6 +32,9 @@ source-build functionality, **not yet a no-setup public installer**.
 
 In the development plugin, **Copy rendered rich text** stops without changing the clipboard if images or formulas are missing, fail to render, or remain as local attachments. Use draft delivery for content with attachments.
 
+### Choose a draft format
+
+Choose article, images with a caption, or text cards for each draft. In the development CLI, use the same `--format article`, `--format image`, or `--format cards` for `check`, `preview`, and `publish`; in the Obsidian preview use the format selector. A choice applies to the current operation or plugin session and takes precedence over optional document metadata; the file is not changed. With no choice, legacy metadata applies and otherwise the default is article. Image posts need images; cards need the supported section structure. Review the resulting preview before delivery. These capabilities are still under acceptance and not a released installer.
 ## Use a standalone article theme (CLI development build)
 
 Built-in themes work offline. To use a content-only theme bundle from someone you trust, run `publy theme add ./theme.json`, then `publy theme preview THEME_ID` and use `--theme THEME_ID` when rendering. `publy theme ls` lists installed article themes. To replace one, run `publy theme update ./new-theme.json`; to remove it, run `publy theme remove THEME_ID`. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. Obsidian running as the same system user can select validated installed article themes: reopen the plugin settings or preview panel after installation. The CLI manages the shared local bundle; the plugin does not download themes itself.
