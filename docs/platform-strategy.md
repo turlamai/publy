@@ -1,10 +1,10 @@
-# Publy destination and editor scope — 2026-10-30
+# Publy destination and editor scope — updated 2026-11-05
 
 [简体中文](platform-strategy.zh-CN.md) · **Active product decision**
 
-**One publishing destination: WeChat Official Accounts. Two first-class writing
-experiences: Typora and Obsidian.** Standard local Markdown is the shared file
-format, not a promise to integrate every editing product.
+**Markdown is the input; WeChat Official Account drafts are the publishing
+destination.** Generic Markdown and agent workflows are first-class. Typora
+and Obsidian are optional writing entry points; no particular editor is required.
 
 ## What Publy builds
 
@@ -12,6 +12,9 @@ The complete experience is **keep the existing Markdown and images → review
 and check locally → choose the target WeChat Official Account → explicitly
 save a draft → confirm the outcome or recover from an unknown result**.
 
+- **Markdown and agents:** use an existing Markdown file from any editor or an
+  explicitly instructed agent; check and preview locally without moving the
+  source, then choose the destination and create a draft only with authorization.
 - **Typora:** open its existing Markdown file and resolve its relative image
   paths, local `typora-root-url`, covers and math. Deliver a source-preserving,
   usable local preview and a simple future nontechnical publishing entry.
@@ -24,22 +27,16 @@ save a draft → confirm the outcome or recover from an unknown result**.
   recovery. Public hosted checkout remains closed until real operational and
   Commerce/Permit acceptance.
 
-The shared Markdown engine may read ordinary `.md` files saved by other
-editors, but **we do not ship dedicated integrations, marketing claims,
-regression matrices or support commitments for those products**.
+Ordinary `.md` files are a supported product input. Test the common Markdown
+workflow independently of any editor; a dedicated integration for another
+editor requires a concrete customer need and separate validation.
 
-## Explicitly excluded
+## Publishing scope
 
-**No Zhihu, Toutiao, WordPress, Ghost, DEV/Forem, Xiaohongshu, Douyin,
-Weibo, Medium, or other publishing destination work.** They are not an
-active roadmap, not a discovery backlog, and not a future adapter placeholder.
-Do not investigate their APIs, design a generalized provider framework,
-create provider-specific account UI, or reserve engineering budget for them.
-
-This decision supersedes earlier Zhihu candidate evaluations and all earlier
-conditional references to new destinations. It also supersedes broad
-multi-editor support commitments outside Typora/Obsidian; an ordinary local
-Markdown file is still a valid input.
+The current product delivers only to WeChat Official Account drafts. A new
+publishing destination requires a separate product decision. The owner’s
+2026-11-05 direction also supersedes editor-only positioning: a plain Markdown
+file or an authorized agent is a complete entry point.
 
 ## Release priorities in order
 
