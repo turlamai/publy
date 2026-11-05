@@ -15,13 +15,15 @@
 
 状态：本地渲染与投递组件已存在；公开托管开通与商业运营尚未开放。
 
-**一个文件、两种重点写作入口：** [Typora 使用指南](docs/typora.zh-CN.md) · [跨编辑器使用与商业级验收](docs/editor-workflows.zh-CN.md) · [English](docs/editor-workflows.md)。普通 Markdown 仍由共用引擎读取，但不开发其他编辑器插件；还需真实干净电脑验收。
+**使用任意 Markdown 文件：** [Typora 使用指南](docs/typora.zh-CN.md) · [跨编辑器使用与商业级验收](docs/editor-workflows.zh-CN.md) · [English](docs/editor-workflows.md)。Obsidian 是可选入口，Publy 不依赖特定编辑器；还需真实干净电脑验收。
 
 ## 开始使用
 
 CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。 目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
 
 [安装、首次使用、隐私与备份恢复](docs/USER-GUIDE.zh-CN.md) · [English](docs/USER-GUIDE.md)
+
+[Publy 发布技能](skills/publy-publish/SKILL.md)帮助兼容的 Agent 检查、预览并在授权后创建公众号草稿。
 
 ## 三分钟上手
 
@@ -36,7 +38,7 @@ publy publish article.md --account me  # 明确授权后才执行：只创建公
 
 PowerShell 请将 `"$PUBLY_API_KEY"` 换成 `"$env:PUBLY_API_KEY"`。CLI 会通过命令行参数接收密钥，可能被本机进程查看；不要把真实凭据粘贴到共享日志中。
 
-图片消息：frontmatter 写 `mode: cards`，正文按 `## cover` / `## point` / `## list` / `## ending` 分节，`publy card post.md --preview` 出拼版预览，`publy publish post.md --account me` 投递到草稿箱（需先确认账号与授权）。
+图片消息：可在本次操作中选择 `--format image`（图片与配文）或 `--format cards`（卡片），无需改原文；旧 frontmatter 的 `mode: cards` 仍可使用。卡片正文按 `## cover` / `## point` / `## list` / `## ending` 分节，`publy card post.md --preview` 出拼版预览，`publy publish post.md --account me` 投递到草稿箱（需先确认账号与授权）。
 
 完整手册：[English manual](docs/guide.md) · [中文手册](docs/guide.zh-CN.md) · 主题画廊：[themes.publy.jrtx.site](https://themes.publy.jrtx.site/)
 

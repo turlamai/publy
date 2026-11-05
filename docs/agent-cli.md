@@ -75,6 +75,10 @@ blocking problems may still be written for human review, but exits with 4
 and has `ok:false` in JSON mode. Neither `check` nor `preview` creates
 a WeChat draft.
 
+### Publication format
+
+When `capabilities --json` advertises `publicationFormats`, pass the same `--format article|image|cards` to `check`, `preview`, and `publish` to choose one operation without modifying the Markdown. `formatSource` identifies an explicit choice, existing frontmatter, or the article default. Invalid values return `FORMAT_INVALID` before submission. Inspect the preview for the selected format; do not infer it from length or images. The reusable [Publy publishing skill](../skills/publy-publish/SKILL.md) describes the agent workflow.
+
 ## Raw HTML export and bundled theme discovery
 
 `render --json` creates a permission-limited local HTML file and returns

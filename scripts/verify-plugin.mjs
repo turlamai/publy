@@ -407,6 +407,23 @@ try {
   if (!matched || matched.contentType !== "image/png" || matched.data !== png.toString("base64")) {
     fail("frontmatter-only cover was not included as exact PNG material");
   }
+  const pathKey = "samples/format-choice.md";
+  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + coverPath.split(path.sep).join("/") + ")";
+  app.vaultContentByPath[pathKey] = source;
+  app.workspace.activeFile = { path: pathKey, basename: "format-choice", extension: "md", stat: { mtime: Date.now() } };
+  inst.chooseFormat(pathKey, "image");
+  lastPreviewHtml = "";
+  await inst.previewCurrentNote();
+  if (!lastPreviewHtml.includes("data:image/png;base64,") || !lastPreviewHtml.includes("A short caption")) {
+    fail("chosen image format did not preview its images and caption");
+  }
+  await inst.publishCurrentNote();
+  if (lastSubmitted?.type !== "image_post" || lastSubmitted.images?.length !== 1 ||
+      !lastSubmitted.html?.includes("A short caption") || lastSubmitted.html.includes("<img")) {
+    fail("chosen image format did not submit the same image-and-caption payload");
+  }
+  if (app.vaultContentByPath[pathKey] !== source) fail("format choice modified the original note");
+  inst.chooseFormat(pathKey, "auto");
 } finally {
   fs.rmSync(coverPath, { force: true });
 }

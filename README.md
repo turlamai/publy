@@ -16,13 +16,15 @@ Compliance: Publy only uses official WeChat MP APIs. No account simulation, no b
 
 Status: local rendering and delivery components exist; public hosted onboarding and commercial operation are not open. **Obsidian community-directory publication has not been verified**; the source plugin version and latest published GitHub Release differ. See [directory release readiness](docs/obsidian-submission.md) and [official-install blocker](https://github.com/turlamai/publy/issues/12).
 
-**One document, two primary writing experiences:** [Typora quick start](docs/typora.md) · [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). The shared renderer also reads ordinary Markdown files, but no other editor integration is planned. Typora and Obsidian still require real clean-machine acceptance.
+**Use any Markdown file:** [Typora quick start](docs/typora.md) · [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). Obsidian is optional; Publy does not require a particular editor. Typora and Obsidian still require real clean-machine acceptance.
 
 ## Start here
 
 CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale. Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.
 
 [Installation, first use, privacy, backup and recovery](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
+
+The [Publy publishing skill](skills/publy-publish/SKILL.md) helps compatible agents check, preview and create authorized WeChat drafts.
 
 ## Quick start
 
