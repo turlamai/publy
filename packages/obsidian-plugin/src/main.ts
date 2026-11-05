@@ -13,6 +13,9 @@ import {
   setPngRenderer,
   setEmbeddedFontSubsets,
   generateTitleCover,
+  listInstalledThemes,
+  readInstalledTheme,
+  BUILTIN_CARD_THEMES,
 } from "@publy/core";
 import { configureBundledMath } from "@publy/core/math-bundled";
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
@@ -111,7 +114,9 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   setMediaDesc: { zh: "本地图片查找目录；留空 = 自动跟随 vault 附件设置", en: "Where local images live; empty = follow the vault attachment setting" },
   setMediaPlaceholder: { zh: "自动（vault 附件目录）", en: "Auto (vault attachment folder)" },
   setTheme: { zh: "主题", en: "Theme" },
-  setThemeDesc: { zh: "文章排版主题；terminal 主题用深色代码高亮", en: "Article theme; terminal uses a dark code scheme" },
+  setThemeDesc: { zh: "文章排版主题；通过 CLI 安装的主题可在重新打开设置后选择。terminal 使用深色代码高亮。", en: "Article theme; themes installed by the CLI appear after reopening settings. Terminal uses dark code highlighting." },
+  themeLoadError: { zh: "已选主题不存在或已损坏，请重新安装主题或切换内置主题。", en: "The selected theme is missing or invalid. Reinstall it or select a built-in theme." },
+  themeListError: { zh: "无法读取已安装主题，请用命令行检查主题目录。", en: "Installed themes could not be read. Check the theme directory using the CLI." },
   setConn: { zh: "连接", en: "Connection" },
   setConnDesc: { zh: "检查服务可达性、API key 与套餐配额", en: "Check reachability, API key and plan quota" },
   btnTest: { zh: "测试连接", en: "Test connection" },
@@ -211,6 +216,24 @@ function t(key: string, vars?: Record<string, string | number>): string {
   let out = STRINGS[key]?.[lang] ?? STRINGS[key]?.zh ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split("{" + k + "}").join(String(v));
   return out;
+}
+
+/** Only validated content-only bundles are offered to the plugin. */
+function availableArticleThemes(): Record<string, string> {
+  const choices: Record<string, string> = Object.assign(Object.create(null), THEME_LABELS);
+  try {
+    for (const theme of listInstalledThemes()) {
+      if (!Object.hasOwn(choices, theme.id) && !Object.hasOwn(BUILTIN_CARD_THEMES, theme.id)) {
+        choices[theme.id] = `${theme.name} · ${theme.version}`;
+      }
+    }
+  } catch { new Notice(t("themeListError")); }
+  return choices;
+}
+function articleThemeCss(id: string): string {
+  if (Object.hasOwn(THEME_CSS, id)) return THEME_CSS[id];
+  try { return readInstalledTheme(id).css; }
+  catch { throw new Error(t("themeLoadError")); }
 }
 
 const VIEW_TYPE_PUBLY_PREVIEW = "publy-preview";
@@ -423,7 +446,7 @@ class PublyPreviewView extends ItemView {
     const sel = bar.createEl("select");
     sel.addClass("publy-select");
     sel.setAttribute("title", t("tipTheme"));
-    for (const [id, label] of Object.entries(THEME_LABELS)) {
+    for (const [id, label] of Object.entries(availableArticleThemes())) {
       const opt = sel.createEl("option");
       opt.value = id;
       opt.textContent = label;
@@ -1155,7 +1178,7 @@ export default class PublyPlugin extends Plugin {
       baseDir: this.basePath(),
       mediaDirs: this.mediaDirs(),
       theme: this.settings.theme || "claude",
-      themeCss: THEME_CSS[this.settings.theme || "claude"] ?? claudeThemeCss,
+      themeCss: articleThemeCss(this.settings.theme || "claude"),
       highlightCss: this.settings.theme === "terminal" ? hljsGithubDarkCss : hljsGithubCss,
     };
   }
@@ -1850,7 +1873,7 @@ class PublySettingTab extends PluginSettingTab {
     );
     new Setting(containerEl).setName(t("setTheme")).setDesc(t("setThemeDesc")).addDropdown((drop) =>
       drop
-        .addOptions(THEME_LABELS)
+        .addOptions(availableArticleThemes())
         .setValue(this.plugin.settings.theme || "claude")
         .onChange(async (v) => {
           this.plugin.settings.theme = v;

@@ -7,6 +7,7 @@
 // With an argument, the prepared plugin dir is used as-is (vault layout).
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import Module from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -287,6 +288,37 @@ if (!calls.some((c) => c.startsWith("command:"))) fail("commands not registered"
 app.workspace.activeFile = { path: "samples/article-sample.md", basename: "article-sample", extension: "md" };
 await inst.previewCurrentNote(); // smart dispatch -> article
 if (!calls.some((c) => c.startsWith("view.setHtml("))) fail("article preview did not render — calls: " + calls.join(" | "));
+
+// Only the synthetic run owns this theme directory. Never touch a supplied vault
+// or the user's actual installed theme store.
+if (suppliedPluginDir === undefined) {
+  const themeDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-theme-"));
+  const original = process.env.PUBLY_THEME_DIR; process.env.PUBLY_THEME_DIR = themeDir;
+  const cleanupTheme = () => { try { fs.rmSync(themeDir, { recursive: true, force: true }); } catch {} };
+  process.once("exit", cleanupTheme);
+  try {
+    const css = "#publy p { color: #123456 }";
+    const bundle = { format: "publy-theme-v1", id: "fixture", version: "1.0.0", name: "Fixture", license: "MIT", css,
+      cssSha256: crypto.createHash("sha256").update(css).digest("hex") };
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    inst.settings.theme = "fixture"; lastPreviewHtml = "";
+    await inst.previewCurrentNote();
+    if (!lastPreviewHtml.includes("#123456")) fail("installed theme did not affect the plugin article preview");
+    bundle.css = "#publy p { color: red }"; // digest no longer matches
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    const count = calls.filter(c => c.startsWith("view.setHtml(")).length;
+    const notices = calls.filter(c => c.startsWith("notice:Publy:")).length;
+    await inst.previewCurrentNote();
+    if (calls.filter(c => c.startsWith("view.setHtml(")).length !== count ||
+        calls.filter(c => c.startsWith("notice:Publy:")).length !== notices + 1) {
+      fail("tampered installed theme must not render or silently fall back");
+    }
+  } finally {
+    inst.settings.theme = "claude";
+    if (original === undefined) delete process.env.PUBLY_THEME_DIR; else process.env.PUBLY_THEME_DIR = original;
+    cleanupTheme(); process.removeListener("exit", cleanupTheme);
+  }
+}
 
 // Valid TeX must become real PNGs, not a raw-TeX fallback that merely makes
 // article preview appear successful when MathJax is absent.

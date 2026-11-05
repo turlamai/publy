@@ -66,7 +66,7 @@ The historical rationale and unshipped ideas below are context. Theme-marketplac
 
 ### Standalone article theme CLI contract (development)
 
-`theme ls` and `theme preview` remain offline; listing includes installed content-only article bundles. `theme pack` writes a new bundle without overwriting; `theme add`, `update` and `remove` explicitly mutate the local theme directory. Local files use no network. HTTPS add/update requires the full bundle SHA-256 and refuses redirects; the digest does not authenticate the author. All four support `--json` and return a single `theme-bundle` object with `ok`, `code`, `networkUsed` and `submitted:false`; failures exit 2. Agent callers must obtain user approval before these local writes or remote fetches. No gallery, signing infrastructure or Obsidian theme installation is implied.
+`theme ls` and `theme preview` remain offline; listing includes installed content-only article bundles. `theme pack` writes a new bundle without overwriting; `theme add`, `update` and `remove` explicitly mutate the local theme directory. Local files use no network. HTTPS add/update requires the full bundle SHA-256 and refuses redirects; the digest does not authenticate the author. All four support `--json` and return a single `theme-bundle` object with `ok`, `code`, `networkUsed` and `submitted:false`; failures exit 2. Agent callers must obtain user approval before these local writes or remote fetches. Obsidian may select a validated bundle installed by the CLI under the same system user; it does not download bundles. No gallery or signing infrastructure is implied.
 
 ## 0. 一句话
 
