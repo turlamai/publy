@@ -23,5 +23,6 @@ try {
   assert.equal(spawnSync(launcher, [], { shell: false }).status, 37);
   console.log("PASS — Windows launcher preserves arguments and child exit status without a shell");
 } finally {
-  fs.rmSync(dir, { recursive: true, force: true });
+  // Windows may briefly retain an executable lock after the child exits.
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
