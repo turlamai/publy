@@ -29,7 +29,9 @@ if (info.platform !== process.platform || info.arch !== process.arch || Number(i
   throw new Error("Runtime must match the host platform and architecture and be Node 22 or newer");
 }
 fs.mkdirSync(output, { recursive: false, mode: 0o755 });
-const app = path.join(output, "app");
+// pnpm computes relative links during deploy; provide a canonical path so
+// symlinked ancestors such as /var -> /private/var cannot corrupt them.
+const app = path.join(fs.realpathSync(output), "app");
 const deployArgs = ["--filter", "@turlamai/publy", "--prod", "deploy", "--legacy", app];
 // Invoking pnpm's JavaScript entry avoids shell interpretation of output paths.
 const result = options["--pnpm-entry"]
@@ -65,6 +67,10 @@ fs.mkdirSync(path.join(output, "runtime"));
 const runtimeName = process.platform === "win32" ? "node.exe" : "node";
 fs.copyFileSync(runtime, path.join(output, "runtime", runtimeName));
 fs.chmodSync(path.join(output, "runtime", runtimeName), 0o755);
+const copiedRuntimeCheck = spawnSync(path.join(output, "runtime", runtimeName), ["-p", "process.versions.node"], { encoding: "utf8" });
+if (copiedRuntimeCheck.status !== 0 || copiedRuntimeCheck.stdout.trim() !== info.version) {
+  throw new Error("Copied runtime cannot run independently; supply a self-contained Node distribution");
+}
 fs.copyFileSync(license, path.join(output, "runtime", "LICENSE"));
 fs.copyFileSync(path.join(root, "LICENSE"), path.join(output, "LICENSE"));
 if (process.platform === "win32") {
