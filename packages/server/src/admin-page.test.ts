@@ -49,6 +49,39 @@ test("operator requests retain authentication and live feed uses short-lived tic
   assert.match(element("j-rows").innerHTML, /结果未知，请检查草稿箱/);
   assert.match(element("j-rows").innerHTML, /&lt;script&gt;/);
   assert.doesNotMatch(element("j-rows").innerHTML, /<script>/);
+  context.fetch = async () => ({ ok: true, json: async () => ({ jobs: [
+    { id: "waiting", title: "Waiting", status: "pending", runAt: 1 },
+    { id: "uncertain", title: "Uncertain", status: "interrupted", runAt: 1 },
+  ] }) });
+  await context.loadJobs();
+  assert.equal((element("j-rows").innerHTML.match(/data-cancel-job=/g) || []).length, 1);
+  let confirmAction: (() => Promise<void>) | undefined;
+  let refreshCount = 0;
+  context.confirmBox = (_message: string, action: () => Promise<void>) => { confirmAction = action; };
+  context.refreshDrafts = () => { refreshCount++; };
+  let mutationCount = 0;
+  context.fetch = async (url: string, options: any) => {
+    mutationCount++;
+    assert.equal(url, "/v1/jobs/job%2F1");
+    assert.equal(options.method, "DELETE");
+    assert.equal(options.headers["x-api-key"], "private-admin-key");
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  context.toast = () => {};
+  context.confirmCancelJob({ id: "job/1", title: "Test" });
+  assert.equal(mutationCount, 0, "opening confirmation must not cancel the job");
+  assert.ok(confirmAction);
+  await confirmAction();
+  assert.equal(mutationCount, 1);
+  assert.equal(refreshCount, 1);
+  let notice = "";
+  context.toast = (message: string) => { notice = message; };
+  context.fetch = async () => { throw new Error("connection lost"); };
+  context.confirmCancelJob({ id: "waiting", title: "Waiting" });
+  assert.ok(confirmAction);
+  await confirmAction();
+  assert.match(notice, /未能确认取消结果/);
+  assert.equal(refreshCount, 2, "refresh after uncertain cancellation");
   context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ history: [
     { event: "published", ts: "2026-11-01T00:00:00Z", title: "<img>", account: "a" },
     { event: "outcome-unknown", ts: "2026-11-01T00:00:01Z", title: "pending", account: "b" },

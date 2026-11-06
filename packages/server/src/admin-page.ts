@@ -65,7 +65,7 @@ export function adminPage(): string {
       </div>
       <p class="hint">这里只显示服务端排程任务，时间按本机时区显示。已完成表示草稿已创建，不表示公开发布。结果未知时先检查微信公众号草稿箱，再决定后续操作。</p>
       <div id="jobs-status" class="hint" role="status" aria-live="polite"></div>
-      <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th></tr></thead>
+      <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th><th>操作</th></tr></thead>
       <tbody id="j-rows"></tbody></table>
       <h3 style="margin-top:28px">最近投递记录</h3>
       <p class="hint">显示最近 100 条服务事件中的投递记录，可能受日志保留影响；请以公众号草稿箱和实际回执为准。</p>
@@ -273,7 +273,7 @@ async function loadOverview() {
   } catch (error) { status.textContent = '无法读取服务概览，请检查连接后刷新。'; }
 }
 
-/* ---------- scheduled drafts (read only) ---------- */
+/* ---------- scheduled drafts ---------- */
 async function loadJobs() {
   var status = document.getElementById('jobs-status'), rows = document.getElementById('j-rows');
   status.textContent = '正在读取任务…';
@@ -286,20 +286,40 @@ async function loadJobs() {
     var labels = { pending: '等待投递', running: '投递中', done: '草稿已确认',
       failed: '失败，请核对', cancelled: '已取消', interrupted: '结果未知，请检查草稿箱' };
     if (!data.jobs.length) {
-      rows.innerHTML = '<tr><td colspan="5" class="empty">暂无排程任务</td></tr>';
+      rows.innerHTML = '<tr><td colspan="6" class="empty">暂无排程任务</td></tr>';
     } else {
-      rows.innerHTML = data.jobs.map(function (job) {
+      rows.innerHTML = data.jobs.map(function (job, index) {
         var when = new Date(job.runAt);
         var label = Object.prototype.hasOwnProperty.call(labels, job.status) ? labels[job.status] : '状态未知，请检查';
+        var action = job.status === 'pending' && typeof job.id === 'string'
+          ? '<button class="btn btn-ghost btn-sm" data-cancel-job="' + index + '">取消任务</button>' : '—';
         return '<tr><td>' + esc(job.title) + '</td><td>' + esc(job.account) + '</td><td>'
           + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
-          + esc(label) + '</td><td class="key">' + esc(job.id) + '</td></tr>';
+          + esc(label) + '</td><td class="key">' + esc(job.id) + '</td><td>' + action + '</td></tr>';
       }).join('');
+      rows.querySelectorAll('[data-cancel-job]').forEach(function (button) {
+        var job = data.jobs[Number(button.dataset.cancelJob)];
+        button.onclick = function () { confirmCancelJob(job); };
+      });
     }
     status.textContent = '共 ' + data.jobs.length + ' 个任务';
   } catch (error) {
     status.textContent = '无法读取任务，请检查服务连接和权限后刷新。';
   }
+}
+function confirmCancelJob(job) {
+  confirmBox('取消「' + (job.title || '未命名任务') + '」的排程？已开始投递的任务无法在此取消。', async function () {
+    try {
+      var response = await api('/v1/jobs/' + encodeURIComponent(job.id), { method: 'DELETE' });
+      if (!response.ok) throw new Error('not cancelled');
+      var result = await response.json();
+      if (result.ok !== true) throw new Error('not confirmed');
+      toast('任务已取消', 'ok');
+    } catch (error) {
+      toast('未能确认取消结果，请刷新任务状态后再操作。', 'err');
+    }
+    refreshDrafts();
+  });
 }
 async function loadDraftHistory() {
   var status = document.getElementById('history-status'), rows = document.getElementById('h-rows');
