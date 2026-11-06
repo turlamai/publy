@@ -203,6 +203,7 @@ function daysLeft(ts) { return Math.ceil((ts - Date.now()) / 86400000); }
 function logout() {
   sessionStorage.removeItem('publy_admin_key'); KEY = '';
   wsDown();
+  approvedWsOrigins.clear();
   document.getElementById('key').value = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-card').style.display = 'block';
@@ -535,7 +536,7 @@ document.getElementById('acc-btn').onclick = function () {
 };
 
 /* ---------- live feed (publy-ws gateway) ---------- */
-var ws = null, wsTimer = null, wsGeneration = 0;
+var ws = null, wsTimer = null, wsGeneration = 0, approvedWsOrigins = new Set();
 var EV_CLS = { published: 'ok', failed: 'err', scheduled: '', cancelled: 'dim', deduped: 'dim', 'purchase-paid': 'gold', 'purchase-completed': 'gold', bound: 'ok' };
 function wsUrl() {
   var saved = localStorage.getItem('publy_ws_url');
@@ -572,12 +573,23 @@ async function wsConnect() {
   wsSetState('wait', '获取连接凭证…');
   var keyAtStart = KEY, generation = wsGeneration;
   try {
+    var target = new URL(url);
+    if ((target.protocol !== 'ws:' && target.protocol !== 'wss:') || target.username || target.password || target.hash)
+      throw new Error('网关地址无效，请使用 ws 或 wss 地址');
+    if (location.protocol === 'https:' && target.protocol !== 'wss:') throw new Error('HTTPS 页面需要加密的 wss 连接');
+    var localTarget = ['localhost', '127.0.0.1', '[::1]'].indexOf(target.hostname) !== -1;
+    var needsApproval = target.hostname !== location.hostname || (target.protocol === 'ws:' && !localTarget);
+    if (needsApproval && !approvedWsOrigins.has(target.origin)) {
+      if (!window.confirm('实时动态将连接到 ' + target.origin + ' 并发送临时连接凭证。'
+          + (target.protocol === 'ws:' ? '此连接未加密。' : '') + '请确认这是你的网关。')) {
+        wsSetState('', '未连接'); return;
+      }
+      approvedWsOrigins.add(target.origin);
+    }
     var response = await api('/v1/ws-ticket', { method: 'POST' });
     if (!response.ok) throw new Error('无法获取短期凭证（HTTP ' + response.status + '）');
     var data = await response.json();
     if (!KEY || KEY !== keyAtStart || generation !== wsGeneration) return;
-    var target = new URL(url);
-    if (target.protocol !== 'ws:' && target.protocol !== 'wss:') throw new Error('地址必须使用 ws 或 wss');
     target.searchParams.set('key', data.ticket);
     wsSetState('wait', '连接中…');
     ws = new WebSocket(target.toString());
