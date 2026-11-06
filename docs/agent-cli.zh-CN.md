@@ -25,14 +25,22 @@ publy account add Work --theme claude --json  # 本地写入，必须先得到�
 publy quota --json
 publy jobs list --json
 publy history --json
+publy tunnel --json  # 明确的联网操作：启动/确认 SSH 隧道
 ```
 
 `capabilities --json` 离线返回版本化的能力列表：每个命令是否
-支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿。
-**没有声明 JSON 的命令不要凭猜测去解析：**部分剩余命令仍偏向人类使用。
+支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿，并声明
+`usage` 示例、`prerequisites`（如 `markdown-file`、`configured-server`、
+`api-key`、`wechat-account`、`config.tunnel`）与 `requiresUserApproval`。
+当前所有已声明命令都支持 `--json`；以具体版本的 manifest 为准，不要只看本文档。
 `config set <key> <value> --json` 已支持结构化回执，不回显 API key 等配置值；这是需经操作者授权的本地修改。
 `jobs cancel <jobId> --json` 和 `jobs retry <jobId> --json` 现在能返回
 结构化回执，但**属于修改服务器状态的操作，Agent 必须先获得用户授权**。
+`publy tunnel --json` 成功时返回 `status:"up"`、`localPort`、`remotePort`
+与 `server`；未配置返回 `TUNNEL_NOT_CONFIGURED`（退出 1），启动失败返回
+`TUNNEL_UNREACHABLE`（退出 5）。本地端口本来就已监听时，
+`startedByThisCall` 与 `networkUsed` 为 false，不虚报联网。该命令可能启动
+SSH，必须取得用户明确授权。
 若网络异常而结果不确定，返回 `status:"unknown"` 与原 jobId，
 应先通过 `jobs list --json` 对账，不能盲目反复操作。
 中断草稿的 retry 只对账内容完全匹配的本地确认记录，或重新接入可证明尚未提交的失败。

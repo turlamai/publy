@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import net from "node:net";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -263,6 +264,85 @@ try {
   assert.ok(contract.commands.some((c) => c.name === "render" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "theme ls" && c.json === true && c.network === false && c.jsonNetwork === false));
   assert.ok(contract.commands.some((c) => c.name === "theme preview" && c.json === true && c.jsonNetwork === false));
+  // Every advertised command declares stable prerequisites, usage and an
+  // explicit approval boolean; tunnel now offers JSON instead of human-only
+  // output, so no remaining command hides behind "human-oriented".
+  for (const entry of contract.commands) {
+    assert.ok(Array.isArray(entry.prerequisites), entry.name + " must declare prerequisites");
+    assert.equal(typeof entry.requiresUserApproval, "boolean", entry.name + " must declare approval");
+    assert.ok(entry.usage, entry.name + " must declare usage");
+  }
+  assert.ok(contract.commands.some((c) => c.name === "tunnel" && c.json === true && c.requiresUserApproval === true));
+  assert.ok(contract.commands.some((c) => c.name === "publish" && c.prerequisites.includes("wechat-account")));
+
+  const noTunnel = cli("tunnel", "--json");
+  assert.equal(noTunnel.status, 1, noTunnel.stderr);
+  const noTunnelBody = JSON.parse(noTunnel.stdout);
+  assert.equal(noTunnelBody.kind, "tunnel");
+  assert.equal(noTunnelBody.ok, false);
+  assert.equal(noTunnelBody.code, "TUNNEL_NOT_CONFIGURED");
+  assert.equal(noTunnelBody.networkUsed, false);
+  assert.equal(noTunnelBody.submitted, false);
+
+  // A tunnel whose local port is already listening needs no SSH: the
+  // structured result must say so instead of claiming network use.
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, "127.0.0.1", resolve));
+  const listeningPort = listener.address().port;
+  const tunnelConfig = path.join(dir, "tunnel-config.json");
+  fs.writeFileSync(tunnelConfig, JSON.stringify({
+    tunnel: { ssh_target: "unused@example.invalid", local_port: listeningPort, remote_port: 8081 },
+  }));
+  try {
+    const up = spawnSync(process.execPath, [entrypoint, "tunnel", "--json"], {
+      encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: tunnelConfig },
+    });
+    assert.equal(up.status, 0, up.stderr);
+    const upBody = JSON.parse(up.stdout);
+    assert.equal(upBody.kind, "tunnel");
+    assert.equal(upBody.ok, true);
+    assert.equal(upBody.status, "up");
+    assert.equal(upBody.localPort, listeningPort);
+    assert.equal(upBody.startedByThisCall, false);
+    assert.equal(upBody.networkUsed, false);
+    assert.equal(upBody.submitted, false);
+  } finally {
+    listener.close();
+  }
+
+  // A failed SSH start is a network attempt: report it truthfully and keep
+  // the documented exit code. The PATH shim keeps this offline and portable
+  // (POSIX only; Windows has no shell-script shim here).
+  if (process.platform !== "win32") {
+    const probePort = await new Promise((resolve) => {
+      const probe = net.createServer();
+      probe.listen(0, "127.0.0.1", () => {
+        const port = probe.address().port;
+        probe.close(() => resolve(port));
+      });
+    });
+    const shimDir = path.join(dir, "shim-bin");
+    fs.mkdirSync(shimDir, { recursive: true });
+    const shim = path.join(shimDir, "ssh");
+    fs.writeFileSync(shim, "#!/bin/sh\nexit 1\n");
+    fs.chmodSync(shim, 0o755);
+    const downConfig = path.join(dir, "tunnel-down.json");
+    fs.writeFileSync(downConfig, JSON.stringify({
+      tunnel: { ssh_target: "unused@example.invalid", local_port: probePort, remote_port: 8081 },
+    }));
+    const down = spawnSync(process.execPath, [entrypoint, "tunnel", "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: downConfig, PATH: shimDir + path.delimiter + process.env.PATH },
+    });
+    assert.equal(down.status, 5, down.stderr);
+    const downBody = JSON.parse(down.stdout);
+    assert.equal(downBody.ok, false);
+    assert.equal(downBody.status, "down");
+    assert.equal(downBody.code, "TUNNEL_UNREACHABLE");
+    assert.equal(downBody.networkUsed, true);
+    assert.equal(downBody.submitted, false);
+  }
+
   // Both human and machine theme discovery must be genuinely offline, not
   // merely reporting networkUsed:false while silently fetching a registry.
   const fetchSentinel = path.join(dir, "theme-fetch-was-called");
