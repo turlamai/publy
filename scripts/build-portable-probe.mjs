@@ -42,12 +42,13 @@ if (result.status !== 0) throw new Error("Dependency deployment failed; inspect 
 const workspaceTargets = new Set(fs.readdirSync(path.join(root, "packages"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory()).map((entry) => fs.realpathSync(path.join(root, "packages", entry.name))));
 const workspaceHub = path.join(app, "node_modules", ".pnpm", "node_modules");
+const realApp = fs.realpathSync(app);
 function checkLinks(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const name = path.join(dir, entry.name);
     if (entry.isSymbolicLink()) {
       const resolved = fs.realpathSync(name);
-      const relative = path.relative(app, resolved);
+      const relative = path.relative(realApp, resolved);
       if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
         const hubRelative = path.relative(workspaceHub, name);
         if (hubRelative && hubRelative !== ".." && !hubRelative.startsWith(".." + path.sep) && !path.isAbsolute(hubRelative) && workspaceTargets.has(resolved)) {
