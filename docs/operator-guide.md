@@ -59,8 +59,10 @@ account secrets.
 - **Overview:** a snapshot of service counts and shortcuts. The legacy plan
   and order figures describe local records, not authoritative billing.
 - **Draft tasks:** scheduled jobs and recent delivery events. “Draft confirmed”
-  means WeChat acknowledged draft creation, not public publication. History is
-  limited and may be affected by retention.
+  means WeChat acknowledged draft creation, not public publication. Pending
+  jobs can be cancelled after confirmation; if the result is uncertain, refresh
+  and check the status. Jobs already sending cannot be cancelled here. History
+  is limited and may be affected by retention.
 - **Users:** local user records, keys and legacy plan fields. Creating or
   extending a legacy plan here is an operator mutation, not a payment or
   Permit entitlement.
