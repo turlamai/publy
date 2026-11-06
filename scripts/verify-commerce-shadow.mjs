@@ -13,6 +13,7 @@ import { observeHostedProof } from "../packages/server/dist/commerce-proof-reque
 import { HostedEntitlementFence } from "../packages/server/dist/hosted-entitlement-fence.js";
 import { HostedQuotaLedger } from "../packages/server/dist/hosted-quota.js";
 import { verifyHostedSnapshot, verifyAndFenceHostedSnapshot } from "../packages/server/dist/hosted-snapshot-verifier.js";
+import { observeAndFenceHostedSnapshot } from "../packages/server/dist/hosted-shadow-coordinator.js";
 
 const commerce = process.env.COMMERCE_ROOT && path.resolve(process.env.COMMERCE_ROOT);
 const permit = process.env.PERMIT_ROOT && path.resolve(process.env.PERMIT_ROOT);
@@ -163,6 +164,13 @@ try {
     const recorded = { subject: scope.subjectId, offer: scope.offerId, entitlementId: checked.entitlement_id,
       revision: checked.revision, payloadSha256: crypto.createHash("sha256").update(exactPayload).digest("hex") };
     if (fence.record(recorded, true) !== "enrolled" || fence.record(recorded, false) !== "unchanged") throw new Error("Entitlement fence failed");
+    const remembered = fence.lookup(scope.subjectId, scope.offerId);
+    if (!remembered) throw new Error("Entitlement fence lookup failed");
+    const current = await observeAndFenceHostedSnapshot({ ...verifier, endpoint, serviceId: request.serviceId,
+      secret: request.secret, scope, fence, enroll: false });
+    if (current?.status !== "verified-snapshot" || current.canAuthorize !== false || current.revision !== remembered.revision) {
+      throw new Error("Remembered proof scope did not reconcile");
+    }
     let staleRejected = false;
     try { fence.record({ ...recorded, revision: recorded.revision - 1 }, false); } catch { staleRejected = true; }
     // Synthetic issuance starts at revision 0; conflicting same-revision data
