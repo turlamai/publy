@@ -40,6 +40,15 @@ jobs:
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP/publy-clean-home" "$RUNNER_TEMP/publy-probe/publy" check "$RUNNER_TEMP/publy-input/测试 文章.md" --json > "$RUNNER_TEMP/article-check.json"
           env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP/publy-clean-home" "$RUNNER_TEMP/publy-probe/publy" preview "$RUNNER_TEMP/publy-input/测试 文章.md" --json --out "$RUNNER_TEMP/article-preview.html" > "$RUNNER_TEMP/article-preview.json"
           node -e 'const f=require("node:fs"),p=require("node:path"),c=require("node:crypto"),t=process.env.RUNNER_TEMP,d=p.join(t,"publy-input");for(const name of ["article-check.json","article-preview.json"]){const r=JSON.parse(f.readFileSync(p.join(t,name)));if(!r.ok||r.networkUsed!==false||r.submitted!==false)process.exit(1)}if(c.createHash("sha256").update(f.readFileSync(p.join(d,"测试 文章.md"))).digest("hex")!==f.readFileSync(p.join(d,"original.sha"),"utf8"))process.exit(1)'
+          mkdir -p "$RUNNER_TEMP/publy-local-temp"
+          printf '%s\n' '#publy p { color: #123456; }' > "$RUNNER_TEMP/theme.css"
+          clean_env=(env -i PATH=/usr/bin:/bin "TMPDIR=$RUNNER_TEMP/publy-local-temp" "PUBLY_CONFIG=$RUNNER_TEMP/publy-clean-home/config.json" "PUBLY_THEME_DIR=$RUNNER_TEMP/publy-clean-home/themes")
+          "${clean_env[@]}" "$RUNNER_TEMP/publy-probe/publy" theme pack "$RUNNER_TEMP/theme.css" --id fixture-theme --theme-version 1.0.0 --name Fixture --license MIT --output "$RUNNER_TEMP/theme.json" --json > "$RUNNER_TEMP/theme-pack.json"
+          "${clean_env[@]}" "$RUNNER_TEMP/publy-probe/publy" theme add "$RUNNER_TEMP/theme.json" --json > "$RUNNER_TEMP/theme-add.json"
+          "${clean_env[@]}" "$RUNNER_TEMP/publy-probe/publy" theme ls --json > "$RUNNER_TEMP/theme-list.json"
+          "${clean_env[@]}" "$RUNNER_TEMP/publy-probe/publy" theme preview fixture-theme --json > "$RUNNER_TEMP/theme-preview.json"
+          "${clean_env[@]}" "$RUNNER_TEMP/publy-probe/publy" preview "$RUNNER_TEMP/publy-input/测试 文章.md" --format image --json --out "$RUNNER_TEMP/image-preview.html" > "$RUNNER_TEMP/image-preview.json"
+          node -e 'const f=require("node:fs"),p=require("node:path"),t=process.env.RUNNER_TEMP;for(const n of ["theme-pack.json","theme-add.json","theme-list.json","theme-preview.json","image-preview.json"]){const r=JSON.parse(f.readFileSync(p.join(t,n)));if(!r.ok||r.networkUsed!==false||r.submitted!==false)process.exit(1)}const l=JSON.parse(f.readFileSync(p.join(t,"theme-list.json")));if(!l.installedArticleThemes.some(x=>x.id==="fixture-theme"))process.exit(1)'
       - name: Package and exercise without a user-installed Node (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -60,10 +69,12 @@ jobs:
           $article = Join-Path $inputDir "测试&文章.md"
           [IO.File]::WriteAllText($article, "---`ntitle: 安装测试`ncover: 素材/封面 图.png`n---`n`n# 安装测试`n`n公式 `$x^2 + y^2`$。`n`n![图](素材/封面%20图.png)`n", [Text.UTF8Encoding]::new($false))
           $before = (Get-FileHash $article -Algorithm SHA256).Hash
-          $oldPath, $oldProfile, $oldAppData, $oldLocal = $env:PATH, $env:USERPROFILE, $env:APPDATA, $env:LOCALAPPDATA
+          $oldPath, $oldProfile, $oldAppData, $oldLocal, $oldConfig, $oldThemes, $oldTemp, $oldTmp = $env:PATH, $env:USERPROFILE, $env:APPDATA, $env:LOCALAPPDATA, $env:PUBLY_CONFIG, $env:PUBLY_THEME_DIR, $env:TEMP, $env:TMP
           try {
             $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
             $env:USERPROFILE = $cleanHome; $env:APPDATA = $cleanHome; $env:LOCALAPPDATA = $cleanHome
+            $env:PUBLY_CONFIG = Join-Path $cleanHome "config.json"; $env:PUBLY_THEME_DIR = Join-Path $cleanHome "themes"
+            $env:TEMP = $cleanHome; $env:TMP = $cleanHome
           $launcher = Join-Path $probe "publy.exe"
           & $runtime scripts/verify-windows-launcher.mjs $launcher
           if ($LASTEXITCODE -ne 0) { throw "Launcher argument forwarding failed" }
@@ -75,7 +86,20 @@ jobs:
             if ($LASTEXITCODE -ne 0 -or !$check.ok -or $check.networkUsed -or $check.submitted) { throw "Article check failed" }
             $preview = (& $launcher preview $article --json --out (Join-Path $env:RUNNER_TEMP "article-preview.html") | ConvertFrom-Json)
             if ($LASTEXITCODE -ne 0 -or !$preview.ok -or $preview.networkUsed -or $preview.submitted) { throw "Article preview failed" }
+            $css = Join-Path $env:RUNNER_TEMP "theme.css"; $bundle = Join-Path $env:RUNNER_TEMP "theme.json"
+            [IO.File]::WriteAllText($css, '#publy p { color: #123456; }', [Text.UTF8Encoding]::new($false))
+            $pack = (& $launcher theme pack $css --id fixture-theme --theme-version 1.0.0 --name Fixture --license MIT --output $bundle --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$pack.ok -or $pack.networkUsed -or $pack.submitted) { throw "Theme pack failed" }
+            $add = (& $launcher theme add $bundle --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$add.ok -or $add.networkUsed -or $add.submitted) { throw "Theme add failed" }
+            $list = (& $launcher theme ls --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$list.ok -or !($list.installedArticleThemes | Where-Object { $_.id -eq 'fixture-theme' })) { throw "Theme list failed" }
+            $themePreview = (& $launcher theme preview fixture-theme --json | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$themePreview.ok -or $themePreview.networkUsed -or $themePreview.submitted) { throw "Theme preview failed" }
+            $imagePreview = (& $launcher preview $article --format image --json --out (Join-Path $env:RUNNER_TEMP "image-preview.html") | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0 -or !$imagePreview.ok -or $imagePreview.networkUsed -or $imagePreview.submitted) { throw "Image preview failed" }
             if ((Get-FileHash $article -Algorithm SHA256).Hash -ne $before) { throw "Source changed" }
           } finally {
             $env:PATH = $oldPath; $env:USERPROFILE = $oldProfile; $env:APPDATA = $oldAppData; $env:LOCALAPPDATA = $oldLocal
+            $env:PUBLY_CONFIG = $oldConfig; $env:PUBLY_THEME_DIR = $oldThemes; $env:TEMP = $oldTemp; $env:TMP = $oldTmp
           }
