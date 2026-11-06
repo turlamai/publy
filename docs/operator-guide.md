@@ -72,7 +72,9 @@ account secrets.
   server configuration and backups restricted. An AppSecret in configuration
   is plaintext; database account encryption depends on `secretKey`.
 - **Activity:** live events require the separately configured WebSocket
-  gateway. An empty or disconnected feed is not proof that no event occurred.
+  gateway. Confirm the address before connecting to another host or a remote
+  unencrypted gateway; an HTTPS console requires `wss`. An empty or
+  disconnected feed is not proof that no event occurred.
 
 ## When delivery is uncertain
 
