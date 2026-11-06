@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { observeHostedProof } from "../packages/server/dist/commerce-proof-request.js";
 import { HostedEntitlementFence } from "../packages/server/dist/hosted-entitlement-fence.js";
 import { HostedQuotaLedger } from "../packages/server/dist/hosted-quota.js";
+import { verifyHostedSnapshot, verifyAndFenceHostedSnapshot } from "../packages/server/dist/hosted-snapshot-verifier.js";
 
 const commerce = process.env.COMMERCE_ROOT && path.resolve(process.env.COMMERCE_ROOT);
 const permit = process.env.PERMIT_ROOT && path.resolve(process.env.PERMIT_ROOT);
@@ -130,22 +131,13 @@ try {
   }
   const tampered = verify({ ...allowedScope.credential, payload: "dGFtcGVyZWQ=" });
   if (tampered.status !== "denied") throw new Error("Tampered signed proof was accepted");
-  const snapshotFile = path.join(dir, "inspect-snapshot.rkt");
-  fs.writeFileSync(snapshotFile, String.raw`#lang racket/base
-(require json permit/trust)
-(define inspect (dynamic-require (string->path (getenv "PUBLY_SNAPSHOT_MODULE")) 'inspect-publy-hosted-snapshot))
-(define input (read-json))
-(write-json (inspect (hash-ref input 'credential) (read-trust-store (getenv "PUBLY_FIXTURE_TRUST"))
-  #:account "customer-a" #:plan "personal" #:entitlement-id "snapshot-entitlement"
-  #:revision (hash-ref input 'revision)))
-`);
-  const inspectSnapshot = (credential, revision) => {
-    const run = spawnSync("racket", [snapshotFile], { input: JSON.stringify({ credential, revision }), encoding: "utf8",
-      env: { ...process.env, PUBLY_SNAPSHOT_MODULE: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../racket/publy-hosted-snapshot.rkt"),
-        PUBLY_FIXTURE_TRUST: path.join(dir, "trust.json"), PLTCOLLECTS: collects } });
-    if (run.status !== 0) throw new Error("Snapshot verification failed: " + run.stderr.slice(-1000));
-    return JSON.parse(run.stdout);
-  };
+  const racketLocation = spawnSync(process.platform === "win32" ? "where" : "which", ["racket"], { encoding: "utf8" });
+  const racketExecutable = racketLocation.stdout.trim().split(/\r?\n/)[0];
+  if (racketLocation.status !== 0 || !path.isAbsolute(racketExecutable)) throw new Error("Racket executable not found");
+  process.env.PLTCOLLECTS = collects;
+  const verifier = { racketExecutable,
+    verifierScript: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../racket/publy-hosted-snapshot-cli.rkt"),
+    trustStore: path.join(dir, "trust.json"), subject: scope.subjectId, plan: "personal" };
   const grantEnvelope = JSON.parse(fs.readFileSync(path.join(dir, "grant.json"), "utf8"));
   const withdrawalEnvelope = JSON.parse(fs.readFileSync(path.join(dir, "withdrawal.json"), "utf8"));
   const withdrawalObservation = await observeHostedProof({ ...request, fetcher: async () => new Response(JSON.stringify({
@@ -154,12 +146,15 @@ try {
   if (withdrawalObservation.status !== "recorded-withdrawal" || withdrawalObservation.canAuthorize !== false) {
     throw new Error("Withdrawal observation was lost or granted access");
   }
-  const snapshotGrant = inspectSnapshot(grantEnvelope, 0);
-  const snapshotWithdrawal = inspectSnapshot(withdrawalObservation.credential, withdrawalObservation.revision);
-  if (snapshotGrant.status !== "verified-snapshot" || snapshotWithdrawal.status !== "verified-snapshot" ||
-      snapshotGrant.authorizes_use !== false || snapshotWithdrawal.authorizes_use !== false ||
-      snapshotWithdrawal.payload_sha256 !== crypto.createHash("sha256").update(Buffer.from(withdrawalEnvelope.payload, "base64")).digest("hex") ||
-      inspectSnapshot(withdrawalEnvelope, 0).status !== "denied") throw new Error("Signed snapshot validation failed");
+  const grantObservation = { kind: "shadow-observation", canAuthorize: false, status: "verified-proof",
+    entitlementId: "snapshot-entitlement", revision: 0, credential: grantEnvelope };
+  const snapshotGrant = await verifyHostedSnapshot({ ...verifier, observation: grantObservation });
+  const snapshotWithdrawal = await verifyHostedSnapshot({ ...verifier, observation: withdrawalObservation });
+  const wrongRevision = await verifyHostedSnapshot({ ...verifier, observation: { ...withdrawalObservation, revision: 0 } });
+  if (snapshotGrant?.status !== "verified-snapshot" || snapshotWithdrawal?.status !== "verified-snapshot" ||
+      snapshotGrant.canAuthorize !== false || snapshotWithdrawal.canAuthorize !== false ||
+      snapshotWithdrawal.payloadSha256 !== crypto.createHash("sha256").update(Buffer.from(withdrawalEnvelope.payload, "base64")).digest("hex") ||
+      wrongRevision !== null) throw new Error("Signed snapshot validation failed");
   // Exercise durable product-side fences and quota with synthetic inputs only.
   const productDb = new DatabaseSync(path.join(dir, "product-fixture.sqlite"));
   try {
@@ -176,19 +171,24 @@ try {
     try { fence.record({ ...recorded, payloadSha256: "f".repeat(64) }, false); } catch { conflictRejected = true; }
     if ((recorded.revision > 0 && !staleRejected) || !conflictRejected) throw new Error("Entitlement rollback fence failed");
     const snapshotPath = path.join(dir, "snapshot-fixture.sqlite");
-    const snapshotRecord = (checked) => ({ subject: scope.subjectId, offer: scope.offerId,
-      entitlementId: checked.entitlement_id, revision: checked.revision, payloadSha256: checked.payload_sha256 });
     const snapshotDb = new DatabaseSync(snapshotPath);
     try {
       const snapshotFence = new HostedEntitlementFence(snapshotDb);
-      if (snapshotFence.record(snapshotRecord(snapshotGrant), true) !== "enrolled" ||
-          snapshotFence.record(snapshotRecord(snapshotWithdrawal), false) !== "advanced") throw new Error("Signed withdrawal fence did not advance");
+      const enrolled = await verifyAndFenceHostedSnapshot({ ...verifier, observation: grantObservation,
+        fence: snapshotFence, offer: scope.offerId, enroll: true });
+      const tamperedWithdrawal = await verifyAndFenceHostedSnapshot({ ...verifier,
+        observation: { ...withdrawalObservation, credential: { ...withdrawalEnvelope, payload: "dGFtcGVyZWQ=" } },
+        fence: snapshotFence, offer: scope.offerId, enroll: false });
+      if (tamperedWithdrawal !== null) throw new Error("Tampered withdrawal was accepted");
+      const advanced = await verifyAndFenceHostedSnapshot({ ...verifier, observation: withdrawalObservation,
+        fence: snapshotFence, offer: scope.offerId, enroll: false });
+      if (!enrolled || !advanced || advanced.revision !== 1 || advanced.canAuthorize !== false) throw new Error("Signed withdrawal fence did not advance");
     } finally { snapshotDb.close(); }
     const reopenedDb = new DatabaseSync(snapshotPath);
     try {
-      let replayRejected = false;
-      try { new HostedEntitlementFence(reopenedDb).record(snapshotRecord(snapshotGrant), false); } catch { replayRejected = true; }
-      if (!replayRejected) throw new Error("Older signed grant replay was accepted after withdrawal");
+      const replay = await verifyAndFenceHostedSnapshot({ ...verifier, observation: grantObservation,
+        fence: new HostedEntitlementFence(reopenedDb), offer: scope.offerId, enroll: false });
+      if (replay !== null) throw new Error("Older signed grant replay was accepted after withdrawal");
     } finally { reopenedDb.close(); }
     const quota = new HostedQuotaLedger(productDb);
     const now = Date.now(), periodStart = now - 1000, periodEnd = now + 60000;
