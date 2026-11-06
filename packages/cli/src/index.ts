@@ -106,11 +106,13 @@ function isPortListening(port: number): Promise<boolean> {
   });
 }
 
-/** Start the configured SSH tunnel (idempotent) and wait for it to answer. */
-async function ensureTunnel(config: CliConfig): Promise<boolean> {
+/** Start the configured SSH tunnel (idempotent) and wait for it to answer.
+ *  `started` distinguishes "port was already listening" from "this call tried
+ *  to start SSH", so structured output can report network use truthfully. */
+async function ensureTunnel(config: CliConfig): Promise<{ ok: boolean; started: boolean }> {
   const t = config.tunnel;
-  if (!t) return false;
-  if (await isPortListening(t.local_port)) return true;
+  if (!t) return { ok: false, started: false };
+  if (await isPortListening(t.local_port)) return { ok: true, started: false };
   const args = [
     "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30",
     "-f", "-N", "-L", `${t.local_port}:localhost:${t.remote_port}`, t.ssh_target,
@@ -118,13 +120,13 @@ async function ensureTunnel(config: CliConfig): Promise<boolean> {
   try {
     execFileSync("ssh", args, { stdio: "ignore" });
   } catch {
-    return false;
+    return { ok: false, started: true };
   }
   for (let i = 0; i < 20; i++) {
-    if (await isPortListening(t.local_port)) return true;
+    if (await isPortListening(t.local_port)) return { ok: true, started: true };
     await new Promise((r) => setTimeout(r, 300));
   }
-  return false;
+  return { ok: false, started: true };
 }
 
 function escapeHtml(s: string): string {
@@ -1222,33 +1224,35 @@ const AGENT_USAGE: Record<string, string> = {
   "theme update": "publy theme update <file-or-https-url> [--sha256 <hash>] --json",
   "theme remove": "publy theme remove <id> --json",
   "theme preview": "publy theme preview <name> --json",
-  tunnel: "publy tunnel",
+  tunnel: "publy tunnel --json",
 };
 
-/** Stable agent discovery of implemented operations (not a future roadmap). */
+/** Stable agent discovery of implemented operations (not a future roadmap).
+ *  Prerequisites use stable tokens documented in docs/agent-cli.md; they
+ *  describe what must already exist, never a promise of future support. */
 const AGENT_COMMANDS = [
-  { name: "capabilities", json: true, network: false, effect: "read" },
-  { name: "check", json: true, network: false, effect: "read" },
-  { name: "render", json: true, network: false, effect: "write-html-if-out" },
-  { name: "preview", json: true, network: false, effect: "write-private-html" },
-  { name: "card", json: true, network: "font-fallback-may-download", effect: "write-png" },
-  { name: "publish", json: true, network: true, effect: "create-wechat-draft" },
-  { name: "publish-result", json: true, network: true, effect: "read" },
-  { name: "jobs list", json: true, network: true, effect: "read" },
-  { name: "jobs cancel", json: true, network: true, effect: "cancel-scheduled-job" },
-  { name: "jobs retry", json: true, network: true, effect: "re-admit-job" },
-  { name: "history", json: true, network: true, effect: "read" },
-  { name: "quota", json: true, network: true, effect: "read" },
-  { name: "account list", json: true, network: false, effect: "read-local-config" },
-  { name: "account add", json: true, network: false, effect: "write-local-config" },
-  { name: "config set", json: true, network: false, effect: "write-local-config" },
-  { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read" },
-  { name: "theme pack", json: true, network: false, effect: "write-local-theme-bundle" },
-  { name: "theme add", json: true, network: "remote-source-only", effect: "write-local-theme" },
-  { name: "theme update", json: true, network: "remote-source-only", effect: "write-local-theme" },
-  { name: "theme remove", json: true, network: false, effect: "write-local-theme" },
-  { name: "theme preview", json: true, network: "font-fallback-may-download", jsonNetwork: false, effect: "write-preview-and-open-browser", jsonEffect: "write-private-html" },
-  { name: "tunnel", json: false, network: true, effect: "start-ssh-tunnel" },
+  { name: "capabilities", json: true, network: false, effect: "read", prerequisites: [] },
+  { name: "check", json: true, network: false, effect: "read", prerequisites: ["markdown-file"] },
+  { name: "render", json: true, network: false, effect: "write-html-if-out", prerequisites: ["markdown-file"] },
+  { name: "preview", json: true, network: false, effect: "write-private-html", prerequisites: ["markdown-file"] },
+  { name: "card", json: true, network: "font-fallback-may-download", effect: "write-png", prerequisites: ["markdown-file"] },
+  { name: "publish", json: true, network: true, effect: "create-wechat-draft", prerequisites: ["markdown-file", "configured-server", "api-key", "wechat-account"] },
+  { name: "publish-result", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key", "request-id"] },
+  { name: "jobs list", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "jobs cancel", json: true, network: true, effect: "cancel-scheduled-job", prerequisites: ["configured-server", "api-key", "job-id"] },
+  { name: "jobs retry", json: true, network: true, effect: "re-admit-job", prerequisites: ["configured-server", "api-key", "job-id"] },
+  { name: "history", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "quota", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "account list", json: true, network: false, effect: "read-local-config", prerequisites: ["local-config"] },
+  { name: "account add", json: true, network: false, effect: "write-local-config", prerequisites: ["local-config"] },
+  { name: "config set", json: true, network: false, effect: "write-local-config", prerequisites: ["local-config"] },
+  { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read", prerequisites: [] },
+  { name: "theme pack", json: true, network: false, effect: "write-local-theme-bundle", prerequisites: ["css-file"] },
+  { name: "theme add", json: true, network: "remote-source-only", effect: "write-local-theme", prerequisites: ["theme-bundle"] },
+  { name: "theme update", json: true, network: "remote-source-only", effect: "write-local-theme", prerequisites: ["installed-theme-id"] },
+  { name: "theme remove", json: true, network: false, effect: "write-local-theme", prerequisites: ["installed-theme-id"] },
+  { name: "theme preview", json: true, network: "font-fallback-may-download", jsonNetwork: false, effect: "write-preview-and-open-browser", jsonEffect: "write-private-html", prerequisites: ["theme-id"] },
+  { name: "tunnel", json: true, network: true, effect: "start-ssh-tunnel", prerequisites: ["config.tunnel"] },
 ] as const;
 
 export function createProgram(): Command {
@@ -1396,18 +1400,34 @@ export function createProgram(): Command {
   program
     .command("tunnel")
     .description("bring up the configured SSH tunnel (config.tunnel) and verify it")
-    .action(async () => {
-      const config = loadConfig();
-      if (!config.tunnel) {
-        console.error('publy: no tunnel configured. Add to ~/.publy/config.json:\n  "tunnel": { "ssh_target": "user@host", "local_port": 18081, "remote_port": 8081 }');
+    .option("--json", "structured tunnel status (may start SSH and use the network)")
+    .action(async (opts: { json?: boolean }) => {
+      let config: CliConfig;
+      try { config = loadConfig(); }
+      catch {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "tunnel", ok: false, code: "CONFIG_INVALID", networkUsed: false, submitted: false }));
+        else console.error("publy: invalid local configuration");
         process.exit(1);
       }
-      const ok = await ensureTunnel(config);
-      const { local_port, remote_port, ssh_target } = config.tunnel;
-      console.log(ok
+      if (!config.tunnel) {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "tunnel", ok: false, code: "TUNNEL_NOT_CONFIGURED", networkUsed: false, submitted: false }));
+        else console.error('publy: no tunnel configured. Add to ~/.publy/config.json:\n  "tunnel": { "ssh_target": "user@host", "local_port": 18081, "remote_port": 8081 }');
+        process.exit(1);
+      }
+      const result = await ensureTunnel(config);
+      const { local_port, remote_port, ssh_target, server } = config.tunnel;
+      if (opts.json) console.log(JSON.stringify({
+        schemaVersion: 1, kind: "tunnel", ok: result.ok,
+        ...(result.ok ? { status: "up" } : { status: "down", code: "TUNNEL_UNREACHABLE" }),
+        localPort: local_port, remotePort: remote_port,
+        server: server ?? `http://127.0.0.1:${local_port}`,
+        startedByThisCall: result.started,
+        networkUsed: result.started, submitted: false,
+      }));
+      else console.log(result.ok
         ? `tunnel up: localhost:${local_port} → ${ssh_target}:${remote_port}`
         : `tunnel FAILED: could not reach ${ssh_target} or bind localhost:${local_port}`);
-      process.exit(ok ? 0 : 5);
+      process.exit(result.ok ? 0 : 5);
     });
 
   const jobsCmd = program.command("jobs").description("manage scheduled publishes");

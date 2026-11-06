@@ -26,14 +26,23 @@ publy account add Work --theme claude --json  # explicit local mutation; user ap
 publy quota --json
 publy jobs list --json
 publy history --json
+publy tunnel --json  # explicit network action; starts/configures SSH
 ```
 
 `capabilities --json` runs without a network connection, account, browser or
-side effects and returns a **versioned** manifest. Each command declares
-`json` support and whether it reads, writes local output, may access the
-network or performs a draft-creating/mutating action. **Do not guess** that
-every command supports `--json`: some legacy commands are still human-oriented.
+side effects and returns a **versioned** manifest. Each command declares its
+`json` support, `network` behavior, `effect`, `usage` example,
+`prerequisites` (stable tokens such as `markdown-file`, `configured-server`,
+`api-key`, `wechat-account`, `config.tunnel`) and `requiresUserApproval`.
+Every advertised command currently supports `--json`; treat the manifest, not
+this document, as the source of truth for a given build.
 `account add <name> --json` returns an `account-add` object with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or configuration contents; omitted options preserve existing fields. This local mutation requires explicit user approval.
+
+`publy tunnel --json` reports `status:"up"` with `localPort`, `remotePort` and
+`server`, or `ok:false` with `TUNNEL_NOT_CONFIGURED` (no config; exit 1) or
+`TUNNEL_UNREACHABLE` (exit 5). `startedByThisCall` and `networkUsed` are false
+when the local port was already listening, so a read does not claim network
+use. The command may start SSH and therefore requires explicit user approval.
 
 A `DRAFT_OUTCOME_UNKNOWN` response to `publish --json` is reported as
 `status:"unknown"` with the original request ID (exit 5). The server keeps an
