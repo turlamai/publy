@@ -12,10 +12,17 @@
   A confirmed result is also kept in SQLite for the ten-minute duplicate
   window. A failure before draft submission or an explicit WeChat rejection
   releases the claim; an unresolved claim does not expire automatically.
-  Inspect WeChat drafts and keep the original identity. No operator recovery
-  action for clearing an unresolved claim is provided yet. Requests without a key retain legacy
-  behavior and do not receive this protection. This is not multi-instance
-  hosted-service or exactly-once acceptance evidence.
+  Inspect WeChat drafts and keep the original identity. An operator may resolve
+  the claim in the console (or with `GET /v1/admin/claims` plus
+  `POST /v1/admin/claims/:key/reconcile`) only after the server reads that
+  account's WeChat draft box in the same request: `delivered` must name a
+  media_id present in the box, and `absent` is accepted only when a complete
+  read shows no draft with the same title. Both outcomes require a written note
+  and are recorded in the audit trail. A partial box read, a same-title draft,
+  a missing account or an unavailable WeChat API leaves the claim blocked;
+  reconciliation never resends anything implicitly. Requests without a key
+  retain legacy behavior and do not receive this protection. This is not
+  multi-instance hosted-service or exactly-once acceptance evidence.
 - **Lost responses**: clients reconcile via `GET /v1/publish-result/:key`
   (confirmed | unknown). A timeout is never permission to re-issue.
 - **Scheduled jobs**: admission is idempotent (same key never enqueues two

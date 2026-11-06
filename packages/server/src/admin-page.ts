@@ -34,6 +34,7 @@ export function adminPage(): string {
   <nav class="tabs" id="tabs">
     <button data-tab="overview" class="tab active">概览</button>
     <button data-tab="jobs" class="tab">草稿任务</button>
+    <button data-tab="claims" class="tab">待核对</button>
     <button data-tab="users" class="tab">用户</button>
     <button data-tab="orders" class="tab">订单</button>
     <button data-tab="accounts" class="tab">账号</button>
@@ -48,6 +49,7 @@ export function adminPage(): string {
       <p class="hint">笔记仍在原来的文件夹或 Obsidian 笔记库中管理；公众号草稿请在微信后台查看。此处是自托管服务的开发期管理工具，订单功能仅用于历史数据及隔离测试。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="switchTab('jobs')">查看草稿任务</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('claims')">核对未知结果</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('users')">开通 / 延期用户</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">查看历史订单</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('accounts')">绑定公众号</button>
@@ -72,6 +74,19 @@ export function adminPage(): string {
       <div id="history-status" class="hint" role="status" aria-live="polite"></div>
       <table><thead><tr><th>时间</th><th>标题</th><th>公众号</th><th>结果</th></tr></thead>
       <tbody id="h-rows"></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-claims" class="panel" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <h3>待核对的即时发布</h3>
+        <button class="btn btn-ghost btn-sm" id="claims-refresh">刷新</button>
+      </div>
+      <p class="hint">这些请求在提交时丢失了回执，草稿可能已经创建。核对会实时读取对应公众号的草稿箱；确认后，该请求编号才会被标记为已创建或释放，客户端才能安全地查询或重试。不要在没有核对的情况下重发草稿。</p>
+      <div id="claims-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>发生时间</th><th>用户</th><th>公众号</th><th>标题</th><th>请求编号</th><th>操作</th></tr></thead>
+      <tbody id="c-rows"></tbody></table>
     </div>
   </section>
 
@@ -240,6 +255,7 @@ function switchTab(name) {
   document.getElementById('tab-' + name).style.display = 'block';
   if (name === 'overview') loadOverview();
   if (name === 'jobs') refreshDrafts();
+  if (name === 'claims') loadClaims();
   if (name === 'users') loadUsers();
   if (name === 'orders') loadOrders();
   if (name === 'accounts') loadAccounts();
@@ -264,6 +280,7 @@ async function loadOverview() {
     ['本月草稿', d.publishes.monthTotal, '全部用户合计'],
     ['历史待确认订单', d.orders.pending, d.orders.paid + ' 笔历史已支付标记'],
     ['公众号账号', d.accounts.total, '请保护凭据与备份'],
+    ['待核对发布', (d.claims || {}).pending || 0, '回执丢失，需要人工核对'],
     ['今日事件', d.eventsToday, '审计流 24h 窗口']
   ];
   g.innerHTML = cards.map(function (c) {
@@ -534,6 +551,148 @@ document.getElementById('acc-btn').onclick = function () {
     else document.getElementById('a-out').textContent = JSON.stringify(d);
   };
 };
+
+/* ---------- unresolved immediate claims ---------- */
+var claimsCache = [];
+async function loadClaims() {
+  var status = document.getElementById('claims-status'), rows = document.getElementById('c-rows');
+  status.textContent = '正在读取待核对请求…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/admin/claims');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.claims)) throw new Error('待核对数据格式错误');
+    claimsCache = data.claims;
+    if (!claimsCache.length) {
+      rows.innerHTML = '<tr><td colspan="6" class="empty">当前没有待核对的发布</td></tr>';
+      status.textContent = '';
+      return;
+    }
+    rows.innerHTML = claimsCache.map(function (claim, index) {
+      var when = claim.createdAt ? new Date(claim.createdAt) : null;
+      return '<tr><td>' + esc(when && !Number.isNaN(when.getTime()) ? when.toLocaleString() : '—') + '</td>'
+        + '<td>' + esc(claim.ownerContact || claim.owner) + '</td>'
+        + '<td>' + esc(claim.account || '—') + '</td>'
+        + '<td>' + esc(claim.title || '—') + '</td>'
+        + '<td class="key">' + esc(claim.key) + '</td>'
+        + '<td><button class="btn btn-ghost btn-sm" data-inspect="' + index + '">核对草稿箱</button></td></tr>';
+    }).join('');
+    rows.querySelectorAll('[data-inspect]').forEach(function (button) {
+      var claim = claimsCache[Number(button.dataset.inspect)];
+      button.onclick = function () { openClaimInspection(claim); };
+    });
+    status.textContent = '共 ' + claimsCache.length + ' 条待核对';
+  } catch (error) {
+    status.textContent = '无法读取待核对请求，请检查服务连接和权限后刷新。';
+  }
+}
+function claimErrorText(code, message) {
+  var known = {
+    CLAIM_NOT_VERIFIED: '该草稿不在当前公众号的草稿箱中。请重新读取草稿箱后再选。',
+    CLAIM_STILL_PRESENT: '草稿箱里仍有同标题草稿，不能按「不存在」处理；如果就是它，请确认草稿存在。',
+    CLAIM_ABSENCE_UNPROVEN: '草稿箱没有完整读取，无法证明草稿不存在。请归档旧草稿后重试，或按 media_id 确认。',
+    CLAIM_CONTEXT_MISSING: '这条请求缺少公众号或标题上下文，无法自动核对。请保持原样，不要重发。',
+    CLAIM_NOT_PENDING: '这条请求已经被处理或过期，请刷新列表。',
+    ACCOUNT_NOT_FOUND: '这条请求的公众号已不在本服务中，无法读取草稿箱。请保持原样。',
+    NOT_FOUND: '服务端没有这条待核对请求，请刷新列表。'
+  };
+  if (Object.prototype.hasOwnProperty.call(known, code)) return known[code];
+  if (typeof code === 'string' && code.indexOf('WECHAT_') === 0) {
+    return '微信接口暂时不可用（' + code + '），没有修改任何状态，请稍后再核对。';
+  }
+  if (typeof message === 'string' && message) return message;
+  return '操作未完成，请稍后刷新再试。';
+}
+function openClaimInspection(claim) {
+  openModal('<h3>核对微信草稿箱</h3>'
+    + '<p class="hint">公众号：' + esc(claim.account || '未知') + '　标题：' + esc(claim.title || '未知') + '</p>'
+    + '<p class="hint">请求编号 <span class="key">' + esc(claim.key) + '</span></p>'
+    + '<div id="claim-body"><div class="hint">读取草稿箱是只读操作，不会修改微信内容。请先读取，再根据结果确认「已存在」或「不存在」。</div>'
+    + '<button class="btn btn-sm" id="claim-load">读取草稿箱</button></div>');
+  document.getElementById('claim-load').onclick = function () { void inspectClaim(claim, false); };
+}
+async function inspectClaim(claim, includeAll) {
+  var body = document.getElementById('claim-body');
+  body.innerHTML = '<div class="hint">正在读取微信草稿箱…</div>';
+  try {
+    var response = await api('/v1/admin/claims/' + encodeURIComponent(claim.key) + '/candidates' + (includeAll ? '?includeAll=1' : ''));
+    var data = await response.json();
+    if (!response.ok) throw new Error(claimErrorText(data.code, data.message));
+    renderClaimCandidates(claim, data, includeAll);
+  } catch (error) {
+    body.innerHTML = '<div class="msg" style="display:block">无法读取草稿箱：' + esc(error.message) + '。该请求仍保持待核对，不要直接重发。</div>'
+      + '<button class="btn btn-ghost btn-sm" id="claim-retry">重新读取</button>';
+    document.getElementById('claim-retry').onclick = function () { void inspectClaim(claim, includeAll); };
+  }
+}
+function renderClaimCandidates(claim, data, includeAll) {
+  var body = document.getElementById('claim-body');
+  var items = data.candidates || [];
+  var head = '<p class="hint">已读取 ' + esc(data.scanned) + ' / ' + esc(data.totalCount) + ' 个草稿'
+    + (data.complete ? '' : '（未能完整读取，暂不能确认「不存在」）')
+    + (data.sameTitleCount === 0 ? '；没有同标题草稿' : '；同标题 ' + esc(data.sameTitleCount) + ' 个') + '。</p>';
+  var list = items.length
+    ? items.map(function (candidate, index) {
+        return '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--surface-2)">'
+          + '<input type="radio" name="claim-pick" value="' + index + '">'
+          + '<span><b>' + esc(candidate.title || '（无标题）') + '</b>'
+          + '<span class="dim" style="display:block">' + esc(candidate.mediaId) + '</span></span></label>';
+      }).join('')
+    : '<div class="hint">当前列表中没有草稿。</div>';
+  body.innerHTML = head
+    + (includeAll
+      ? '<button class="btn btn-ghost btn-sm" id="claim-same">只看同标题草稿</button>'
+      : '<button class="btn btn-ghost btn-sm" id="claim-all">显示该账号全部草稿</button>')
+    + '<div style="max-height:36vh;overflow:auto;margin:12px 0">' + list + '</div>'
+    + '<label>核对说明（必填，会写入审计记录）</label>'
+    + '<textarea id="claim-note" rows="2" style="width:100%" placeholder="例如：已按标题和创建时间在草稿箱核对"></textarea>'
+    + '<div class="msg" id="claim-out" style="display:none"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px">'
+    + '<button class="btn btn-ghost btn-sm" id="claim-absent">没有这篇草稿</button>'
+    + '<button class="btn btn-sm" id="claim-delivered">确认是这篇草稿</button></div>';
+  var allButton = document.getElementById('claim-all'), sameButton = document.getElementById('claim-same');
+  if (allButton) allButton.onclick = function () { void inspectClaim(claim, true); };
+  if (sameButton) sameButton.onclick = function () { void inspectClaim(claim, false); };
+  document.getElementById('claim-delivered').onclick = function () {
+    var picked = body.querySelector('input[name="claim-pick"]:checked');
+    if (!picked) {
+      toast('请先选中草稿箱里的那篇草稿', 'err');
+      return;
+    }
+    return reconcileClaim(claim, 'delivered', items[Number(picked.value)].mediaId);
+  };
+  document.getElementById('claim-absent').onclick = function () { return reconcileClaim(claim, 'absent', null); };
+}
+async function reconcileClaim(claim, outcome, mediaId) {
+  var out = document.getElementById('claim-out');
+  var note = gv('claim-note');
+  if (note.length < 4) {
+    out.style.display = 'block';
+    out.textContent = '请先填写核对说明（至少 4 个字），说明你是怎么核对的。';
+    return;
+  }
+  out.style.display = 'block';
+  out.textContent = '正在提交核对结果…';
+  var payload = { outcome: outcome, note: note };
+  if (mediaId) payload.mediaId = mediaId;
+  try {
+    var response = await api('/v1/admin/claims/' + encodeURIComponent(claim.key) + '/reconcile', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    var data = await response.json();
+    if (!response.ok) {
+      out.textContent = claimErrorText(data.code, data.message);
+      return;
+    }
+    toast(outcome === 'delivered' ? '已确认草稿存在，原请求会去重' : '已确认草稿不存在，原请求可以重试', 'ok');
+    closeModal();
+    loadClaims();
+  } catch (error) {
+    out.textContent = '提交失败：' + error.message + '。请刷新后再核对，不要直接重发草稿。';
+  }
+}
+document.getElementById('claims-refresh').onclick = loadClaims;
 
 /* ---------- live feed (publy-ws gateway) ---------- */
 var ws = null, wsTimer = null, wsGeneration = 0, approvedWsOrigins = new Set();

@@ -63,6 +63,13 @@ account secrets.
   jobs can be cancelled after confirmation; if the result is uncertain, refresh
   and check the status. Jobs already sending cannot be cancelled here. History
   is limited and may be affected by retention.
+- **Unresolved submissions (待核对):** immediate requests whose response was
+  lost. Resolving one reads the account's WeChat draft box at that moment.
+  “Draft found” requires selecting the actual draft; “Draft absent” is allowed
+  only when the whole box was read and no same-title draft exists. Both need a
+  short note and are written to the audit trail. A partial read, a same-title
+  draft, a missing account or an unreachable WeChat API leaves the request
+  blocked — do not resubmit it.
 - **Users:** local user records, keys and legacy plan fields. Creating or
   extending a legacy plan here is an operator mutation, not a payment or
   Permit entitlement.
@@ -80,9 +87,12 @@ account secrets.
 
 A timeout or lost response does not mean a draft failed. Keep the original
 request identity, use `publy publish-result <requestId> --json` when available,
-and check the correct WeChat draft box. Do not automatically resubmit. The
-current console cannot resolve every unknown immediate request; an old backup
-can also be missing later deliveries. See [recovery and backup](operations.md)
+and check the correct WeChat draft box. Do not automatically resubmit. Use the
+**待核对** section to resolve it: the console reads the draft box, then records
+the draft as found or proves it absent; only then may the client retry. The
+check uses live WeChat API results, so an offline or partially read draft box
+stays blocked instead of guessing. An old backup can also be missing later
+deliveries. See [recovery and backup](operations.md)
 before restarting or restoring a service.
 
 ## Care for the service

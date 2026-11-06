@@ -117,3 +117,88 @@ test("operator requests retain authentication and live feed uses short-lived tic
   assert.equal(ticketRequests, 1);
   assert.match(sockets.at(-1)!, /^wss:\/\/other\.example\/events\?key=/);
 });
+
+test("claim reconciliation reads the draft box and requires a note before resolving", async () => {
+  const html = adminPage();
+  assert.match(html, /data-tab="claims"/);
+  assert.match(html, /id="c-rows"/);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  const elements = new Map<string, any>();
+  const element = (id: string) => {
+    if (!elements.has(id)) {
+      elements.set(id, {
+        value: "", style: {}, dataset: {},
+        classList: { add() {}, remove() {}, toggle() {} },
+        addEventListener() {}, appendChild() {},
+        querySelectorAll() { return []; },
+        querySelector() { return { value: "0" }; },
+      });
+    }
+    return elements.get(id);
+  };
+  const calls: Array<{ url: string; options: any }> = [];
+  const context = vm.createContext({
+    document: {
+      getElementById: element, addEventListener() {}, querySelectorAll() { return []; }, querySelector() { return null; },
+      createElement() {
+        let content = "";
+        return {
+          set textContent(value: unknown) { content = String(value); },
+          get innerHTML() { return content.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); },
+          classList: { add() {}, remove() {} },
+          remove() {},
+        };
+      },
+    },
+    sessionStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    location: { protocol: "https:", port: "", hostname: "example.test" },
+    fetch: async (url: string, options: any) => {
+      calls.push({ url, options });
+      if (url === "/v1/admin/claims") {
+        return {
+          ok: true, status: 200,
+          json: async () => ({ claims: [{ key: "claim-1", ownerContact: "operator", account: "synth", title: "<b>unsafe</b>", state: "pending", createdAt: 1700000000000 }], pending: 1 }),
+        };
+      }
+      if (url.endsWith("/candidates")) {
+        return {
+          ok: true, status: 200,
+          json: async () => ({ scanned: 1, totalCount: 1, complete: true, sameTitleCount: 1, candidates: [{ mediaId: "draft-verified", title: "unsafe" }] }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true, claim: { key: "claim-1", state: "confirmed" } }) };
+    },
+    WebSocket: class { constructor() {} },
+    URL, setTimeout, clearTimeout, navigator: {}, console,
+  });
+  vm.runInContext(script, context);
+  context.KEY = "private-admin-key";
+  await context.loadClaims();
+  assert.match(element("c-rows").innerHTML, /&lt;b&gt;unsafe&lt;\/b&gt;/, "claim titles must be escaped");
+  assert.match(element("claims-status").textContent, /1 条待核对/);
+
+  const claim = { key: "claim-1", account: "synth", title: "unsafe" };
+  context.openClaimInspection(claim);
+  assert.equal(typeof element("claim-load").onclick, "function");
+  await context.inspectClaim(claim, false);
+  assert.equal(calls.at(-1)!.url, "/v1/admin/claims/claim-1/candidates");
+  assert.equal(calls.at(-1)!.options.headers["x-api-key"], "private-admin-key");
+
+  element("claim-note").value = "ok";
+  await element("claim-delivered").onclick();
+  assert.equal(calls.filter((call) => call.url.endsWith("/reconcile")).length, 0, "a short note must not submit");
+  assert.match(element("claim-out").textContent, /至少 4 个字/);
+
+  element("claim-note").value = "已按标题在草稿箱核对";
+  await element("claim-delivered").onclick();
+  const reconcile = calls.find((call) => call.url === "/v1/admin/claims/claim-1/reconcile");
+  assert.ok(reconcile);
+  assert.deepEqual(JSON.parse(reconcile.options.body), {
+    outcome: "delivered",
+    mediaId: "draft-verified",
+    note: "已按标题在草稿箱核对",
+  });
+  assert.equal(calls.at(-1)!.url, "/v1/admin/claims", "the list refreshes after resolving");
+});
