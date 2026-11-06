@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { TokenManager } from "./wechat.js";
+import { TokenManager, draftBatchGet, listDraftSummaries } from "./wechat.js";
 
 test("TokenManager rejects missing or malformed success tokens without caching them", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-token-validation-"));
@@ -133,5 +133,72 @@ test("TokenManager preserves prototype-like app IDs across disk recovery", async
   } finally {
     globalThis.fetch = originalFetch;
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("draftBatchGet keeps titles and media IDs and ignores malformed entries", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; body: any }> = [];
+  globalThis.fetch = (async (input: any, init: any) => {
+    requests.push({ url: String(input), body: JSON.parse(init.body) });
+    return Response.json({
+      total_count: 4,
+      item_count: 4,
+      item: [
+        { media_id: "draft-a", content: { news_item: [{ title: "Synthetic A" }] }, update_time: 1700000000 },
+        { media_id: "", content: { news_item: [{ title: "empty id" }] } },
+        { media_id: "draft-b", content: {}, update_time: "not-a-number" },
+        null,
+      ],
+    });
+  }) as typeof fetch;
+  try {
+    const page = await draftBatchGet("synthetic-token", 20, 99);
+    assert.equal(requests[0].body.offset, 20);
+    assert.equal(requests[0].body.count, 20, "WeChat page size must be clamped to 20");
+    assert.equal(requests[0].body.no_content, 1);
+    assert.equal(page.totalCount, 4);
+    assert.deepEqual(page.items, [
+      { mediaId: "draft-a", title: "Synthetic A", updateTime: 1700000000 },
+      { mediaId: "draft-b", title: "", updateTime: 0 },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listDraftSummaries pages through the draft box and stops on an empty page", async () => {
+  const originalFetch = globalThis.fetch;
+  const offsets: number[] = [];
+  globalThis.fetch = (async (_input: any, init: any) => {
+    const body = JSON.parse(init.body);
+    offsets.push(body.offset);
+    const start = body.offset;
+    const count = Math.max(Math.min(45 - start, body.count), 0);
+    const item = Array.from({ length: count }, (_, index) => ({
+      media_id: `draft-${start + index}`,
+      content: { news_item: [{ title: `Title ${start + index}` }] },
+      update_time: 1700000000 + start + index,
+    }));
+    return Response.json({ total_count: 45, item_count: item.length, item });
+  }) as typeof fetch;
+  try {
+    const listing = await listDraftSummaries("synthetic-token", 100);
+    assert.deepEqual(offsets, [0, 20, 40], "pages must advance by the server-reported count");
+    assert.equal(listing.totalCount, 45);
+    assert.equal(listing.items.length, 45);
+    assert.equal(listing.items.at(-1)?.mediaId, "draft-44");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draft box listing fails closed with the WeChat error code", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => Response.json({ errcode: 40001, errmsg: "invalid credential" })) as typeof fetch;
+  try {
+    await assert.rejects(draftBatchGet("stale-token"), /40001: invalid credential/);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });

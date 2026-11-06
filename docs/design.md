@@ -282,6 +282,9 @@ POST /v1/publish          # 发布（JSON，≤30MB）
 GET  /v1/publish-result/:key   # 按幂等键查询结果：confirmed | unknown（超时恢复入口）
 POST /v1/jobs/:id/retry        # 显式重试 interrupted/failed 任务（幂等键随行）
 POST /v1/admin/users/:id/rotate-key  # 用户 key 轮换（旧 key 立即失效）
+GET  /v1/admin/claims          # 运营者：待核对的即时发布（需 admin key）
+GET  /v1/admin/claims/:key/candidates  # 只读读取该账号草稿箱，供核对
+POST /v1/admin/claims/:key/reconcile   # 依据草稿箱证据标记 delivered / absent
 POST /v1/ws-ticket             # 换取短时 WS 票据（替代 URL 携带长期 key）
 ```
 

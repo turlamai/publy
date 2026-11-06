@@ -7,6 +7,15 @@ import path from "node:path";
 const TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
 const ADD_MATERIAL_URL = "https://api.weixin.qq.com/cgi-bin/material/add_material";
 const DRAFT_ADD_URL = "https://api.weixin.qq.com/cgi-bin/draft/add";
+const DRAFT_BATCHGET_URL = "https://api.weixin.qq.com/cgi-bin/draft/batchget";
+
+/** Read-only summary of one WeChat draft. Titles are the operator-visible
+ *  identity; media_id is the value a confirmed draft must retain. */
+export interface WechatDraftSummary {
+  mediaId: string;
+  title: string;
+  updateTime: number;
+}
 
 export class WechatError extends Error {
   constructor(public errcode: number, public errmsg: string) {
@@ -116,6 +125,57 @@ export async function draftAdd(accessToken: string, article: Record<string, unkn
   assertOk(data);
   if (!data.media_id) throw new Error(`draft/add returned no media_id: ${JSON.stringify(data)}`);
   return data.media_id as string;
+}
+
+/**
+ * List one page of the account's draft box. This is the only way an operator
+ * can prove which drafts really exist after an ambiguous submission, so it is
+ * deliberately read-only and never creates or edits anything.
+ *
+ * WeChat returns at most 20 items per call; ask for no_content to keep the
+ * response small while retaining titles and media IDs.
+ */
+export async function draftBatchGet(accessToken: string, offset = 0, count = 20): Promise<{ totalCount: number; items: WechatDraftSummary[] }> {
+  const safeCount = Math.min(Math.max(Math.trunc(count) || 20, 1), 20);
+  const safeOffset = Math.max(Math.trunc(offset) || 0, 0);
+  const res = await fetch(`${DRAFT_BATCHGET_URL}?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ offset: safeOffset, count: safeCount, no_content: 1 }),
+  });
+  const data = await res.json() as any;
+  assertOk(data);
+  const rawItems: any[] = Array.isArray(data.item) ? data.item : [];
+  const items: WechatDraftSummary[] = [];
+  for (const item of rawItems) {
+    const mediaId = item?.media_id;
+    if (typeof mediaId !== "string" || !mediaId) continue;
+    const newsItem = Array.isArray(item?.content?.news_item) ? item.content.news_item[0] : null;
+    const title = typeof newsItem?.title === "string" ? newsItem.title : "";
+    items.push({ mediaId, title, updateTime: Number(item?.update_time) || 0 });
+  }
+  const totalCount = Number.isFinite(data.total_count) ? Number(data.total_count) : items.length;
+  return { totalCount, items };
+}
+
+/**
+ * Read up to `limit` drafts across pages. A partial listing is returned when
+ * WeChat reports fewer drafts than requested; callers must treat an empty
+ * result as "not seen on this page set", never as proof that a draft was
+ * never created outside the scanned range.
+ */
+export async function listDraftSummaries(accessToken: string, limit = 100): Promise<{ totalCount: number; items: WechatDraftSummary[] }> {
+  const max = Math.min(Math.max(Math.trunc(limit) || 100, 1), 200);
+  const pageSize = 20;
+  const items: WechatDraftSummary[] = [];
+  let totalCount = 0;
+  for (let offset = 0; offset < max; offset += pageSize) {
+    const page = await draftBatchGet(accessToken, offset, Math.min(pageSize, max - offset));
+    totalCount = Math.max(totalCount, page.totalCount);
+    items.push(...page.items);
+    if (page.items.length === 0 || items.length >= totalCount) break;
+  }
+  return { totalCount: Math.max(totalCount, items.length), items: items.slice(0, max) };
 }
 
 /** Connectivity check for novice onboarding: does this AppID/AppSecret work

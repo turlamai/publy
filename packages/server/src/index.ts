@@ -16,8 +16,8 @@ import { pathToFileURL } from "node:url";
 import Fastify from "fastify";
 import type { FastifyError, FastifyReply } from "fastify";
 import type { JobInfo, JobStatus, PublishRequest, PublishResponse, PublishResultInfo } from "@publy/shared";
-import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, type AccountCredential } from "@publy/core";
-import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type Plan, type UserRow } from "./store.js";
+import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, listDraftSummaries, type AccountCredential, type WechatDraftSummary } from "@publy/core";
+import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
 import { requestHostedCheckout } from "./commerce-checkout-request.js";
 import { purchasePage } from "./pages.js";
@@ -830,7 +830,7 @@ export function buildApp(config: ServerConfig) {
         return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${body.account}"` });
       }
       if (key) {
-        const outcome = store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS);
+        const outcome = store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS, { account: body.account, title: body.title });
         if (outcome !== "claimed") {
           const prior = store.getImmediateClaim(key);
           if (!prior || prior.owner !== owner || prior.fingerprint !== fingerprint) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
@@ -1147,6 +1147,7 @@ export function buildApp(config: ServerConfig) {
       publishes: { monthTotal },
       orders: { pending, paid: paid.length, revenueFen: paid.reduce((a, o) => a + o.amountFen, 0) },
       accounts: { total: (config.accounts ?? []).length + store.listAccounts().length },
+      claims: { pending: store.listImmediateClaims("pending", 500).length },
       eventsToday,
     };
   });
@@ -1168,6 +1169,167 @@ export function buildApp(config: ServerConfig) {
         })),
     ];
     return { accounts: all };
+  });
+
+  // --- operator reconciliation of unresolved immediate requests -------------
+  //
+  // A submission whose response was lost can leave a pending claim forever.
+  // The operator may resolve it only with evidence read back from WeChat's
+  // draft box in this same request; a free-form console note alone is never
+  // evidence. "delivered" records the verified media_id so the original
+  // identity dedupes, while "absent" releases the claim only when no
+  // same-title draft is visible in a completely read box, letting the caller
+  // retry under the original identity.
+
+  /** Latest audit context per request key (legacy claims predate stored context). */
+  function latestAuditContext(): Map<string, { account?: string; title?: string }> {
+    const index = new Map<string, { account?: string; title?: string }>();
+    for (const entry of readHistory(2000)) {
+      if (!entry || typeof entry.key !== "string" || !entry.key) continue;
+      const account = typeof entry.account === "string" ? entry.account : undefined;
+      const title = typeof entry.title === "string" ? entry.title : undefined;
+      if (account || title) index.set(entry.key, { account, title });
+    }
+    return index;
+  }
+
+  function claimOwnerLabel(owner: string): string {
+    if (owner === "admin") return "operator";
+    const match = /^user:(.+)$/.exec(owner);
+    if (!match) return owner;
+    return store.findUserById(match[1])?.contact ?? "deleted user";
+  }
+
+  type DraftBoxRead =
+    | { ok: true; account: string; totalCount: number; complete: boolean; items: WechatDraftSummary[] }
+    | { ok: false; status: number; code: string; message: string };
+
+  async function readDraftBox(account: string): Promise<DraftBoxRead> {
+    const cred = resolveAccount(account, { admin: true });
+    if (!cred) return { ok: false, status: 404, code: "ACCOUNT_NOT_FOUND", message: `Unknown account "${account}"` };
+    try {
+      const token = await tokens.get(cred.appId, cred.appSecret);
+      const listing = await listDraftSummaries(token, 200);
+      return {
+        ok: true,
+        account: cred.name,
+        totalCount: listing.totalCount,
+        complete: listing.items.length >= listing.totalCount,
+        items: listing.items,
+      };
+    } catch (error) {
+      const code = error instanceof WechatError ? `WECHAT_${error.errcode}` : "WECHAT_UNAVAILABLE";
+      return { ok: false, status: 502, code, message: "Could not read the WeChat draft box; no claim state was changed." };
+    }
+  }
+
+  function claimContext(claim: ImmediateClaimRow, fallback: { account?: string; title?: string } | undefined): { account: string | null; title: string | null } {
+    return { account: claim.account ?? fallback?.account ?? null, title: claim.title ?? fallback?.title ?? null };
+  }
+
+  app.get<{ Querystring: { state?: string } }>("/v1/admin/claims", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const requested = (req.query as { state?: string }).state;
+    const state: "pending" | "confirmed" | "all" = requested === "all" || requested === "confirmed" ? requested : "pending";
+    const fallback = latestAuditContext();
+    const claims = store.listImmediateClaims(state, 200).map((claim) => {
+      const context = claimContext(claim, fallback.get(claim.key));
+      return {
+        key: claim.key,
+        owner: claim.owner,
+        ownerContact: claimOwnerLabel(claim.owner),
+        account: context.account,
+        title: context.title,
+        state: claim.state,
+        mediaId: claim.mediaId ?? undefined,
+        createdAt: claim.createdAt ?? undefined,
+        completedAt: claim.completedAt ?? undefined,
+      };
+    });
+    return { claims, pending: store.listImmediateClaims("pending", 500).length };
+  });
+
+  app.get<{ Params: { key: string }; Querystring: { includeAll?: string } }>("/v1/admin/claims/:key/candidates", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const key = (req.params as { key: string }).key;
+    const claim = store.getImmediateClaim(key);
+    if (!claim) return reply.code(404).send({ code: "NOT_FOUND", message: "no unresolved claim for this key" });
+    if (claim.state !== "pending") return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    const context = claimContext(claim, latestAuditContext().get(key));
+    if (!context.account) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no account context; keep it blocked and reconcile the account manually." });
+    }
+    const box = await readDraftBox(context.account);
+    if (!box.ok) return reply.code(box.status).send({ code: box.code, message: box.message });
+    const normalizedTitle = (context.title ?? "").trim();
+    const sameTitle = normalizedTitle ? box.items.filter((item) => item.title.trim() === normalizedTitle) : [];
+    const includeAll = (req.query as { includeAll?: string }).includeAll === "1";
+    const visible = includeAll ? box.items : sameTitle;
+    return {
+      key,
+      account: box.account,
+      title: context.title,
+      totalCount: box.totalCount,
+      scanned: box.items.length,
+      complete: box.complete,
+      sameTitleCount: sameTitle.length,
+      candidates: visible.map((item) => ({ mediaId: item.mediaId, title: item.title, updateTime: item.updateTime || undefined })),
+    };
+  });
+
+  app.post<{ Params: { key: string }; Body: { outcome?: string; mediaId?: string; note?: string } }>("/v1/admin/claims/:key/reconcile", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const key = (req.params as { key: string }).key;
+    const body = (req.body ?? {}) as { outcome?: string; mediaId?: string; note?: string };
+    if (body.outcome !== "delivered" && body.outcome !== "absent") {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "outcome must be delivered or absent" });
+    }
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (note.length < 4 || note.length > 500) {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "note must record how the WeChat draft box was checked (4-500 characters)" });
+    }
+    const claim = store.getImmediateClaim(key);
+    if (!claim) return reply.code(404).send({ code: "NOT_FOUND", message: "no unresolved claim for this key" });
+    if (claim.state !== "pending") return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    const context = claimContext(claim, latestAuditContext().get(key));
+    if (!context.account) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no account context; keep it blocked and reconcile the account manually." });
+    }
+    const box = await readDraftBox(context.account);
+    if (!box.ok) return reply.code(box.status).send({ code: box.code, message: box.message });
+
+    if (body.outcome === "delivered") {
+      const requestedMediaId = typeof body.mediaId === "string" ? body.mediaId.trim() : "";
+      if (!requestedMediaId || requestedMediaId.length > 512) {
+        return reply.code(400).send({ code: "BAD_REQUEST", message: "mediaId must be the media_id of a draft visible in this account" });
+      }
+      const match = box.items.find((item) => item.mediaId === requestedMediaId);
+      if (!match) {
+        return reply.code(409).send({ code: "CLAIM_NOT_VERIFIED", message: "That draft is not visible in this account's draft box; refresh the listing before resolving." });
+      }
+      if (!store.reconcileImmediateClaim(key, match.mediaId, Date.now())) {
+        return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+      }
+      audit({ event: "claim-reconciled", key, outcome: "delivered", account: box.account, title: match.title || context.title, owner: claim.owner, mediaId: match.mediaId, note });
+      return { ok: true, claim: { key, state: "confirmed", mediaId: match.mediaId } };
+    }
+
+    const normalizedTitle = (context.title ?? "").trim();
+    if (!normalizedTitle) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no title to compare; keep it blocked rather than guessing it was absent." });
+    }
+    if (!box.complete) {
+      return reply.code(409).send({ code: "CLAIM_ABSENCE_UNPROVEN", message: `The draft box has ${box.totalCount} drafts but only ${box.items.length} could be read; archive old drafts or resolve by media_id instead.` });
+    }
+    const present = box.items.find((item) => item.title.trim() === normalizedTitle);
+    if (present) {
+      return reply.code(409).send({ code: "CLAIM_STILL_PRESENT", message: "A draft with this title is still in the account's draft box; resolve it as delivered instead." });
+    }
+    if (!store.releaseImmediateClaimByOperator(key)) {
+      return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    }
+    audit({ event: "claim-reconciled", key, outcome: "absent", account: box.account, title: context.title, owner: claim.owner, scanned: box.items.length, note });
+    return { ok: true, claim: { key, state: "released" } };
   });
 
   // --- websocket tickets --------------------------------------------------------
