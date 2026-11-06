@@ -13,6 +13,7 @@ test("entitlement lineage and high-water revision survive restarts and reject re
   try {
     let fence = new HostedEntitlementFence(db);
     const value = { subject: "account-a", offer: "personal", entitlementId: "ent-1", revision: 1, payloadSha256: "a".repeat(64) };
+    assert.equal(fence.lookup("account-a", "personal"), null);
     assert.throws(() => fence.record(value, false), /FENCE_NOT_ENROLLED/);
     assert.equal(fence.record(value, true), "enrolled");
     assert.equal(fence.record(value, false), "unchanged");
@@ -22,10 +23,15 @@ test("entitlement lineage and high-water revision survive restarts and reject re
     db.close();
     db = new DatabaseSync(dbPath);
     fence = new HostedEntitlementFence(db);
+    assert.deepEqual(fence.lookup("account-a", "personal"), { entitlementId: "ent-1", revision: 2, payloadSha256: "b".repeat(64) });
+    assert.equal(fence.lookup("account-b", "personal"), null);
     assert.throws(() => fence.record(value, false), /FENCE_STALE_REVISION/);
     assert.equal(fence.record({ ...value, revision: 2, payloadSha256: "b".repeat(64) }, false), "unchanged");
     assert.throws(() => fence.record({ ...value, subject: "account-b" }, false), /FENCE_NOT_ENROLLED/);
     assert.throws(() => fence.record({ ...value, revision: -1 }, true), /FENCE_INVALID_INPUT/);
+    db.prepare("UPDATE hosted_entitlement_fences SET payload_sha256 = ? WHERE subject = ? AND offer = ?").run("damaged", "account-a", "personal");
+    assert.throws(() => fence.lookup("account-a", "personal"), /FENCE_CORRUPT_STATE/);
+    assert.throws(() => fence.record({ ...value, revision: 3 }, false), /FENCE_CORRUPT_STATE/);
   } finally {
     db.close();
     fs.rmSync(dir, { recursive: true, force: true });
