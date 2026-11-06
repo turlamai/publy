@@ -145,6 +145,11 @@ export async function draftBatchGet(accessToken: string, offset = 0, count = 20)
   });
   const data = await res.json() as any;
   assertOk(data);
+  // Evidence must be well formed: a missing total_count would make a partial
+  // listing look complete and could wrongly release a claim.
+  if (typeof data?.total_count !== "number" || !Number.isFinite(data.total_count)) {
+    throw new Error("draft/batchget returned no usable total_count");
+  }
   const rawItems: any[] = Array.isArray(data.item) ? data.item : [];
   const items: WechatDraftSummary[] = [];
   for (const item of rawItems) {
@@ -154,8 +159,7 @@ export async function draftBatchGet(accessToken: string, offset = 0, count = 20)
     const title = typeof newsItem?.title === "string" ? newsItem.title : "";
     items.push({ mediaId, title, updateTime: Number(item?.update_time) || 0 });
   }
-  const totalCount = Number.isFinite(data.total_count) ? Number(data.total_count) : items.length;
-  return { totalCount, items };
+  return { totalCount: data.total_count, items };
 }
 
 /**

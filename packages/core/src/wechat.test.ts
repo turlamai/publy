@@ -202,3 +202,21 @@ test("draft box listing fails closed with the WeChat error code", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("draft box listing refuses a response without a usable total_count", async () => {
+  const originalFetch = globalThis.fetch;
+  const responses = [
+    { item: [{ media_id: "draft-a", content: { news_item: [{ title: "Synthetic" }] } }] },
+    { total_count: "3", item: [] },
+    { total_count: null, item: [] },
+  ];
+  let calls = 0;
+  globalThis.fetch = (async () => Response.json(responses[calls++])) as typeof fetch;
+  try {
+    for (const _ of responses) {
+      await assert.rejects(draftBatchGet("synthetic-token"), /no usable total_count/);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

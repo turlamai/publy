@@ -598,6 +598,9 @@ function claimErrorText(code, message) {
     NOT_FOUND: '服务端没有这条待核对请求，请刷新列表。'
   };
   if (Object.prototype.hasOwnProperty.call(known, code)) return known[code];
+  if (typeof code === 'string' && code.indexOf('WECHAT_') === 0) {
+    return '微信接口暂时不可用（' + code + '），没有修改任何状态，请稍后再核对。';
+  }
   if (typeof message === 'string' && message) return message;
   return '操作未完成，请稍后刷新再试。';
 }
