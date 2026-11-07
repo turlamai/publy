@@ -58,6 +58,31 @@ try {
   env.PUBLY_FETCH_STATUS = "200";
   const remote = cli("add", "https://themes.example.test/a", "--sha256", digest.toUpperCase()).output;
   assert.equal(remote.ok, true); assert.equal(remote.networkUsed, true);
+  // Signed v2 bundles: the signature is verified on every read/install, and a
+  // pinned key additionally binds the author. A pin without a signature fails.
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
+  const pub = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+  const otherPub = crypto.generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "der" }).toString("base64");
+  const keyFile = path.join(tmp, "signing-key.pem");
+  fs.writeFileSync(keyFile, privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
+  const signedFile = path.join(tmp, "signed.json");
+  const signed = cli("pack", cssFile, "--id", "signedfixture", "--theme-version", "1.0.0", "--name", "Signed", "--license", "MIT", "--output", signedFile, "--sign-key", keyFile);
+  assert.equal(signed.output.ok, true);
+  const signedBody = JSON.parse(fs.readFileSync(signedFile, "utf8"));
+  assert.equal(signedBody.format, "publy-theme-v2");
+  assert.equal(signedBody.signature.alg, "ed25519");
+  assert.equal(signedBody.signature.publicKey, pub);
+  assert.equal(cli("add", signedFile, "--trusted-key", otherPub).output.code, "THEME_UNTRUSTED_SIGNER");
+  assert.equal(cli("add", signedFile, "--trusted-key", "not-base64").output.code, "THEME_SIGNING_KEY_INVALID");
+  assert.equal(cli("add", signedFile, "--trusted-key", pub).output.ok, true);
+  assert.equal(cli("remove", "signedfixture").output.ok, true);
+  assert.equal(cli("add", source, "--trusted-key", pub).output.code, "THEME_UNTRUSTED_SIGNER");
+  assert.equal(cli("add", signedFile).output.ok, true);
+  const tamperedFile = path.join(tmp, "tampered.json");
+  const tampered = { ...signedBody, name: "Tampered" };
+  fs.writeFileSync(tamperedFile, JSON.stringify(tampered));
+  assert.equal(cli("add", tamperedFile).output.code, "THEME_SIGNATURE_INVALID");
+  assert.equal(cli("remove", "signedfixture").output.ok, true);
   fs.writeFileSync(path.join(env.PUBLY_THEME_DIR, "fixture.json"), "corrupt");
   const invalidList = cli("ls"); assert.equal(invalidList.status, 2); assert.equal(invalidList.output.code, "THEME_LIST_FAILED");
   assert.equal(cli("remove", "fixture").output.ok, true);

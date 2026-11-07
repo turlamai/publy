@@ -13,4 +13,4 @@ export * from "./cover-art.js";
 export * from "./wechat.js";
 export * from "./publish.js";
 
-export { validateThemeBundle, installThemeBundle, listInstalledThemes, readInstalledTheme, removeInstalledTheme } from "./theme-bundle.js";
+export { validateThemeBundle, installThemeBundle, listInstalledThemes, readInstalledTheme, removeInstalledTheme, themeSignaturePayload, decodeThemePublicKey, type ThemeBundle, type ThemeSignature } from "./theme-bundle.js";

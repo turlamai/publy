@@ -51,6 +51,8 @@ The command validates the content, refuses to overwrite an existing output and p
 
 To migrate an older local theme, keep a backup of its CSS and licence, then use `theme pack` on a copy. Adapt unsupported selectors or declarations explicitly; Publy rejects them rather than silently weakening validation. A CSS file you personally trust can still be used for a one-off render with `--custom-theme /path/to/theme.css`; that older path reads CSS as trusted input and is not the bundle safety boundary. Do not run an old package's install scripts. The bundle flow does not import npm packages automatically.
 
+Signed bundles are optional. `theme pack --sign-key <pem>` with an Ed25519 private key emits a `publy-theme-v2` bundle that carries the matching public key and a detached signature over its metadata and CSS hash. `theme add/update --trusted-key <base64>` installs only a bundle signed by exactly that key. Pin a key only when you obtained it from the author through a trusted channel: a signature proves possession of that key, not identity, and an unpinned signature is informational. The private key stays in your local process and is never uploaded.
+
 ## Where are my notes and drafts?
 
 Publy does not create a notebook or provide a dashboard for browsing and
