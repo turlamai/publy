@@ -19,7 +19,7 @@ markdown 文件 → publy CLI → publy-server（你的服务器）→ 微信官
 
 ## 当前可用范围
 
-公开托管尚未开放注册、购买或付款。请先使用本地渲染与自己的服务端，不向历史托管地址发送 API key 或 AppSecret。服务端默认关闭旧版 `/purchase`、`/order/:id`、`/lookup`、`/pay/xunhupay/notify` 路由，统一返回 `CHECKOUT_NOT_AVAILABLE`。仅隔离的开发者模拟测试可以显式设置 `payments.enableLegacyCheckout: true` 与 `payments.provider: "manual"`；这**不代表允许对外收款**。配置缺失的支付宝／虎皮椒渠道不再静默降级为手工收款。托管支付需按 [#17](https://github.com/turlamai/publy/issues/17) 接入 Commerce/Permit 并完成真实商户与授权验收。完整状态、隐私和恢复说明见 [USER-GUIDE.zh-CN.md](USER-GUIDE.zh-CN.md)。
+公开托管尚未开放注册、购买或付款。请先使用本地渲染与自己的服务端，不向历史托管地址发送 API key 或 AppSecret。服务端默认关闭旧版 `/purchase`、`/order/:id`、`/lookup`、`/pay/xunhupay/notify` 路由，统一返回 `CHECKOUT_NOT_AVAILABLE`。旧版手工收款流程仅供进程内隔离模拟测试，服务端配置文件不能启用它。配置缺失的支付宝／虎皮椒渠道不再静默降级为手工收款。托管支付需按 [#17](https://github.com/turlamai/publy/issues/17) 接入 Commerce/Permit 并完成真实商户与授权验收。完整状态、隐私和恢复说明见 [USER-GUIDE.zh-CN.md](USER-GUIDE.zh-CN.md)。
 
 ## 准备工作
 
@@ -86,7 +86,7 @@ publy account list
 ## 发布文章
 
 ```bash
-publy publish article.md
+publy publish article.md --account TuringLambdaAI
 ```
 
 就这一条。渲染（主题 + 代码高亮 + 链接转脚注 + Obsidian 语法）全部自动完成，产物进公众号草稿箱，**请在后台核对草稿并按账号实际权限发布或群发**；不能根据投递结果推断公开发布成功。
@@ -198,7 +198,7 @@ tags: [咖啡, 手冲]
 
 ```bash
 publy card post.md --preview    # 浏览器打开拼版预览（全部卡片 + 配文）
-publy publish post.md           # lint 通过后发布
+publy publish post.md --account TuringLambdaAI  # 核对账号后投递到草稿箱
 ```
 
 ## 主题
@@ -226,7 +226,7 @@ pnpm install --frozen-lockfile && pnpm -r build
 # Environment=PUBLY_SERVER_CONFIG=/root/.publy/server.json
 ```
 
-源码提供以下机制，真实持久化与超时恢复仍需按 #7/#8 验收，不能据此承诺零重复或零丢失：access_token 缓存（两小时过期自动刷新、并发单飞）、素材去重（同图免重传）、幂等（同内容 10 分钟内重试不重复发布）、审计日志（`~/.publy/server-data/history.jsonl`，客户端 `publy history` 直读）、定时任务（`--at`，jobs.json 持久化 + 失败重试 3 次）、webhook（账号配置 `"webhook": "https://..."` 即推送 publish/failed 事件）。
+源码提供以下机制，真实持久化与超时恢复仍需按 #7/#8 验收，不能据此承诺零重复或零丢失：access_token 缓存（两小时过期自动刷新、并发单飞）、素材去重（同图免重传）、幂等（同内容 10 分钟内重试不重复发布）、审计日志（`~/.publy/server-data/history.jsonl`，客户端 `publy history` 直读）、定时任务（`--at`，jobs.json 持久化；投递开始后的未知结果不自动重试）、webhook（账号配置 `"webhook": "https://..."` 即推送 publish/failed 事件）。
 
 安全建议：API key 用 24+ 字节随机值（`node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`）；任何跨机访问应使用 HTTPS 或私有隧道；可在服务器前挂 Caddy 提供 HTTPS（Caddyfile 两行：域名 + `reverse_proxy localhost:8081`）。
 
@@ -242,7 +242,7 @@ cd /opt/publy && git pull && pnpm install --frozen-lockfile && pnpm -r build && 
 publy history            # 服务器审计日志（谁、何时、发了什么、mediaId）
 publy jobs list          # 定时任务
 publy jobs cancel <id>   # 取消未执行的定时任务
-publy jobs retry <id>    # 显式重试中断/失败的任务（幂等对账，不会重复建草稿）
+publy jobs retry <id>    # 仅能重试已证明在投递前失败的任务；中断任务仅对账已确认记录
 ```
 
 **服务端冲突保护：** 如果客户端将同一个请求键用于不同公众号、
@@ -259,10 +259,10 @@ publy jobs retry <id>    # 显式重试中断/失败的任务（幂等对账，�
 真正端到端恰好一次：微信公众号已建草稿而本地服务未落盘的故障仍可能导致
 结果未知，必须查询原请求、人工核对草稿，而不是盲目重新发布。
 
-超时恢复：发布命令网络中断时退出码 5，并打印本次的幂等键。先查再重试，不要直接重发：
+超时恢复：发布命令网络中断时退出码 5，并打印本次的幂等键。先查询并检查微信草稿箱，不要直接重发：
 
 ```bash
-publy publish-result <幂等键>   # confirmed = 草稿已建；unknown = 可原样重试
+publy publish-result <幂等键>   # confirmed = 草稿已建；unknown = 先检查公众号草稿箱
 ```
 
 ## 故障排查
@@ -275,7 +275,7 @@ publy publish-result <幂等键>   # confirmed = 草稿已建；unknown = 可原
 | 退出码 5 + `WECHAT_40001` | AppSecret 不对或被重置，改服务器端 server.json |
 | 退出码 5 + `WECHAT_45166` | 图片消息内容超微信长度限制，精简 |
 | 连接拒绝 | 服务端 `systemctl status publy-server`，检查安全组/防火墙端口放行 |
-| 退出码 5 + outcome UNKNOWN | 网络中断，草稿可能已建：先 `publy publish-result <键>` 查询，再决定原样重试 |
+| 退出码 5 + outcome UNKNOWN | 网络中断，草稿可能已建：先 `publy publish-result <键>` 查询，并检查公众号草稿箱，再决定是否重新提交 |
 | 卡片出现乱码方块 | 生僻字/emoji 超出内置 GB2312 子集：`--font-file` 指定全量字体（首次自动下载） |
 
 ## 设计边界（为什么没有这些）

@@ -21,6 +21,7 @@ await esbuild.build({
   target: "node20",
   outfile: path.join(here, "dist", "index.js"),
   sourcemap: false,
+  banner: { js: "/*!\n" + fs.readFileSync(path.join(here, "third-party-notices.txt"), "utf8").replaceAll("*/", "* /") + "\n*/" },
   // entry file already starts with #!/usr/bin/env node — no banner needed
   external: [
     "@resvg/resvg-js",

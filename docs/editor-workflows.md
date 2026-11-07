@@ -84,7 +84,7 @@ browser action. `check` itself does not fetch remote resources.
 2. **Review:** One accurate WeChat preview, usable typography, phone-width
    toggle, themes and a clear **asset checklist** (present, missing, remote,
    unsupported, duplicated basenames) with actionable fixes.
-3. **Choose:** Separate **Copy formatted HTML** (with image limitations) from
+3. **Choose:** Separate **Copy formatted HTML** (text-only, with no unresolved media/formula attachments; it refuses to overwrite the clipboard if a required asset is missing) from
    **Save to selected account's draft box**. Show account, title, cover and
    operation before the remote action. Never silently broadcast/send.
 4. **Resolve:** Confirmed draft, duplicate suppressed, queued, pending/unknown,
@@ -93,10 +93,9 @@ browser action. `check` itself does not fetch remote resources.
 5. **Return:** The original source stays in place, remains editable by Typora,
    Obsidian, VS Code etc., and retains the same relative media paths.
 
-The companion, if built, is a **delivery shell**, not a second Markdown
-editor or database. Rivet is a candidate only if it meets cross-platform
-packaging, accessibility and installation quality gates; the core document
-contract must not depend on it.
+A future publishing companion should make delivery easier while preserving
+the original files. Any such application must meet the cross-platform
+installation and accessibility requirements before release.
 
 ## Priority and acceptance
 

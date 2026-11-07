@@ -10,7 +10,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import type { Attachment, JobInfo, PublishRequest, PublishResponse } from "@publy/shared";
-import { blockingMediaWarning, captionToHtml, draftIdempotencyKey, lintCards, parseCardSource, parseSource, publishType, renderCards, renderMarkdown, stripMarkdown } from "@publy/core";
+import { blockingMediaWarning, captionToHtml, draftIdempotencyKey, imagePostCaption, lintCards, parseCardSource, parseSource, resolvePublication, renderCards, renderMarkdown, stripMarkdown } from "@publy/core";
 
 const pkg = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
@@ -106,11 +106,13 @@ function isPortListening(port: number): Promise<boolean> {
   });
 }
 
-/** Start the configured SSH tunnel (idempotent) and wait for it to answer. */
-async function ensureTunnel(config: CliConfig): Promise<boolean> {
+/** Start the configured SSH tunnel (idempotent) and wait for it to answer.
+ *  `started` distinguishes "port was already listening" from "this call tried
+ *  to start SSH", so structured output can report network use truthfully. */
+async function ensureTunnel(config: CliConfig): Promise<{ ok: boolean; started: boolean }> {
   const t = config.tunnel;
-  if (!t) return false;
-  if (await isPortListening(t.local_port)) return true;
+  if (!t) return { ok: false, started: false };
+  if (await isPortListening(t.local_port)) return { ok: true, started: false };
   const args = [
     "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30",
     "-f", "-N", "-L", `${t.local_port}:localhost:${t.remote_port}`, t.ssh_target,
@@ -118,13 +120,13 @@ async function ensureTunnel(config: CliConfig): Promise<boolean> {
   try {
     execFileSync("ssh", args, { stdio: "ignore" });
   } catch {
-    return false;
+    return { ok: false, started: true };
   }
   for (let i = 0; i < 20; i++) {
-    if (await isPortListening(t.local_port)) return true;
+    if (await isPortListening(t.local_port)) return { ok: true, started: true };
     await new Promise((r) => setTimeout(r, 300));
   }
-  return false;
+  return { ok: false, started: true };
 }
 
 function escapeHtml(s: string): string {
@@ -133,16 +135,30 @@ function escapeHtml(s: string): string {
 
 // ---------------------------------------------------------------------------
 
+/** Reject bad operation choices before rendering, writing or networking. */
+function validPublicationChoice(opts: Record<string, any>, kind: string): boolean {
+  if (opts.format === undefined || ["article", "image", "cards"].includes(opts.format)) return true;
+  const problem = "Choose --format article, image or cards.";
+  if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind, ok: false, code: "FORMAT_INVALID", problems: [problem], submitted: false,
+    ...(kind === "publish-result" ? { status: "not_submitted", requestId: null } : { networkUsed: false }) }));
+  else console.error("publy: " + problem);
+  process.exitCode = 2;
+  return false;
+}
+
 /** Offline safety-first preflight for any file-based Markdown editor.
  * The source document remains where it is. This function makes no server
  * calls, and does not publish or alter the source file.
  */
 async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> {
+  if (!validPublicationChoice(opts, "local-preflight")) return;
   const source = path.resolve(file);
   const problems: string[] = [];
   const warnings: string[] = [];
   let title = path.basename(source, path.extname(source));
   let type: "article" | "image_post" = "article";
+  let format: "article" | "image" | "cards" = "article";
+  let formatSource: "choice" | "frontmatter" | "default" = "default";
   let attachments = 0;
   let cardCount: number | undefined;
   let inputError = false;
@@ -160,9 +176,10 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
     try {
       const raw = fs.readFileSync(source, "utf8");
       const parsed = parseSource(raw);
-      type = publishType(parsed.meta);
+      const selection = resolvePublication(parsed.meta, opts.format);
+      type = selection.type; format = selection.format; formatSource = selection.source;
       title = parsed.meta.title?.trim() || title;
-      if (type === "image_post" && parsed.meta.mode?.toLowerCase() === "cards") {
+      if (selection.format === "cards") {
         const cards = parseCardSource(raw);
         const lint = lintCards(cards.sections, cards.caption);
         cardCount = cards.sections.length;
@@ -215,19 +232,21 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
           footnote: opts.footnote !== false,
           footer: opts.footer,
         });
-        attachments = rendered.attachments.length;
-        warnings.push(...rendered.warnings);
-        for (const warning of rendered.warnings) {
-          if (blockingMediaWarning(warning)) {
-            problems.push(warning);
+        try {
+          attachments = rendered.attachments.length;
+          warnings.push(...rendered.warnings);
+          for (const warning of rendered.warnings) {
+            if (blockingMediaWarning(warning)) {
+              problems.push(warning);
+            }
           }
-        }
-        if (type === "article" && !rendered.cover && attachments === 0) {
-          problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-        }
-        if (type === "image_post" && attachments === 0) {
-          problems.push("No local images found for the image post.");
-        }
+          if (type === "article" && !rendered.cover && attachments === 0) {
+            problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+          }
+          if (type === "image_post" && attachments === 0) {
+            problems.push("No local images found for the image post.");
+          }
+        } finally { rendered.cleanup(); }
       }
     } catch {
       // Avoid echoing the raw YAML/parser exception: it can include snippets
@@ -239,7 +258,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
 
   const ok = problems.length === 0;
   const report = {
-    schemaVersion: 1, ok, kind: "local-preflight", source, title, type,
+    schemaVersion: 1, ok, kind: "local-preflight", source, title, type, format, formatSource,
     attachmentCount: attachments, ...(cardCount === undefined ? {} : { cardCount }),
     problems, warnings, networkUsed: false, submitted: false,
   };
@@ -318,49 +337,51 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
     return;
   }
 
-  const problems = result.warnings.filter(blockingMediaWarning);
-  if (result.type === "article" && !result.cover && result.attachments.length === 0) {
-    problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-  } else if (result.type === "image_post" && result.attachments.length === 0) {
-    problems.push("No local images found for the image post.");
-  }
-  for (const warning of result.warnings) console.error("warn: " + warning);
+  try {
+    const problems = result.warnings.filter(blockingMediaWarning);
+    if (result.type === "article" && !result.cover && result.attachments.length === 0) {
+      problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+    } else if (result.type === "image_post" && result.attachments.length === 0) {
+      problems.push("No local images found for the image post.");
+    }
+    for (const warning of result.warnings) console.error("warn: " + warning);
 
-  const out = opts.out
-    ? path.resolve(opts.out)
-    : opts.json ? path.join(fs.mkdtempSync(path.join(os.tmpdir(), "publy-render-")), "index.html") : null;
-  if (out) {
-    if (!allowHtmlOutput(source, out, opts.force === true)) {
-      if (opts.json) console.log(JSON.stringify({
-        schemaVersion: 1, kind: "html-render", ok: false, code: "OUTPUT_INVALID",
-        source, problems: ["Choose a new .html output path or explicitly use --force."],
+    const out = opts.out
+      ? path.resolve(opts.out)
+      : opts.json ? path.join(fs.mkdtempSync(path.join(os.tmpdir(), "publy-render-")), "index.html") : null;
+    if (out) {
+      if (!allowHtmlOutput(source, out, opts.force === true)) {
+        if (opts.json) console.log(JSON.stringify({
+          schemaVersion: 1, kind: "html-render", ok: false, code: "OUTPUT_INVALID",
+          source, problems: ["Choose a new .html output path or explicitly use --force."],
+          networkUsed: false, submitted: false,
+        }));
+        return;
+      }
+      try {
+        fs.writeFileSync(out, result.html, { flag: opts.force ? "w" : "wx", mode: 0o600 });
+        if (process.platform !== "win32") fs.chmodSync(out, 0o600);
+      } catch {
+        agentError("OUTPUT_FAILED", 2, ["Cannot write the requested local HTML output."]);
+        return;
+      }
+    }
+    if (opts.json) {
+      console.log(JSON.stringify({
+        schemaVersion: 1, kind: "html-render", ok: problems.length === 0,
+        source, output: out, title: result.title, type: result.type,
+        contentType: "text/html", attachmentCount: result.attachments.length,
+        containsAttachmentReferences: result.html.includes("attachment://"),
+        problems, warnings: result.warnings,
         networkUsed: false, submitted: false,
       }));
-      return;
+      if (problems.length) process.exitCode = 4;
+    } else if (out) {
+      console.error(`rendered → ${out}`);
+    } else {
+      process.stdout.write(result.html);
     }
-    try {
-      fs.writeFileSync(out, result.html, { flag: opts.force ? "w" : "wx", mode: 0o600 });
-      if (process.platform !== "win32") fs.chmodSync(out, 0o600);
-    } catch {
-      agentError("OUTPUT_FAILED", 2, ["Cannot write the requested local HTML output."]);
-      return;
-    }
-  }
-  if (opts.json) {
-    console.log(JSON.stringify({
-      schemaVersion: 1, kind: "html-render", ok: problems.length === 0,
-      source, output: out, title: result.title, type: result.type,
-      contentType: "text/html", attachmentCount: result.attachments.length,
-      containsAttachmentReferences: result.html.includes("attachment://"),
-      problems, warnings: result.warnings,
-      networkUsed: false, submitted: false,
-    }));
-    if (problems.length) process.exitCode = 4;
-  } else if (out) {
-    console.error(`rendered → ${out}`);
-  } else {
-    process.stdout.write(result.html);
-  }
+  } finally { result.cleanup(); }
 }
 
 /** Embed private/local images inside the temporary preview, never sending
@@ -379,6 +400,7 @@ function inlineLocalPreviewImages(html: string, attachments: readonly { name: st
 }
 
 async function cmdPreview(file: string, opts: Record<string, any>): Promise<void> {
+  if (!validPublicationChoice(opts, "local-preview")) return;
   const source = path.resolve(file);
   let raw: string;
   let parsed: ReturnType<typeof parseSource>;
@@ -401,7 +423,8 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     process.exitCode = sourceRead ? 3 : 2;
     return;
   }
-  const cardsMode = publishType(parsed.meta) === "image_post" && parsed.meta.mode?.toLowerCase() === "cards";
+  const selection = resolvePublication(parsed.meta, opts.format);
+  const cardsMode = selection.format === "cards";
   const out = opts.out
     ? path.resolve(opts.out)
     : path.join(fs.mkdtempSync(path.join(os.tmpdir(), "publy-preview-")), "index.html");
@@ -464,17 +487,25 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
       footnote: opts.footnote !== false,
       footer: opts.footer,
     });
-    for (const warning of result.warnings) console.error("warn: " + warning);
-    preview = inlineLocalPreviewImages(result.html, result.attachments);
-    problems = result.warnings.filter(blockingMediaWarning);
-    // Preview readiness should not contradict the separate local check:
-    // WeChat articles need a cover or a body image; image posts need media.
-    if (publishType(parsed.meta) === "article" &&
-        !result.cover && result.attachments.length === 0) {
-      problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
-    } else if (publishType(parsed.meta) === "image_post" && result.attachments.length === 0) {
-      problems.push("No local images found for the image post.");
-    }
+    try {
+      for (const warning of result.warnings) console.error("warn: " + warning);
+      if (selection.format === "image") {
+        const payload = textModePayload(result, raw);
+        const images = payload.images.map((image, i) => `<figure><img alt="Image ${i + 1}" src="data:${image.contentType};base64,${image.data}" style="width:100%;height:auto"></figure>`).join("");
+        preview = `<section aria-label="WeChat image post preview"><h2>公众号图片消息 / Image post</h2>${images}<div>${payload.html}</div></section>`;
+      } else {
+        preview = inlineLocalPreviewImages(result.html, result.attachments);
+      }
+      problems = result.warnings.filter(blockingMediaWarning);
+      // Preview readiness should not contradict the separate local check:
+      // WeChat articles need a cover or a body image; image posts need media.
+      if (selection.type === "article" &&
+          !result.cover && result.attachments.length === 0) {
+        problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+      } else if (selection.type === "image_post" && result.attachments.length === 0) {
+        problems.push("No local images found for the image post.");
+      }
+    } finally { result.cleanup(); }
   }
 
   const warningPanel = problems.length
@@ -491,8 +522,9 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     console.log(JSON.stringify({
       schemaVersion: 1, kind: "local-preview", ok: problems.length === 0,
       source, output: out, title,
-      type: publishType(parsed.meta),
-      mode: cardsMode ? "cards" : "article",
+      type: selection.type,
+      mode: selection.format === "cards" ? "cards" : selection.format === "image" ? "text" : "article",
+      format: selection.format, formatSource: selection.source,
       problems, contentType: "text/html",
       networkUsed: false, submitted: false,
     }));
@@ -579,58 +611,205 @@ async function cmdConfigSet(key: string, value: string, opts: { json?: boolean }
 }
 
 async function cmdAccountAdd(name: string, opts: Record<string, any>): Promise<void> {
-  const config = loadConfig();
+  const json = opts.json === true;
+  const report = (ok: boolean, code: string, extra: Record<string, unknown> = {}): void => {
+    if (json) console.log(JSON.stringify({
+      schemaVersion: 1, kind: "account-add", ok, code,
+      networkUsed: false, submitted: false, ...extra,
+    }));
+  };
+  // An alias is a visible identifier, not a place to store credentials.
+  // Never echo input values on JSON failures (they may contain secrets).
+  const alias = name.trim();
+  if (!alias || alias.length > 128 || /[\x00-\x1f\x7f]/.test(alias)) {
+    if (!json) console.error("publy: account name must be 1-128 characters without control characters.");
+    report(false, "ACCOUNT_NAME_INVALID");
+    process.exitCode = 1;
+    return;
+  }
+  let config: CliConfig;
+  try {
+    config = loadConfig();
+    if (config.accounts !== undefined && (!Array.isArray(config.accounts) ||
+      config.accounts.some((a) => !a || typeof a !== "object" || typeof a.name !== "string"))) {
+      throw new Error("Invalid account collection");
+    }
+  } catch {
+    if (!json) console.error("publy: invalid local configuration");
+    report(false, "CONFIG_INVALID");
+    process.exitCode = 1;
+    return;
+  }
   config.accounts ??= [];
-  const existing = config.accounts.find((a) => a.name === name);
-  const account = { name, app_id: opts.appId, author: opts.author, theme: opts.theme };
+  const existing = config.accounts.find((a) => a.name === alias);
+  // An omitted option must not erase an existing app id, theme or author.
+  const account: CliAccount = existing ? { ...existing } : { name: alias };
+  if (opts.appId !== undefined) account.app_id = opts.appId;
+  if (opts.author !== undefined) account.author = opts.author;
+  if (opts.theme !== undefined) account.theme = opts.theme;
   if (existing) Object.assign(existing, account);
   else config.accounts.push(account);
-  if (!config.default_account) config.default_account = name;
-  saveConfig(config);
-  console.log(`account ${name} saved${config.default_account === name ? " (default)" : ""}`);
+  if (!config.default_account) config.default_account = alias;
+  try { saveConfig(config); }
+  catch {
+    if (!json) console.error("publy: cannot save local configuration");
+    report(false, "CONFIG_WRITE_FAILED");
+    process.exitCode = 1;
+    return;
+  }
+  if (json) report(true, "ACCOUNT_SAVED", {
+    name: alias, created: !existing, isDefault: config.default_account === alias,
+  });
+  else console.log(`account ${alias} saved${config.default_account === alias ? " (default)" : ""}`);
 }
 
-async function cmdThemePreview(name: string): Promise<void> {
-  const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, renderMarkdown, renderCards, buildPreviewHtml } = await import("@publy/core");
-  // samples ship inside the package; fall back to repo layouts for dev checkouts
-  const distDir = path.dirname(fileURLToPath(import.meta.url));
-  const sampleDirs = [path.resolve(distDir, "../samples"), path.resolve(distDir, "../../../packages/cli/samples"), path.resolve(distDir, "../../../docs/samples")];
-  const sampleDir = sampleDirs.find((d) => fs.existsSync(path.join(d, "card-sample.md")));
-  if (!sampleDir) throw new Error("bundled theme samples not found");
+const THEME_ERRORS: Record<string, string> = {
+  THEME_INVALID_BUNDLE: "Bundle metadata or format is invalid.",
+  THEME_UNSAFE_CSS: "CSS is outside the supported, scoped article-theme subset.",
+  THEME_CSS_HASH_MISMATCH: "The CSS content does not match the bundle checksum.",
+  THEME_HASH_MISMATCH: "The bundle does not match the supplied SHA-256.",
+  THEME_CHECKSUM_REQUIRED: "HTTPS themes require a valid full-file SHA-256.",
+  THEME_HTTPS_REQUIRED: "Remote themes require an HTTPS URL without embedded credentials.",
+  THEME_DOWNLOAD_FAILED: "Could not download the theme; redirects are not supported.",
+  THEME_INVALID_SOURCE: "The source must be a regular file within the size limit.",
+  THEME_RESERVED_ID: "That ID belongs to a built-in theme.",
+  THEME_VERSION_UNCHANGED: "The installed theme already has that version.",
+  THEME_EXISTS: "The output or installed theme already exists.",
+  THEME_NOT_FOUND: "The source or installed theme was not found.",
+};
+function themeError(error: unknown, fallback: string): string {
+  const err = error as NodeJS.ErrnoException;
+  if (err?.code === "ENOENT") return "THEME_NOT_FOUND";
+  if (err?.code === "EEXIST") return "THEME_EXISTS";
+  return typeof err?.message === "string" && Object.hasOwn(THEME_ERRORS, err.message) ? err.message : fallback;
+}
 
-  if (name in BUILTIN_CARD_THEMES) {
-    const raw = fs.readFileSync(path.join(sampleDir, "card-sample.md"), "utf8");
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-preview-"));
-    const result = await renderCards(raw, { theme: name, outDir });
-    const previewFile = path.join(outDir, "preview.html");
-    fs.writeFileSync(previewFile, buildPreviewHtml(result));
-    console.error(`preview → ${previewFile}`);
-    openInBrowser(previewFile);
-    return;
+async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; json?: boolean }): Promise<void> {
+  const { validateThemeBundle, BUILTIN_THEMES, BUILTIN_CARD_THEMES } = await import("@publy/core");
+  try {
+    if ((BUILTIN_THEMES as readonly string[]).includes(opts.id) || Object.hasOwn(BUILTIN_CARD_THEMES, opts.id)) throw new Error("THEME_RESERVED_ID");
+    const stat = fs.lstatSync(cssFile);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 128 * 1024) throw new Error("THEME_INVALID_SOURCE");
+    const fd = fs.openSync(cssFile, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    let css: string;
+    try {
+      const opened = fs.fstatSync(fd);
+      if (!opened.isFile() || opened.size > 128 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("THEME_INVALID_SOURCE");
+      const data = Buffer.alloc(128 * 1024 + 1); const length = fs.readSync(fd, data, 0, data.length, 0);
+      if (length > 128 * 1024) throw new Error("THEME_INVALID_SOURCE");
+      css = new TextDecoder("utf-8", { fatal: true }).decode(data.subarray(0, length));
+    } finally { fs.closeSync(fd); }
+    const bundle = { format: "publy-theme-v1", id: opts.id, version: opts.themeVersion, name: opts.name, license: opts.license,
+      css, cssSha256: crypto.createHash("sha256").update(css, "utf8").digest("hex") };
+    const raw = JSON.stringify(bundle, null, 2) + "\n"; validateThemeBundle(raw);
+    fs.writeFileSync(opts.output, raw, { flag: "wx", mode: 0o600 });
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: "THEME_PACK_OK", id: opts.id,
+      sha256: crypto.createHash("sha256").update(raw, "utf8").digest("hex"), networkUsed: false, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.log(`Created ${opts.output}\nSHA-256: ${result.sha256}`);
+  } catch (error) {
+    const code = themeError(error, "THEME_PACK_FAILED");
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code, networkUsed: false, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.error(`publy: ${THEME_ERRORS[code] ?? "Could not create the theme bundle."}`);
+    process.exitCode = 2;
   }
-  if ((BUILTIN_THEMES as readonly string[]).includes(name)) {
-    const raw = fs.readFileSync(path.join(sampleDir, "article-sample.md"), "utf8");
-    const rendered = renderMarkdown(raw, { theme: name });
-    const out = path.join(os.tmpdir(), `publy-theme-preview-${name}-${Date.now()}.html`);
-    fs.writeFileSync(out, rendered.html);
-    console.error(`preview → ${out}`);
-    openInBrowser(out);
-    return;
+}
+
+async function cmdThemeBundle(action: "add" | "update" | "remove", source: string, opts: { json?: boolean; sha256?: string }): Promise<void> {
+  const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, installThemeBundle, removeInstalledTheme } = await import("@publy/core");
+  let networkUsed = false;
+  let downloading = false;
+  try {
+    if (action === "remove") { removeInstalledTheme(source); }
+    else {
+      let bytes: Uint8Array;
+      if (/^https?:\/\//i.test(source)) {
+        const url = new URL(source);
+        if (url.protocol !== "https:" || url.username || url.password) throw new Error("THEME_HTTPS_REQUIRED");
+        if (!opts.sha256 || !/^[a-f0-9]{64}$/i.test(opts.sha256)) throw new Error("THEME_CHECKSUM_REQUIRED");
+        networkUsed = true; downloading = true;
+        const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+        if (!response.ok || !response.body) throw new Error("THEME_DOWNLOAD_FAILED");
+        const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let length = 0;
+        try { while (true) { const { done, value } = await reader.read(); if (done) break; length += value.length; if (length > 256 * 1024) throw new Error("THEME_INVALID_SOURCE"); chunks.push(value); } }
+        finally { await reader.cancel().catch(() => {}); }
+        bytes = Buffer.concat(chunks); downloading = false;
+      } else {
+        const stat = fs.lstatSync(source);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256 * 1024) throw new Error("THEME_INVALID_SOURCE");
+        const fd = fs.openSync(source, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+        try {
+          const opened = fs.fstatSync(fd);
+          if (!opened.isFile() || opened.size > 256 * 1024 || opened.dev !== stat.dev || opened.ino !== stat.ino) throw new Error("THEME_INVALID_SOURCE");
+          const buffer = Buffer.alloc(256 * 1024 + 1); const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
+          if (length > 256 * 1024) throw new Error("THEME_INVALID_SOURCE");
+          bytes = buffer.subarray(0, length);
+        } finally { fs.closeSync(fd); }
+      }
+      if (opts.sha256 && (!/^[a-f0-9]{64}$/i.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256.toLowerCase())) throw new Error("THEME_HASH_MISMATCH");
+      const raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      const bundle = installThemeBundle(raw, action, [...BUILTIN_THEMES, ...Object.keys(BUILTIN_CARD_THEMES)]);
+      source = bundle.id;
+    }
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: `THEME_${action.toUpperCase()}_OK`, id: source, networkUsed, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.log(`${action}: ${source}`);
+  } catch (error) {
+    const code = themeError(error, downloading ? "THEME_DOWNLOAD_FAILED" : "THEME_BUNDLE_FAILED");
+    const result = { schemaVersion: 1, kind: "theme-bundle", ok: false, code, networkUsed, submitted: false };
+    if (opts.json) console.log(JSON.stringify(result)); else console.error(`publy: ${THEME_ERRORS[code] ?? "Theme operation failed."}`);
+    process.exitCode = 2;
   }
-  console.error(`publy: unknown theme "${name}". Use \`publy theme ls\` to list built-ins.`);
-  process.exit(1);
+}
+
+async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<void> {
+  const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, renderMarkdown, renderCards, buildPreviewHtml, readInstalledTheme } = await import("@publy/core");
+  let installed = false;
+  try { readInstalledTheme(name); installed = true; } catch { /* absent or invalid */ }
+  const card = Object.hasOwn(BUILTIN_CARD_THEMES, name);
+  const article = (BUILTIN_THEMES as readonly string[]).includes(name) || installed;
+  const failure = (code: string, exitCode: number) => {
+    if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "theme-preview", ok: false, code, networkUsed: false, submitted: false }));
+    else console.error(`publy: ${code}; use \`publy theme ls\` to list built-in themes.`);
+    process.exitCode = exitCode;
+  };
+  if (!card && !article) return failure("UNKNOWN_THEME", 2);
+  let outDir: string | undefined;
+  let complete = false;
+  try {
+    // Samples ship inside the package; fall back to repo layouts in development.
+    const distDir = path.dirname(fileURLToPath(import.meta.url));
+    const sampleDirs = [path.resolve(distDir, "../samples"), path.resolve(distDir, "../../../packages/cli/samples"), path.resolve(distDir, "../../../docs/samples")];
+    const sample = card ? "card-sample.md" : "article-sample.md";
+    const sampleDir = sampleDirs.find((d) => fs.existsSync(path.join(d, sample)));
+    if (!sampleDir) throw new Error("bundled sample missing");
+    const raw = fs.readFileSync(path.join(sampleDir, sample), "utf8");
+    outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-theme-preview-"));
+    const output = path.join(outDir, "preview.html");
+    let html: string;
+    if (card) {
+      const result = await renderCards(raw, { theme: name, outDir, offline: opts.json === true });
+      html = buildPreviewHtml(result);
+      // The HTML embeds each PNG; the separate card files are no longer needed.
+      for (const card of result.cards) fs.rmSync(card.file, { force: true });
+    } else {
+      const rendered = renderMarkdown(raw, { theme: name });
+      try { html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"></head><body>${rendered.html}</body></html>`; } finally { rendered.cleanup(); }
+    }
+    fs.writeFileSync(output, html, { mode: 0o600, flag: "wx" });
+    if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "theme-preview", ok: true, theme: name, type: card ? "cards" : "article", output, contentType: "text/html", networkUsed: false, submitted: false }));
+    else { console.error(`preview → ${output}`); openInBrowser(output); }
+    complete = true;
+  } catch {
+    failure("THEME_PREVIEW_FAILED", 3);
+  } finally {
+    if (outDir && !complete) fs.rmSync(outDir, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
 
 /** text-mode image post: body images in order, caption = remaining paragraphs. */
 function textModePayload(rendered: ReturnType<typeof renderMarkdown>, raw: string): { html: string; images: Attachment[]; coverName?: string } {
-  const { body } = parseSource(raw);
-  const captionText = body
-    .split("\n")
-    .filter((l) => !/^\s*!\[\[|^\s*!\[/.test(l))
-    .join("\n")
-    .trim();
+  const captionText = imagePostCaption(raw);
   const images: Attachment[] = rendered.attachments.map((a) => ({
     name: a.name,
     data: fs.readFileSync(a.path).toString("base64"),
@@ -640,6 +819,7 @@ function textModePayload(rendered: ReturnType<typeof renderMarkdown>, raw: strin
 }
 
 async function cmdPublish(file: string, opts: Record<string, any>): Promise<void> {
+  if (!validPublicationChoice(opts, "publish-result")) return;
   const agentFailure = (
     status: "not_submitted" | "unknown" | "rejected",
     code: string, exitCode: number,
@@ -693,7 +873,8 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     return;
   }
   const baseDir = path.dirname(path.resolve(file));
-  const type = publishType(parsed.meta);
+  const selection = resolvePublication(parsed.meta, opts.format);
+  const type = selection.type;
 
   let html: string;
   let images: Attachment[];
@@ -710,22 +891,23 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
   };
 
   if (type === "image_post") {
-    const mode = String((parsed.meta as Record<string, unknown>).mode ?? "text").toLowerCase();
-    if (mode === "cards") {
+    if (selection.format === "cards") {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
-      const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
-      if (!cardResult.lint.ok) {
-        for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
-        agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
-        return;
-      }
-      images = cardResult.cards.map((c) => ({
-        name: c.name,
-        data: fs.readFileSync(c.file).toString("base64"),
-        contentType: "image/png",
-      }));
-      html = captionToHtml(cardResult.caption);
-      coverName = images[0]?.name;
+      try {
+        const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
+        if (!cardResult.lint.ok) {
+          for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
+          agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
+          return;
+        }
+        images = cardResult.cards.map((c) => ({
+          name: c.name,
+          data: fs.readFileSync(c.file).toString("base64"),
+          contentType: "image/png",
+        }));
+        html = captionToHtml(cardResult.caption);
+        coverName = images[0]?.name;
+      } finally { fs.rmSync(outDir, { recursive: true, force: true }); }
     } else {
       const rendered = renderMarkdown(raw, {
         theme: opts.theme,
@@ -736,8 +918,10 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
         footnote: false,
         footer: opts.footer,
       });
-      emitWarnings(rendered.warnings);
-      ({ html, images, coverName } = textModePayload(rendered, raw));
+      try {
+        emitWarnings(rendered.warnings);
+        ({ html, images, coverName } = textModePayload(rendered, raw));
+      } finally { rendered.cleanup(); }
     }
     title = opts.title || parsed.meta.title || path.basename(file, path.extname(file));
   } else {
@@ -750,36 +934,38 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       footnote: opts.footnote !== false,
       footer: opts.footer,
     });
-    emitWarnings(rendered.warnings);
-    const attachments: Attachment[] = rendered.attachments.map((a) => ({
-      name: a.name,
-      data: fs.readFileSync(a.path).toString("base64"),
-      contentType: a.contentType,
-    }));
-    const coverPath = opts.cover || rendered.cover;
-    if (coverPath) {
-      const resolved = path.isAbsolute(coverPath) ? coverPath : path.resolve(baseDir, coverPath);
-      if (!fs.existsSync(resolved)) {
-        console.error(`publy: cover not found: ${resolved}`);
-        agentFailure("not_submitted", "COVER_NOT_FOUND", 2);
-        return;
+    try {
+      emitWarnings(rendered.warnings);
+      const attachments: Attachment[] = rendered.attachments.map((a) => ({
+        name: a.name,
+        data: fs.readFileSync(a.path).toString("base64"),
+        contentType: a.contentType,
+      }));
+      const coverPath = opts.cover || rendered.cover;
+      if (coverPath) {
+        const resolved = path.isAbsolute(coverPath) ? coverPath : path.resolve(baseDir, coverPath);
+        if (!fs.existsSync(resolved)) {
+          console.error(`publy: cover not found: ${resolved}`);
+          agentFailure("not_submitted", "COVER_NOT_FOUND", 2);
+          return;
+        }
+        const existing = rendered.attachments.find((a) => a.path === resolved);
+        if (existing) {
+          coverName = existing.name;
+        } else {
+          const ext = path.extname(resolved).toLowerCase();
+          coverName = path.basename(resolved);
+          attachments.unshift({
+            name: coverName,
+            data: fs.readFileSync(resolved).toString("base64"),
+            contentType: ext === ".png" ? "image/png" : "image/jpeg",
+          });
+        }
       }
-      const existing = rendered.attachments.find((a) => a.path === resolved);
-      if (existing) {
-        coverName = existing.name;
-      } else {
-        const ext = path.extname(resolved).toLowerCase();
-        coverName = path.basename(resolved);
-        attachments.unshift({
-          name: coverName,
-          data: fs.readFileSync(resolved).toString("base64"),
-          contentType: ext === ".png" ? "image/png" : "image/jpeg",
-        });
-      }
-    }
-    html = rendered.html;
-    images = attachments;
-    title = opts.title || rendered.title || path.basename(file, path.extname(file));
+      html = rendered.html;
+      images = attachments;
+      title = opts.title || rendered.title || path.basename(file, path.extname(file));
+    } finally { rendered.cleanup(); }
   }
 
   // Failed image references must stop before any HTTP POST. An explicit
@@ -863,7 +1049,14 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     const body = rawResponse as PublishResult;
-    if (res.ok && !body.mediaId && !body.jobId) {
+    // A 2xx transport response is not a delivery acknowledgement. Require
+    // exactly one nonblank, correctly typed identifier before reporting success.
+    const mediaOk = typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+    const jobOk = typeof body.jobId === "string" && body.jobId.trim().length > 0;
+    if (res.ok && mediaOk === jobOk) {
+      throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
+    }
+    if (res.ok && ((!mediaOk && body.mediaId !== undefined) || (!jobOk && body.jobId !== undefined))) {
       throw new Error("PUBLY_SERVER_RESPONSE_INVALID");
     }
     return { res, body };
@@ -875,21 +1068,13 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     result = await postPublish(server);
   } catch (err) {
     netErr = err;
-    /* network error — maybe the network blocks large POSTs and a tunnel is configured */
+    /* The request may have reached WeChat; do not replay through any route. */
   }
-  if (!result && config.tunnel) {
-    console.error("publy: server unreachable, bringing up the SSH tunnel…");
-    if (await ensureTunnel(config)) {
-      const tunnelServer = config.tunnel.server ?? `http://127.0.0.1:${config.tunnel.local_port}`;
-      try {
-        result = await postPublish(tunnelServer);
-      } catch (error) {
-        // Tunnel request may also have reached the remote server. Preserve
-        // the original draft identity and report an unknown outcome.
-        netErr = error;
-      }
-    }
-  }
+  // NEVER automatically replay an ambiguous publish through a tunnel.
+  // A timeout, invalid acknowledgement or dropped response can occur after
+  // WeChat accepted the draft. A second route is still a second submission.
+  // Operators can establish a tunnel explicitly before a *new* request,
+  // after independently reconciling the original request ID.
   if (!result) {
     // network-level failure: the server may or may not have delivered the
     // draft — outcome unknown, never treated as permission to re-send (#7).
@@ -899,7 +1084,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       ? "server response was not valid confirmation JSON"
       : "network failed or timed out";
     console.error(`publy: cannot confirm draft delivery (${detail})`);
-    console.error(`publy: check --server / config server, or run \`publy tunnel\` when a tunnel is configured (e.g. TLS failures on the public domain)`);
+    console.error("publy: inspect the original draft outcome first. If a tunnel is needed, run `publy tunnel` before a separately reviewed submission.");
     console.error(`publy: outcome UNKNOWN — the draft may already exist. Query before retrying: publy publish-result ${idempotencyKey}`);
     agentFailure("unknown", "NETWORK_OUTCOME_UNKNOWN", 5, idempotencyKey);
     return;
@@ -911,12 +1096,13 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     const code = typeof body.code === "string" && /^[A-Z0-9_]{1,64}$/.test(body.code)
       ? body.code : "SERVER_REJECTED";
     console.error(`publy: draft API returned HTTP ${res.status} (${code})`);
-    agentFailure(res.status >= 500 ? "unknown" : "rejected", code, 5, idempotencyKey);
+    const confirmedRejection = res.status === 502 && /^WECHAT_[0-9]{1,12}$/.test(code);
+    agentFailure((res.status >= 500 && !confirmedRejection) || code === "DRAFT_OUTCOME_UNKNOWN" ? "unknown" : "rejected", code, 5, idempotencyKey);
     return;
   }
 
   if (opts.json) {
-    console.log(JSON.stringify({ schemaVersion: 1, kind: "publish-result", ok: true, status: body.jobId ? "scheduled" : "confirmed", account: accountName, type, title, mediaId: body.mediaId, deduped: body.deduped ?? false, scheduled: Boolean(body.jobId), jobId: body.jobId, runAt: body.runAt, requestId: body.requestId ?? idempotencyKey, warnings }));
+    console.log(JSON.stringify({ schemaVersion: 1, kind: "publish-result", ok: true, status: body.jobId ? "scheduled" : "confirmed", account: accountName, type, format: selection.format, formatSource: selection.source, title, mediaId: body.mediaId, deduped: body.deduped ?? false, scheduled: Boolean(body.jobId), jobId: body.jobId, runAt: body.runAt, requestId: body.requestId ?? idempotencyKey, warnings }));
   } else if (body.jobId) {
     console.log(`已创建定时任务 ${body.jobId}，将在 ${body.runAt} 自动发布到 ${accountName}（publy jobs 查看状态）`);
   } else {
@@ -1030,33 +1216,43 @@ const AGENT_USAGE: Record<string, string> = {
   history: "publy history --json",
   quota: "publy quota --json",
   "account list": "publy account list --json",
-  "account add": "publy account add <name> [--app-id <id>]",
+  "account add": "publy account add <name> --json [--app-id <id>]",
   "config set": "publy config set <key> <value> --json",
   "theme ls": "publy theme ls --json",
-  "theme preview": "publy theme preview <name>",
-  tunnel: "publy tunnel",
+  "theme pack": "publy theme pack <css-file> --id <id> --theme-version <version> --name <name> --license <license> --output <file> --json",
+  "theme add": "publy theme add <file-or-https-url> [--sha256 <hash>] --json",
+  "theme update": "publy theme update <file-or-https-url> [--sha256 <hash>] --json",
+  "theme remove": "publy theme remove <id> --json",
+  "theme preview": "publy theme preview <name> --json",
+  tunnel: "publy tunnel --json",
 };
 
-/** Stable agent discovery of implemented operations (not a future roadmap). */
+/** Stable agent discovery of implemented operations (not a future roadmap).
+ *  Prerequisites use stable tokens documented in docs/agent-cli.md; they
+ *  describe what must already exist, never a promise of future support. */
 const AGENT_COMMANDS = [
-  { name: "capabilities", json: true, network: false, effect: "read" },
-  { name: "check", json: true, network: false, effect: "read" },
-  { name: "render", json: true, network: false, effect: "write-html-if-out" },
-  { name: "preview", json: true, network: false, effect: "write-private-html" },
-  { name: "card", json: true, network: "font-fallback-may-download", effect: "write-png" },
-  { name: "publish", json: true, network: true, effect: "create-wechat-draft" },
-  { name: "publish-result", json: true, network: true, effect: "read" },
-  { name: "jobs list", json: true, network: true, effect: "read" },
-  { name: "jobs cancel", json: true, network: true, effect: "cancel-scheduled-job" },
-  { name: "jobs retry", json: true, network: true, effect: "re-admit-job" },
-  { name: "history", json: true, network: true, effect: "read" },
-  { name: "quota", json: true, network: true, effect: "read" },
-  { name: "account list", json: true, network: false, effect: "read-local-config" },
-  { name: "account add", json: false, network: false, effect: "write-local-config" },
-  { name: "config set", json: true, network: false, effect: "write-local-config" },
-  { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read" },
-  { name: "theme preview", json: false, network: "font-fallback-may-download", effect: "write-preview-and-open-browser" },
-  { name: "tunnel", json: false, network: true, effect: "start-ssh-tunnel" },
+  { name: "capabilities", json: true, network: false, effect: "read", prerequisites: [] },
+  { name: "check", json: true, network: false, effect: "read", prerequisites: ["markdown-file"] },
+  { name: "render", json: true, network: false, effect: "write-html-if-out", prerequisites: ["markdown-file"] },
+  { name: "preview", json: true, network: false, effect: "write-private-html", prerequisites: ["markdown-file"] },
+  { name: "card", json: true, network: "font-fallback-may-download", effect: "write-png", prerequisites: ["markdown-file"] },
+  { name: "publish", json: true, network: true, effect: "create-wechat-draft", prerequisites: ["markdown-file", "configured-server", "api-key", "wechat-account"] },
+  { name: "publish-result", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key", "request-id"] },
+  { name: "jobs list", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "jobs cancel", json: true, network: true, effect: "cancel-scheduled-job", prerequisites: ["configured-server", "api-key", "job-id"] },
+  { name: "jobs retry", json: true, network: true, effect: "re-admit-job", prerequisites: ["configured-server", "api-key", "job-id"] },
+  { name: "history", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "quota", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
+  { name: "account list", json: true, network: false, effect: "read-local-config", prerequisites: ["local-config"] },
+  { name: "account add", json: true, network: false, effect: "write-local-config", prerequisites: ["local-config"] },
+  { name: "config set", json: true, network: false, effect: "write-local-config", prerequisites: ["local-config"] },
+  { name: "theme ls", json: true, network: false, jsonNetwork: false, effect: "read", prerequisites: [] },
+  { name: "theme pack", json: true, network: false, effect: "write-local-theme-bundle", prerequisites: ["css-file"] },
+  { name: "theme add", json: true, network: "remote-source-only", effect: "write-local-theme", prerequisites: ["theme-bundle"] },
+  { name: "theme update", json: true, network: "remote-source-only", effect: "write-local-theme", prerequisites: ["installed-theme-id"] },
+  { name: "theme remove", json: true, network: false, effect: "write-local-theme", prerequisites: ["installed-theme-id"] },
+  { name: "theme preview", json: true, network: "font-fallback-may-download", jsonNetwork: false, effect: "write-preview-and-open-browser", jsonEffect: "write-private-html", prerequisites: ["theme-id"] },
+  { name: "tunnel", json: true, network: true, effect: "start-ssh-tunnel", prerequisites: ["config.tunnel"] },
 ] as const;
 
 export function createProgram(): Command {
@@ -1071,6 +1267,8 @@ export function createProgram(): Command {
         tool: "publy", version: pkg.version,
         destination: "wechat-official-account-drafts",
         inputs: ["markdown-file"],
+        editorIndependent: true,
+        publicationFormats: { values: ["article", "image", "cards"], option: "--format", commands: ["check", "preview", "publish"], default: "article", explicitChoiceOverridesFrontmatter: true },
         firstClassEditors: ["Typora", "Obsidian"],
         noPublicSend: true,
         commands: AGENT_COMMANDS.map((command) => ({
@@ -1081,6 +1279,8 @@ export function createProgram(): Command {
             "cancel-scheduled-job",
             "re-admit-job",
             "write-local-config",
+            "write-local-theme-bundle",
+            "write-local-theme",
             "start-ssh-tunnel",
           ].includes(command.effect),
         })),
@@ -1109,7 +1309,8 @@ export function createProgram(): Command {
   const checkCmd = program.command("check")
     .description("Check a Markdown document and local media before publishing (offline; no server required)")
     .argument("<file>")
-    .option("--json", "machine-readable preflight result");
+    .option("--json", "machine-readable preflight result")
+    .option("--format <format>", "article, image or cards for this operation");
   common(checkCmd);
   checkCmd.action(async (file: string, opts) => cmdCheck(file, opts));
 
@@ -1122,7 +1323,8 @@ export function createProgram(): Command {
     .option("-o, --out <path>", "write the local preview to a chosen HTML file")
     .option("--no-open", "do not open a browser after writing the preview")
     .option("--json", "single JSON result; do not open browser")
-    .option("--force", "explicitly replace an existing .html preview output");
+    .option("--force", "explicitly replace an existing .html preview output")
+    .option("--format <format>", "article, image or cards for this operation");
   common(previewCmd);
   previewCmd.action(async (file: string, opts) => cmdPreview(file, opts));
 
@@ -1142,6 +1344,7 @@ export function createProgram(): Command {
     .command("publish")
     .description("Create a WeChat draft via a Publy server (explicit account required)")
     .argument("<file>")
+    .option("--format <format>", "article, image or cards for this operation")
     .option("--account <name>", "required target account for draft creation; never inferred")
     .option("--title <title>", "override article title")
     .option("--cover <path>", "override cover image path")
@@ -1171,33 +1374,60 @@ export function createProgram(): Command {
       };
       const reply = await requestServerJson(requestConfig, `/v1/publish-result/${encodeURIComponent(key)}`);
       if (!reply.ok) { reportReadFailure(opts, "publish-result", reply.code); return; }
-      const body = reply.body as { status?: string; mediaId?: string; account?: string; title?: string } & { code?: string; message?: string };
+      const body = reply.body as { status?: unknown; mediaId?: unknown; account?: unknown; title?: unknown };
+      // A claimed "confirmed" status without a usable mediaId is still
+      // UNKNOWN. Never spread an untrusted server object over agent fields:
+      // it could override ok/schemaVersion or leak unrelated response data.
+      const confirmed = body.status === "confirmed" &&
+        typeof body.mediaId === "string" && body.mediaId.trim().length > 0;
+      const account = typeof body.account === "string" ? body.account : undefined;
+      const title = typeof body.title === "string" ? body.title : undefined;
       if (opts.json) {
-        console.log(JSON.stringify({ schemaVersion: 1, ok: body.status === "confirmed", kind: "publish-result", ...body }));
-        if (body.status !== "confirmed") process.exitCode = 4;
-      } else if (body.status === "confirmed") {
-        console.log(`已确认：《${body.title ?? "?"}》在 ${body.account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
+        console.log(JSON.stringify({
+          schemaVersion: 1, kind: "publish-result", ok: confirmed,
+          status: confirmed ? "confirmed" : "unknown",
+          mediaId: confirmed ? body.mediaId : undefined, account, title,
+        }));
+        if (!confirmed) process.exitCode = 4;
+      } else if (confirmed) {
+        console.log(`已确认：《${title ?? "?"}》在 ${account ?? "?"} 草稿箱，Media ID: ${body.mediaId}`);
       } else {
-        console.log("结果未知：服务端没有这次请求的记录（超出幂等窗口或未送达）。可用原幂等键重试，或到公众号草稿箱确认。");
-        process.exit(4);
+        console.log("结果未知：服务端没有可验证的草稿 Media ID。请先在公众号草稿箱人工核对，不能据此自动重投。");
+        process.exitCode = 4;
       }
     });
 
   program
     .command("tunnel")
     .description("bring up the configured SSH tunnel (config.tunnel) and verify it")
-    .action(async () => {
-      const config = loadConfig();
-      if (!config.tunnel) {
-        console.error('publy: no tunnel configured. Add to ~/.publy/config.json:\n  "tunnel": { "ssh_target": "user@host", "local_port": 18081, "remote_port": 8081 }');
+    .option("--json", "structured tunnel status (may start SSH and use the network)")
+    .action(async (opts: { json?: boolean }) => {
+      let config: CliConfig;
+      try { config = loadConfig(); }
+      catch {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "tunnel", ok: false, code: "CONFIG_INVALID", networkUsed: false, submitted: false }));
+        else console.error("publy: invalid local configuration");
         process.exit(1);
       }
-      const ok = await ensureTunnel(config);
-      const { local_port, remote_port, ssh_target } = config.tunnel;
-      console.log(ok
+      if (!config.tunnel) {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "tunnel", ok: false, code: "TUNNEL_NOT_CONFIGURED", networkUsed: false, submitted: false }));
+        else console.error('publy: no tunnel configured. Add to ~/.publy/config.json:\n  "tunnel": { "ssh_target": "user@host", "local_port": 18081, "remote_port": 8081 }');
+        process.exit(1);
+      }
+      const result = await ensureTunnel(config);
+      const { local_port, remote_port, ssh_target, server } = config.tunnel;
+      if (opts.json) console.log(JSON.stringify({
+        schemaVersion: 1, kind: "tunnel", ok: result.ok,
+        ...(result.ok ? { status: "up" } : { status: "down", code: "TUNNEL_UNREACHABLE" }),
+        localPort: local_port, remotePort: remote_port,
+        server: server ?? `http://127.0.0.1:${local_port}`,
+        startedByThisCall: result.started,
+        networkUsed: result.started, submitted: false,
+      }));
+      else console.log(result.ok
         ? `tunnel up: localhost:${local_port} → ${ssh_target}:${remote_port}`
         : `tunnel FAILED: could not reach ${ssh_target} or bind localhost:${local_port}`);
-      process.exit(ok ? 0 : 5);
+      process.exit(result.ok ? 0 : 5);
     });
 
   const jobsCmd = program.command("jobs").description("manage scheduled publishes");
@@ -1237,13 +1467,13 @@ export function createProgram(): Command {
         console.log("cancelled");
       }
     });
-  // interrupted jobs never auto-rerun after a crash (#8); the owner retries
-  // explicitly — the original idempotency key rides along, so a lost run that
-  // actually delivered reconciles instead of duplicating
+  // Interrupted jobs are not safe to re-send: the server may only
+  // reconcile a matching confirmed local delivery. A 409 result means no
+  // draft was re-submitted; consult WeChat drafts before taking action.
   jobsCmd
     .command("retry")
     .argument("<id>")
-    .description("re-admit an interrupted/failed job (idempotency-checked)")
+    .description("reconcile confirmed interrupted jobs or retry proven pre-publish failures; never blindly re-send")
     .option("--json", "machine-readable retry outcome (changes server state)")
     .action(async (id: string, opts: { json?: boolean }) => {
       let config: CliConfig;
@@ -1327,6 +1557,7 @@ export function createProgram(): Command {
     .option("--app-id <id>")
     .option("--author <name>")
     .option("--theme <id>")
+    .option("--json", "structured local account mutation without credentials")
     .description("add or update an account")
     .action(async (name: string, opts) => cmdAccountAdd(name, opts));
   accountCmd.command("list").description("list accounts").option("--json", "machine-readable account aliases (no secrets)").action(async (opts: {json?: boolean}) => {
@@ -1350,26 +1581,44 @@ export function createProgram(): Command {
     .description("list bundled article and card themes (always offline)")
     .option("--json", "offline JSON list of bundled themes")
     .action(async (opts: { json?: boolean }) => {
-      const { BUILTIN_THEMES, BUILTIN_CARD_THEMES } = await import("@publy/core");
+      const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, listInstalledThemes } = await import("@publy/core");
+      let installed: { id: string; version: string; name: string; license: string }[];
+      try { installed = listInstalledThemes().map(({ id, version, name, license }) => ({ id, version, name, license })); }
+      catch {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind: "themes", ok: false, code: "THEME_LIST_FAILED", networkUsed: false, submitted: false }));
+        else console.error("publy: an installed theme is unreadable or invalid; remove it by ID and reinstall a trusted bundle.");
+        process.exitCode = 2; return;
+      }
       const articleThemes = [...BUILTIN_THEMES];
       const cardThemes = Object.keys(BUILTIN_CARD_THEMES);
       if (opts.json) {
         console.log(JSON.stringify({
           schemaVersion: 1, kind: "themes", ok: true,
-          articleThemes, cardThemes,
+          articleThemes, cardThemes, installedArticleThemes: installed,
           source: "bundled", networkUsed: false, submitted: false,
         }));
         return;
       }
       console.log("Article themes (built-in):", articleThemes.join(", "));
       console.log("Card themes (built-in):", cardThemes.join(", "));
+      if (installed.length) console.log("Installed article themes:", installed.map(t => `${t.id} (${t.version})`).join(", "));
     });
+
+  themeCmd.command("pack").argument("<css-file>").requiredOption("--id <id>").requiredOption("--theme-version <version>")
+    .requiredOption("--name <name>").requiredOption("--license <license>").requiredOption("--output <file>").option("--json")
+    .action((file: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; json?: boolean }) => cmdThemePack(file, opts));
+  for (const action of ["add", "update"] as const) {
+    themeCmd.command(action).argument("<file-or-https-url>").option("--sha256 <hash>", "required for HTTPS; SHA-256 of the bundle file")
+      .option("--json").action((source: string, opts: { json?: boolean; sha256?: string }) => cmdThemeBundle(action, source, opts));
+  }
+  themeCmd.command("remove").argument("<id>").option("--json").action((id: string, opts: { json?: boolean }) => cmdThemeBundle("remove", id, opts));
 
   themeCmd
     .command("preview")
     .argument("<name>")
     .description("render the theme sample locally and open it in the browser")
-    .action(async (name: string) => cmdThemePreview(name));
+    .option("--json", "offline structured preview without opening a browser")
+    .action(async (name: string, opts: { json?: boolean }) => cmdThemePreview(name, opts));
 
   return program;
 }

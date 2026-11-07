@@ -108,14 +108,15 @@ export async function publishToWechat(
   cred: AccountCredential,
   tokenManager: TokenManager,
   materialCache?: MaterialCache,
+  onDraftSubmit?: () => void,
 ): Promise<PublishResponse> {
   const token = await tokenManager.get(cred.appId, cred.appSecret);
   const byName = new Map((req.images ?? []).map((a) => [a.name, a]));
 
   if (req.type === "image_post") {
-    return publishImagePost(req, cred, token, byName, materialCache);
+    return publishImagePost(req, cred, token, byName, materialCache, onDraftSubmit);
   }
-  return publishArticle(req, cred, token, byName, materialCache);
+  return publishArticle(req, cred, token, byName, materialCache, onDraftSubmit);
 }
 
 /** Extract attachment names referenced in published HTML ("attachment://<name>" until the closing quote). */
@@ -131,6 +132,7 @@ async function publishArticle(
   token: string,
   byName: Map<string, Attachment>,
   cache?: MaterialCache,
+  onDraftSubmit?: () => void,
 ): Promise<PublishResponse> {
   let html = req.html ?? "";
 
@@ -181,6 +183,7 @@ async function publishArticle(
     throw new PublishError("NO_COVER", "Provide a cover or at least one image in the body");
   }
 
+  onDraftSubmit?.();
   const mediaId = await draftAdd(token, {
     title: req.title,
     content: html,
@@ -200,6 +203,7 @@ async function publishImagePost(
   token: string,
   byName: Map<string, Attachment>,
   cache?: MaterialCache,
+  onDraftSubmit?: () => void,
 ): Promise<PublishResponse> {
   const images = req.images ?? [];
   if (images.length === 0) {
@@ -214,6 +218,7 @@ async function publishImagePost(
     ? (await upload(token, byName.get(req.cover)!, "cover.jpg", cred.appId, cache)).mediaId
     : imageList[0].image_media_id;
 
+  onDraftSubmit?.();
   const mediaId = await draftAdd(token, {
     title: req.title,
     content: req.html ?? "",

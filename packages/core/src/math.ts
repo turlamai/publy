@@ -30,6 +30,13 @@ interface SvgChain {
 
 // undefined = not tried yet, null = mathjax-full unavailable
 let chain: SvgChain | null | undefined = undefined;
+let moduleLoader: ((id: string) => any) | null = null;
+
+/** Supply statically bundled MathJax modules in hosts without package loading. */
+export function setMathModuleLoader(loader: (id: string) => any): void {
+  moduleLoader = loader;
+  chain = undefined;
+}
 
 /** require relative to this module — same pattern as png.ts (ESM real path,
  *  esbuild-cjs __dirname fallback). */
@@ -50,7 +57,7 @@ function loadChain(): SvgChain | null {
   if (chain !== undefined) return chain;
   chain = null;
   try {
-    const req = nodeRequire();
+    const req = moduleLoader ?? nodeRequire();
     if (!req) return chain;
     const { mathjax } = req("mathjax-full/js/mathjax.js");
     const { TeX } = req("mathjax-full/js/input/tex.js");

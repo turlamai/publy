@@ -5,13 +5,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import net from "node:net";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const entrypoint = path.resolve(here, "..", "dist", "index.js");
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-check-smoke-"));
-const run = (file) => {
-  const result = spawnSync(process.execPath, [entrypoint, "check", file, "--json"], {
+const run = (file, ...extra) => {
+  const result = spawnSync(process.execPath, [entrypoint, "check", file, "--json", ...extra], {
     encoding: "utf8",
     env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json") },
     timeout: 25000,
@@ -47,6 +48,25 @@ try {
   assert.equal(good.report.attachmentCount, 1);
   assert.equal(good.report.title, "User Article");
   assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "preflight must not change source");
+
+  const imageChoice = run(goodPath, "--format", "image");
+  assert.equal(imageChoice.code, 0);
+  assert.equal(imageChoice.report.type, "image_post");
+  assert.equal(imageChoice.report.format, "image");
+  assert.equal(imageChoice.report.formatSource, "choice");
+  const invalidChoice = spawnSync(process.execPath, [entrypoint, "publish", goodPath, "--format", "bogus", "--json"], { encoding: "utf8", timeout: 25000 });
+  assert.equal(invalidChoice.status, 2);
+  assert.equal(JSON.parse(invalidChoice.stdout).code, "FORMAT_INVALID");
+  const imagePreviewPath = path.join(dir, "image-preview.html");
+  const imagePreview = spawnSync(process.execPath, [entrypoint, "preview", goodPath, "--format", "image", "--out", imagePreviewPath, "--json"], { encoding: "utf8", timeout: 25000 });
+  assert.equal(imagePreview.status, 0, imagePreview.stderr);
+  const imagePreviewReport = JSON.parse(imagePreview.stdout);
+  assert.equal(imagePreviewReport.type, "image_post");
+  assert.equal(imagePreviewReport.format, "image");
+  const imagePreviewHtml = fs.readFileSync(imagePreviewPath, "utf8");
+  assert.match(imagePreviewHtml, /WeChat image post preview/);
+  assert.match(imagePreviewHtml, /data:image\/png;base64/);
+  assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "selection must not modify the source");
 
   // Config may contain a server API key. New files must be private, and
   // updating a pre-existing permissive file must tighten its permissions.
@@ -157,6 +177,77 @@ try {
     '{"api_key":"' + malformedSecret + '",',
     "failed config update must preserve the original file");
 
+  // Account mutations are local, explicit and machine-readable. Never print
+  // App IDs, author metadata or private config contents to an Agent.
+  const accountConfig = path.join(dir, "agent-account-add.json");
+  const privateAppId = "wx-secret-identifier-not-for-stdout";
+  const privateAuthor = "private-author-not-for-stdout";
+  const addAccount = (...args) => spawnSync(process.execPath,
+    [entrypoint, "account", "add", ...args, "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: accountConfig },
+    });
+  const firstAccount = addAccount("Work", "--app-id", privateAppId, "--author", privateAuthor, "--theme", "claude");
+  assert.equal(firstAccount.status, 0, firstAccount.stderr);
+  const firstReport = JSON.parse(firstAccount.stdout.trim());
+  assert.equal(firstReport.schemaVersion, 1);
+  assert.equal(firstReport.kind, "account-add");
+  assert.equal(firstReport.ok, true);
+  assert.equal(firstReport.code, "ACCOUNT_SAVED");
+  assert.equal(firstReport.created, true);
+  assert.equal(firstReport.isDefault, true);
+  assert.equal(firstReport.networkUsed, false);
+  assert.equal(firstReport.submitted, false);
+  assert.ok(!firstAccount.stdout.includes(privateAppId));
+  assert.ok(!firstAccount.stdout.includes(privateAuthor));
+  const secondAccount = addAccount("Work", "--theme", "wechat");
+  assert.equal(secondAccount.status, 0, secondAccount.stderr);
+  assert.equal(JSON.parse(secondAccount.stdout).created, false);
+  const storedAccount = JSON.parse(fs.readFileSync(accountConfig, "utf8"));
+  assert.deepEqual(storedAccount.accounts, [{
+    name: "Work", app_id: privateAppId, author: privateAuthor, theme: "wechat",
+  }], "updating only a theme must not erase saved account fields");
+  assert.equal(storedAccount.default_account, "Work");
+  const invalidAccount = addAccount("  ");
+  assert.equal(invalidAccount.status, 1);
+  assert.equal(JSON.parse(invalidAccount.stdout).code, "ACCOUNT_NAME_INVALID");
+  assert.equal(fs.readFileSync(accountConfig, "utf8"), JSON.stringify(storedAccount, null, 2) + "\n");
+  const malformedAccountConfig = path.join(dir, "malformed-account-add.json");
+  const secretConfigMarker = "hidden-account-config-token";
+  fs.writeFileSync(malformedAccountConfig, '{"api_key":"' + secretConfigMarker + '", invalid}');
+  const malformedAccount = spawnSync(process.execPath,
+    [entrypoint, "account", "add", "Work", "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: malformedAccountConfig },
+    });
+  assert.equal(malformedAccount.status, 1);
+  const malformedAccountReport = JSON.parse(malformedAccount.stdout);
+  assert.equal(malformedAccountReport.kind, "account-add");
+  assert.equal(malformedAccountReport.code, "CONFIG_INVALID");
+  assert.ok(!malformedAccount.stdout.includes(secretConfigMarker));
+  assert.ok(!malformedAccount.stderr.includes(secretConfigMarker));
+
+  // Generated math and SVG images must be removed after the CLI has consumed
+  // them; original source assets must stay intact.
+  const cleanupDir = path.join(dir, "isolated-render-temp");
+  fs.mkdirSync(cleanupDir);
+  const cleanupSvg = path.join(dir, "source-cleanup.svg");
+  const cleanupNote = path.join(dir, "cleanup-test.md");
+  const svgSource = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8"/></svg>';
+  fs.writeFileSync(cleanupSvg, svgSource);
+  fs.writeFileSync(cleanupNote, "---\ntitle: cleanup\n---\n\nFormula $x^2$ and ![asset](source-cleanup.svg)");
+  for (const [command, extra] of [["check", []], ["preview", ["--out", path.join(dir, "cleanup-preview.html")]]]) {
+    const result = spawnSync(process.execPath, [entrypoint, command, cleanupNote, ...extra, "--json"], {
+      encoding: "utf8", timeout: 40000,
+      env: { ...process.env, TMPDIR: cleanupDir, TMP: cleanupDir, TEMP: cleanupDir,
+        PUBLY_CONFIG: path.join(dir, "no-such-config.json") },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).ok, true);
+    assert.deepEqual(fs.readdirSync(cleanupDir).filter((name) => /^publy-(math|svg)-/.test(name)), []);
+    assert.equal(fs.readFileSync(cleanupSvg, "utf8"), svgSource);
+  }
+
   // Agent contract discovery is offline and truthful: don't claim JSON
   // support for operations that still only offer human-oriented output.
   const cli = (...args) => spawnSync(process.execPath, [entrypoint, ...args],
@@ -172,6 +263,86 @@ try {
   assert.ok(contract.commands.some((c) => c.name === "preview" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "render" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "theme ls" && c.json === true && c.network === false && c.jsonNetwork === false));
+  assert.ok(contract.commands.some((c) => c.name === "theme preview" && c.json === true && c.jsonNetwork === false));
+  // Every advertised command declares stable prerequisites, usage and an
+  // explicit approval boolean; tunnel now offers JSON instead of human-only
+  // output, so no remaining command hides behind "human-oriented".
+  for (const entry of contract.commands) {
+    assert.ok(Array.isArray(entry.prerequisites), entry.name + " must declare prerequisites");
+    assert.equal(typeof entry.requiresUserApproval, "boolean", entry.name + " must declare approval");
+    assert.ok(entry.usage, entry.name + " must declare usage");
+  }
+  assert.ok(contract.commands.some((c) => c.name === "tunnel" && c.json === true && c.requiresUserApproval === true));
+  assert.ok(contract.commands.some((c) => c.name === "publish" && c.prerequisites.includes("wechat-account")));
+
+  const noTunnel = cli("tunnel", "--json");
+  assert.equal(noTunnel.status, 1, noTunnel.stderr);
+  const noTunnelBody = JSON.parse(noTunnel.stdout);
+  assert.equal(noTunnelBody.kind, "tunnel");
+  assert.equal(noTunnelBody.ok, false);
+  assert.equal(noTunnelBody.code, "TUNNEL_NOT_CONFIGURED");
+  assert.equal(noTunnelBody.networkUsed, false);
+  assert.equal(noTunnelBody.submitted, false);
+
+  // A tunnel whose local port is already listening needs no SSH: the
+  // structured result must say so instead of claiming network use.
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, "127.0.0.1", resolve));
+  const listeningPort = listener.address().port;
+  const tunnelConfig = path.join(dir, "tunnel-config.json");
+  fs.writeFileSync(tunnelConfig, JSON.stringify({
+    tunnel: { ssh_target: "unused@example.invalid", local_port: listeningPort, remote_port: 8081 },
+  }));
+  try {
+    const up = spawnSync(process.execPath, [entrypoint, "tunnel", "--json"], {
+      encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: tunnelConfig },
+    });
+    assert.equal(up.status, 0, up.stderr);
+    const upBody = JSON.parse(up.stdout);
+    assert.equal(upBody.kind, "tunnel");
+    assert.equal(upBody.ok, true);
+    assert.equal(upBody.status, "up");
+    assert.equal(upBody.localPort, listeningPort);
+    assert.equal(upBody.startedByThisCall, false);
+    assert.equal(upBody.networkUsed, false);
+    assert.equal(upBody.submitted, false);
+  } finally {
+    listener.close();
+  }
+
+  // A failed SSH start is a network attempt: report it truthfully and keep
+  // the documented exit code. The PATH shim keeps this offline and portable
+  // (POSIX only; Windows has no shell-script shim here).
+  if (process.platform !== "win32") {
+    const probePort = await new Promise((resolve) => {
+      const probe = net.createServer();
+      probe.listen(0, "127.0.0.1", () => {
+        const port = probe.address().port;
+        probe.close(() => resolve(port));
+      });
+    });
+    const shimDir = path.join(dir, "shim-bin");
+    fs.mkdirSync(shimDir, { recursive: true });
+    const shim = path.join(shimDir, "ssh");
+    fs.writeFileSync(shim, "#!/bin/sh\nexit 1\n");
+    fs.chmodSync(shim, 0o755);
+    const downConfig = path.join(dir, "tunnel-down.json");
+    fs.writeFileSync(downConfig, JSON.stringify({
+      tunnel: { ssh_target: "unused@example.invalid", local_port: probePort, remote_port: 8081 },
+    }));
+    const down = spawnSync(process.execPath, [entrypoint, "tunnel", "--json"], {
+      encoding: "utf8", timeout: 25000,
+      env: { ...process.env, PUBLY_CONFIG: downConfig, PATH: shimDir + path.delimiter + process.env.PATH },
+    });
+    assert.equal(down.status, 5, down.stderr);
+    const downBody = JSON.parse(down.stdout);
+    assert.equal(downBody.ok, false);
+    assert.equal(downBody.status, "down");
+    assert.equal(downBody.code, "TUNNEL_UNREACHABLE");
+    assert.equal(downBody.networkUsed, true);
+    assert.equal(downBody.submitted, false);
+  }
+
   // Both human and machine theme discovery must be genuinely offline, not
   // merely reporting networkUsed:false while silently fetching a registry.
   const fetchSentinel = path.join(dir, "theme-fetch-was-called");
@@ -179,6 +350,8 @@ try {
   // Satori uses fetch for non-network resources during module initialization.
   // Preserve those operations, but fail if the CLI attempts any HTTP(S) request.
   fs.writeFileSync(preload, [
+    'require("node:child_process").spawn = () => { throw new Error("unexpected browser or child process"); };',
+    'require("node:module").syncBuiltinESMExports();',
     'const originalFetch = globalThis.fetch;',
     'globalThis.fetch = (...args) => {',
     '  const input = args[0];',
@@ -190,6 +363,31 @@ try {
     '  return originalFetch(...args);',
     '};',
   ].join("\n"));
+  // Machine theme previews must render both sample types without HTTP or a browser.
+  for (const [theme, type] of [["medium", "article"], ["naive", "cards"]]) {
+    fs.rmSync(fetchSentinel, { force: true });
+    const preview = spawnSync(process.execPath, ["--require", preload, entrypoint, "theme", "preview", theme, "--json"], {
+      encoding: "utf8", timeout: 40000,
+      env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json"), PUBLY_THEME_FETCH_SENTINEL: fetchSentinel },
+    });
+    assert.equal(preview.status, 0, preview.stderr);
+    const result = JSON.parse(preview.stdout);
+    assert.equal(result.kind, "theme-preview");
+    assert.equal(result.type, type);
+    assert.equal(result.networkUsed, false);
+    assert.equal(result.submitted, false);
+    assert.equal(fs.existsSync(fetchSentinel), false);
+    assert.match(fs.readFileSync(result.output, "utf8"), /Content-Security-Policy/);
+    if (process.platform !== "win32") assert.equal(fs.statSync(result.output).mode & 0o077, 0);
+    fs.rmSync(path.dirname(result.output), { recursive: true, force: true });
+  }
+  for (const name of ["not-a-theme", "toString", "__proto__"]) {
+    const unknown = cli("theme", "preview", name, "--json");
+    assert.equal(unknown.status, 2);
+    const report = JSON.parse(unknown.stdout);
+    assert.equal(report.code, "UNKNOWN_THEME");
+    assert.equal(report.networkUsed, false);
+  }
   for (const json of [false, true]) {
     fs.rmSync(fetchSentinel, { force: true });
     const listed = spawnSync(process.execPath,
@@ -214,6 +412,12 @@ try {
   }
   assert.ok(contract.commands.some((c) => c.name === "jobs list" && c.json === true));
   assert.ok(contract.commands.some((c) => c.name === "publish" && c.effect === "create-wechat-draft"));
+  const accountMutation = contract.commands.find((c) => c.name === "account add");
+  assert.equal(accountMutation.json, true);
+  assert.equal(accountMutation.network, false);
+  assert.equal(accountMutation.requiresUserApproval, true);
+  assert.match(accountMutation.usage, /account add <name> --json/);
+
   for (const operation of ["jobs cancel", "jobs retry"]) {
     const def = contract.commands.find((c) => c.name === operation);
     assert.equal(def.json, true);
@@ -558,6 +762,40 @@ try {
   assert.ok(fs.readFileSync(typoraPreviewPath, "utf8").includes("data:image/png;base64,"));
   assert.equal(fs.readFileSync(typoraFile, "utf8"), typoraSource, "Typora source must remain exactly unchanged");
 
+  // An encoded slash/backslash must not be promoted into a directory
+  // separator and silently select an existing, unrelated cover. The normal
+  // %uXXXX and %25uXXXX Chinese filename forms must keep working.
+  const doubleEscapedUnicode = path.join(project, "Typora double-escaped Unicode.md");
+  const doubleEscapedSource = [
+    "---",
+    "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
+    "cover: /blog/assets/%25u5C01%25u9762%20%25u56FE%25u7247.png",
+    "---", "", "# Local review",
+  ].join("\n");
+  fs.writeFileSync(doubleEscapedUnicode, doubleEscapedSource);
+  const doubleEscapedCheck = run(doubleEscapedUnicode);
+  assert.equal(doubleEscapedCheck.code, 0, JSON.stringify(doubleEscapedCheck.report));
+  assert.equal(doubleEscapedCheck.report.ok, true);
+  assert.equal(fs.readFileSync(doubleEscapedUnicode, "utf8"), doubleEscapedSource);
+
+  for (const encodedSeparator of ["%2F", "%5C", "%u002F", "%u005C", "%25u002F", "%25u005C"]) {
+    const unsafeFile = path.join(project, "Typora encoded separator " + encodedSeparator + ".md");
+    const unsafeSource = [
+      "---",
+      "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
+      "cover: /blog" + encodedSeparator + "assets" + encodedSeparator + "%u5C01%u9762%20%u56FE%u7247.png",
+      "---", "", "# Local review",
+    ].join("\n");
+    fs.writeFileSync(unsafeFile, unsafeSource);
+    const unsafeCheck = run(unsafeFile);
+    assert.equal(unsafeCheck.code, 4, encodedSeparator + ": " + JSON.stringify(unsafeCheck.report));
+    assert.equal(unsafeCheck.report.ok, false);
+    assert.equal(unsafeCheck.report.attachmentCount, 0);
+    assert.ok(unsafeCheck.report.problems.some((p) => p.startsWith("Cover not found:")),
+      "encoded separator must block the draft preflight: " + encodedSeparator);
+    assert.equal(fs.readFileSync(unsafeFile, "utf8"), unsafeSource);
+  }
+
   // Typora can also save absolute file:/// image links, including Chinese
   // paths. They must resolve to the exact same local bytes, without exporting
   // a clickable file:// link into the WeChat HTML.
@@ -716,15 +954,38 @@ try {
   // None may leak the server response body or lose requestId on uncertainty.
   const responseServerScript = path.join(dir, "agent-response-stub.mjs");
   const responsePortFile = path.join(dir, "agent-response-port.txt");
+  const responseCountFile = path.join(dir, "agent-response-count.txt");
+  fs.writeFileSync(responseCountFile, "");
   const privateServerMarker = "remote-secret-never-log";
   fs.writeFileSync(responseServerScript, `
 import fs from "node:fs";
 import http from "node:http";
 const server = http.createServer((_req, res) => {
   const key = _req.headers["x-api-key"];
+  if (_req.method === "POST") fs.appendFileSync(process.argv[3], String(key) + "\\n");
   res.setHeader("Content-Type", "application/json");
+  if (_req.url.startsWith("/v1/publish-result/")) {
+    if (key === "confirmed-no-media") {
+      res.end(JSON.stringify({ status: "confirmed", ok: true, mediaId: null, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "unknown-override") {
+      res.end(JSON.stringify({ status: "unknown", ok: true, schemaVersion: 999, secret: "remote-secret-never-log" })); return;
+    }
+    if (key === "confirmed-valid") {
+      res.end(JSON.stringify({ status: "confirmed", mediaId: "SYNTHETIC_MEDIA_1", account: "fixture", title: "local test" })); return;
+    }
+  }
+  if (key === "empty-success") { res.writeHead(200); res.end("{}"); return; }
+  if (key === "invalid-media") { res.writeHead(200); res.end('{"mediaId":123}'); return; }
+  if (key === "invalid-job") { res.writeHead(200); res.end('{"jobId":{"id":"bad"}}'); return; }
   if (key === "bad-response") {
     res.writeHead(200); res.end('{"mediaId":'); return;
+  }
+  if (key === "wechat-rejection") {
+    res.writeHead(502); res.end(JSON.stringify({ code: "WECHAT_40001" })); return;
+  }
+  if (key === "unknown-claim") {
+    res.writeHead(409); res.end(JSON.stringify({ code: "DRAFT_OUTCOME_UNKNOWN" })); return;
   }
   if (key === "denied-response") {
     res.writeHead(400); res.end(JSON.stringify({
@@ -740,7 +1001,7 @@ server.listen(0, "127.0.0.1", () => {
 });
 `);
   const responseServer = spawn(process.execPath,
-    [responseServerScript, responsePortFile],
+    [responseServerScript, responsePortFile, responseCountFile],
     { stdio: "ignore", windowsHide: true });
   try {
     const clock = new Int32Array(new SharedArrayBuffer(4));
@@ -757,7 +1018,12 @@ server.listen(0, "127.0.0.1", () => {
     }));
     for (const [key, expectedStatus, expectedCode] of [
       ["bad-response", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["empty-success", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-media", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
+      ["invalid-job", "unknown", "NETWORK_OUTCOME_UNKNOWN"],
       ["denied-response", "rejected", "BAD_ARGUMENT"],
+      ["unknown-claim", "unknown", "DRAFT_OUTCOME_UNKNOWN"],
+      ["wechat-rejection", "rejected", "WECHAT_40001"],
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
       const runReply = spawnSync(process.execPath,
@@ -774,6 +1040,50 @@ server.listen(0, "127.0.0.1", () => {
       assert.ok(!runReply.stdout.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes(privateServerMarker));
       assert.ok(!runReply.stderr.includes("SyntaxError:"));
+    }
+
+    // A working loopback listener stands in for the SSH tunnel: no SSH process
+    // or remote service is involved. One ambiguous POST must stay one POST.
+    const tunnelConfig = path.join(dir, "response-server-with-tunnel.json");
+    fs.writeFileSync(tunnelConfig, JSON.stringify({
+      server: "http://127.0.0.1:" + responsePort,
+      api_key: "bad-response", default_account: "fixture",
+      accounts: [{ name: "fixture" }],
+      tunnel: { ssh_target: "unused-local-test", local_port: Number(responsePort),
+        remote_port: 8081, server: "http://127.0.0.1:" + responsePort },
+    }));
+    const postCount = () => fs.readFileSync(responseCountFile, "utf8")
+      .split("\n").filter((key) => key === "bad-response").length;
+    const beforeTunnel = postCount();
+    const ambiguousTunnel = spawnSync(process.execPath,
+      [entrypoint, "publish", goodPath, "--json", "--account", "fixture"],
+      { encoding: "utf8", timeout: 25000,
+        env: { ...process.env, PUBLY_CONFIG: tunnelConfig } });
+    assert.equal(ambiguousTunnel.status, 5, ambiguousTunnel.stderr);
+    assert.equal(JSON.parse(ambiguousTunnel.stdout).status, "unknown");
+    assert.equal(postCount() - beforeTunnel, 1,
+      "an ambiguous draft response must not be replayed through a tunnel");
+
+    // A claimed confirmation without mediaId is unknown; a server response
+    // cannot override our agent JSON contract or leak unrelated fields.
+    for (const [key, expectedStatus, expectedOk, expectedExit] of [
+      ["confirmed-no-media", "unknown", false, 4],
+      ["unknown-override", "unknown", false, 4],
+      ["confirmed-valid", "confirmed", true, 0],
+    ]) {
+      const queried = spawnSync(process.execPath,
+        [entrypoint, "publish-result", "synthetic-key", "--json", "--api-key", key],
+        { encoding: "utf8", timeout: 25000,
+          env: { ...process.env, PUBLY_CONFIG: responseConfig } });
+      assert.equal(queried.status, expectedExit, key + " " + queried.stderr);
+      const report = JSON.parse(queried.stdout);
+      assert.equal(report.schemaVersion, 1);
+      assert.equal(report.kind, "publish-result");
+      assert.equal(report.ok, expectedOk);
+      assert.equal(report.status, expectedStatus);
+      assert.ok(!queried.stdout.includes(privateServerMarker));
+      assert.ok(!queried.stderr.includes(privateServerMarker));
+      assert.ok(!("secret" in report));
     }
   } finally {
     responseServer.kill();

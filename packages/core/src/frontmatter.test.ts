@@ -2,7 +2,17 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSource, publishType } from "./frontmatter.js";
+import { parseSource, publishType, resolvePublication } from "./frontmatter.js";
+
+test("explicit publication choice overrides metadata without changing it", () => {
+  const meta = { type: "image", mode: "cards" };
+  assert.deepEqual(resolvePublication(meta, "article"), { format: "article", type: "article", source: "choice" });
+  assert.deepEqual(resolvePublication(meta, "image"), { format: "image", type: "image_post", source: "choice" });
+  assert.deepEqual(meta, { type: "image", mode: "cards" });
+  assert.deepEqual(resolvePublication({}), { format: "article", type: "article", source: "default" });
+  assert.deepEqual(resolvePublication({ mode: "cards" }), { format: "cards", type: "image_post", source: "frontmatter" });
+  assert.throws(() => resolvePublication({}, "invalid" as never));
+});
 
 test("publishType defaults to article", () => {
   assert.equal(publishType({}), "article");

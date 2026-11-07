@@ -36,6 +36,13 @@ test("renderMarkdown --no-footnote keeps anchors", () => {
   assert.ok(result.html.includes("<a"));
 });
 
+test("a Markdown frontmatter theme cannot select a path-like builtin ID", () => {
+  const maliciousAlias = "---\ntheme: ../themes/claude\n---\n\n# Imported note";
+  assert.throws(() => renderMarkdown(maliciousAlias), /Unknown theme id/);
+  // An explicit CSS file remains available via customThemePath for trusted
+  // operator workflows; a Markdown field is not that permission.
+});
+
 test("custom theme css wins over theme id", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-test-"));
   const cssFile = path.join(dir, "mine.css");
@@ -96,6 +103,37 @@ test("renderMarkdown rasterizes inline and block TeX into attachments", () => {
   assert.ok(result.html.includes("display: inline-block"), "inline formula must stay inline");
   assert.match(result.html, /vertical-align:\s*-?\d+(\.\d+)?px/);
   assert.match(result.html, /display:\s*block;\s*margin:\s*12px auto;\s*width:\s*\d+(\.\d+)?px/);
+});
+
+test("inline formulas override theme image margins", () => {
+  for (const theme of ["claude", "medium", "wechat", "ink", "tech", "rose", "official", "fortune", "terminal", "news"]) {
+    const result = renderMarkdown("文字 $a^2+b^2=c^2$ 继续。", { theme });
+    const $ = cheerio.load(result.html);
+    const formula = $("img.publy-math");
+    assert.equal(formula.length, 1, theme);
+    const style = formula.attr("style") ?? "";
+    assert.match(style, /(?:^|;)\s*display:\s*inline-block(?:;|$)/, theme);
+    assert.match(style, /(?:^|;)\s*margin:\s*0(?:px)?(?:;|$)/, `${theme}: inherited image margins move text lines`);
+    assert.match(style, /(?:^|;)\s*vertical-align:\s*-?[\d.]+px(?:;|$)/, theme);
+    assert.ok(formula.parent().text().includes("文字") && formula.parent().text().includes("继续"), theme);
+  }
+});
+
+test("cleanup removes generated math and SVG intermediates without touching source assets", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cleanup-test-"));
+  try {
+    const source = path.join(dir, "original.svg");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8"/></svg>';
+    fs.writeFileSync(source, svg);
+    const result = renderMarkdown("A $x^2$ and ![sample](original.svg)", { baseDir: dir });
+    const generated = result.attachments.map((a) => a.path);
+    assert.equal(generated.length, 2);
+    assert.ok(generated.every((file) => fs.existsSync(file)));
+    result.cleanup();
+    result.cleanup();
+    assert.ok(generated.every((file) => !fs.existsSync(file)));
+    assert.equal(fs.readFileSync(source, "utf8"), svg);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("renderMarkdown dedupes repeated formulas into one attachment", () => {

@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { HostedIdentityBindings } from "./hosted-identity.js";
 
 export type Plan = "free" | "personal" | "studio";
 
@@ -46,6 +47,19 @@ export interface OrderRow {
   paidAt: number;
 }
 
+export interface ImmediateClaimRow {
+  key: string;
+  owner: string;
+  fingerprint: string;
+  state: "pending" | "confirmed";
+  mediaId: string | null;
+  completedAt: number | null;
+  /** submission context captured at claim time (null for legacy rows) */
+  account: string | null;
+  title: string | null;
+  createdAt: number | null;
+}
+
 /** Plan allowances mirror PRICING.md `2026-10-v2`: Personal = 1 account /
  *  30 successful jobs per month, Studio = 3 accounts / 150 jobs. `free` is
  *  the operator-issued evaluation tier, not a published offer. */
@@ -71,6 +85,7 @@ export function newApiKey(): string {
 
 export class Store {
   private db: DatabaseSync;
+  private hostedIdentities: HostedIdentityBindings;
   private secretKey: string | null = null;
 
   constructor(dataDir: string) {
@@ -95,6 +110,17 @@ export class Store {
         app_secret TEXT NOT NULL,
         owner_user_id TEXT
       );
+      CREATE TABLE IF NOT EXISTS immediate_publish_claims (
+        request_key TEXT PRIMARY KEY,
+        owner TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('pending', 'confirmed')),
+        media_id TEXT,
+        completed_at INTEGER,
+        account TEXT,
+        title TEXT,
+        created_at INTEGER
+      );
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         contact TEXT NOT NULL,
@@ -108,6 +134,22 @@ export class Store {
         paid_at INTEGER NOT NULL DEFAULT 0
       );
     `);
+    this.migrateImmediateClaims();
+    this.hostedIdentities = new HostedIdentityBindings(this.db);
+  }
+
+  /**
+   * Older databases predate claim context. Adding columns is additive, so an
+   * existing pending claim stays blocked until an operator can reconstruct its
+   * account/title from the audit trail; nothing is released implicitly.
+   */
+  private migrateImmediateClaims(): void {
+    const columns = new Set(
+      (this.db.prepare("PRAGMA table_info(immediate_publish_claims)").all() as Array<{ name: string }>).map((column) => column.name),
+    );
+    if (!columns.has("account")) this.db.exec("ALTER TABLE immediate_publish_claims ADD COLUMN account TEXT");
+    if (!columns.has("title")) this.db.exec("ALTER TABLE immediate_publish_claims ADD COLUMN title TEXT");
+    if (!columns.has("created_at")) this.db.exec("ALTER TABLE immediate_publish_claims ADD COLUMN created_at INTEGER");
   }
 
   /** close the sqlite handle (fastify onClose hook) */
@@ -171,6 +213,17 @@ export class Store {
     return (this.db.prepare("SELECT * FROM users ORDER BY created_at DESC").all() as Record<string, unknown>[]).map((r) => this.toUser(r));
   }
 
+  /** Internal enrollment only. The caller must authenticate the user and
+   * separately establish that this is a new, not restored, binding. */
+  enrollHostedSubject(userId: string): string {
+    return this.hostedIdentities.enroll(userId, Date.now());
+  }
+
+  /** Internal lookup; an absent or disabled user cannot resolve a subject. */
+  resolveHostedSubject(userId: string): string | null {
+    return this.hostedIdentities.resolve(userId);
+  }
+
   /** paid expiry extension: adds months from the later of now / current expiry */
   extendPlan(userId: string, plan: Exclude<Plan, "free">, months: number): void {
     const u = this.findUserById(userId)!;
@@ -212,6 +265,84 @@ export class Store {
   /** the allowance currently in force for this user */
   planAllowance(user: UserRow): { monthlyPublishes: number; accounts: number } {
     return this.isProActive(user) ? PLAN_LIMITS[user.plan] : PLAN_LIMITS.free;
+  }
+
+  /** Durable immediate-publish claim; unknown outcomes never expire. */
+  getImmediateClaim(key: string): ImmediateClaimRow | null {
+    const row = this.db.prepare("SELECT request_key, owner, fingerprint, state, media_id, completed_at, account, title, created_at FROM immediate_publish_claims WHERE request_key = ?").get(key) as
+      { request_key: string; owner: string; fingerprint: string; state: "pending" | "confirmed"; media_id: string | null; completed_at: number | null; account: string | null; title: string | null; created_at: number | null } | undefined;
+    return row
+      ? { key: row.request_key, owner: row.owner, fingerprint: row.fingerprint, state: row.state, mediaId: row.media_id, completedAt: row.completed_at, account: row.account, title: row.title, createdAt: row.created_at }
+      : null;
+  }
+
+  /** Unresolved claims an operator must reconcile against the WeChat draft box. */
+  listImmediateClaims(state: "pending" | "confirmed" | "all" = "pending", limit = 200): ImmediateClaimRow[] {
+    const max = Math.min(Math.max(Math.trunc(limit) || 200, 1), 500);
+    const statement = state === "all"
+      ? this.db.prepare("SELECT request_key, owner, fingerprint, state, media_id, completed_at, account, title, created_at FROM immediate_publish_claims ORDER BY (state = 'pending') DESC, COALESCE(created_at, 0) DESC LIMIT ?")
+      : this.db.prepare("SELECT request_key, owner, fingerprint, state, media_id, completed_at, account, title, created_at FROM immediate_publish_claims WHERE state = ? ORDER BY COALESCE(created_at, 0) DESC LIMIT ?");
+    const rows = (state === "all" ? statement.all(max) : statement.all(state, max)) as Array<{
+      request_key: string; owner: string; fingerprint: string; state: "pending" | "confirmed";
+      media_id: string | null; completed_at: number | null; account: string | null; title: string | null; created_at: number | null;
+    }>;
+    return rows.map((row) => ({
+      key: row.request_key, owner: row.owner, fingerprint: row.fingerprint, state: row.state,
+      mediaId: row.media_id, completedAt: row.completed_at, account: row.account, title: row.title, createdAt: row.created_at,
+    }));
+  }
+
+  claimImmediate(key: string, owner: string, fingerprint: string, now: number, ttl: number, context: { account?: string; title?: string } = {}): "claimed" | "existing" {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.getImmediateClaim(key);
+      if (existing && !(existing.state === "confirmed" && existing.mediaId && existing.completedAt !== null && now - existing.completedAt >= ttl)) {
+        this.db.exec("COMMIT");
+        return "existing";
+      }
+      if (existing) this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ?").run(key);
+      this.db.prepare("INSERT INTO immediate_publish_claims(request_key, owner, fingerprint, state, account, title, created_at) VALUES (?, ?, ?, 'pending', ?, ?, ?)")
+        .run(key, owner, fingerprint, context.account ?? null, context.title ?? null, now);
+      this.db.exec("COMMIT");
+      return "claimed";
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  releaseImmediate(key: string, owner: string, fingerprint: string): void {
+    const changed = this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ? AND owner = ? AND fingerprint = ? AND state = 'pending'")
+      .run(key, owner, fingerprint);
+    if (Number(changed.changes) !== 1) throw new Error("IMMEDIATE_CLAIM_CONFLICT");
+  }
+
+  confirmImmediate(key: string, owner: string, fingerprint: string, mediaId: string, now: number): void {
+    const changed = this.db.prepare("UPDATE immediate_publish_claims SET state = 'confirmed', media_id = ?, completed_at = ? WHERE request_key = ? AND owner = ? AND fingerprint = ? AND state = 'pending'")
+      .run(mediaId, now, key, owner, fingerprint);
+    if (Number(changed.changes) !== 1) throw new Error("IMMEDIATE_CLAIM_CONFLICT");
+  }
+
+  /**
+   * Operator reconciliation: the server has just verified against WeChat that
+   * this draft exists, so the claim may be resolved to it. Returns false when
+   * the claim is no longer pending (it was resolved elsewhere) — the caller
+   * must not retry implicitly.
+   */
+  reconcileImmediateClaim(key: string, mediaId: string, now: number): boolean {
+    const changed = this.db.prepare("UPDATE immediate_publish_claims SET state = 'confirmed', media_id = ?, completed_at = ? WHERE request_key = ? AND state = 'pending'")
+      .run(mediaId, now, key);
+    return Number(changed.changes) === 1;
+  }
+
+  /**
+   * Operator reconciliation: the server has just verified that no matching
+   * draft is visible in the account's draft box. Releasing the identity lets
+   * the original requester retry; the caller must record the evidence.
+   */
+  releaseImmediateClaimByOperator(key: string): boolean {
+    const changed = this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ? AND state = 'pending'").run(key);
+    return Number(changed.changes) === 1;
   }
 
   // --- accounts ------------------------------------------------------------
@@ -258,6 +389,19 @@ export class Store {
         "INSERT INTO accounts (name, app_id, app_secret, owner_user_id) VALUES (?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET app_id = excluded.app_id, app_secret = excluded.app_secret, owner_user_id = excluded.owner_user_id",
       )
       .run(acc.name, acc.appId, this.encryptSecret(acc.appSecret), acc.ownerUserId);
+  }
+
+  /** Atomically admit a new user-owned account without replacing an existing
+   * name or exceeding the user's account allowance under concurrent binds. */
+  insertOwnedAccount(acc: AccountRow, limit: number): boolean {
+    if (!acc.ownerUserId) throw new Error("owner required");
+    const result = this.db.prepare(`
+      INSERT INTO accounts (name, app_id, app_secret, owner_user_id)
+      SELECT ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM accounts WHERE owner_user_id = ?) < ?
+      ON CONFLICT(name) DO NOTHING
+    `).run(acc.name, acc.appId, this.encryptSecret(acc.appSecret), acc.ownerUserId, acc.ownerUserId, limit);
+    return Number(result.changes) === 1;
   }
 
   findAccount(name: string): AccountRow | null {

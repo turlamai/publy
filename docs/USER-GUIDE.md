@@ -8,16 +8,18 @@ Turn Markdown into WeChat article drafts and image-post cards, with local previe
 
 CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.
 
+The development plugin embeds its rendering assets in `main.js`. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open ([#12](https://github.com/turlamai/publy/issues/12), [#15](https://github.com/turlamai/publy/issues/15)).
+
 ## Platforms and installation
 
-CLI and Obsidian workflows; this is not a Rivet/Glaze desktop application. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.
+Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions. The development server binds to loopback by default; use a protected HTTPS reverse proxy for remote access. If upgrading a direct network listener, adjust access or explicitly set `host`.
 
-See the [README](../README.md) for source installation and execution; release assets do not constitute a deployed service.
+Source builds require Node.js 22+, pnpm and Git; follow the [developer installation and setup](guide.md). Release assets do not constitute a deployed service.
 
-## Write in Typora or Obsidian
+## Use any Markdown editor or agent
 
-For Typora, choose the **original Markdown file**. For Obsidian, use the
-plugin or the same underlying Markdown. No other editor integrations are planned. In the current
+Choose the **original Markdown file** from any editor or agent. For Obsidian, use the optional
+plugin or the same underlying Markdown. In the current
 developer CLI, run `publy check "/path/to/your-note.md" --json` to inspect
 images, covers and card structure **locally**, then `publy preview` before
 considering delivery. Neither command sends a draft. Typora's local
@@ -28,6 +30,49 @@ source-build functionality, **not yet a no-setup public installer**.
 [Typora quick start](typora.md) · [Supported input paths, limitations and commercial user-experience standard](editor-workflows.md)
 · [简体中文](editor-workflows.zh-CN.md)
 
+In the development plugin, **Copy rendered rich text** stops without changing the clipboard if images or formulas are missing, fail to render, or remain as local attachments. Use draft delivery for content with attachments.
+
+### Choose a draft format
+
+Choose article, images with a caption, or text cards for each draft. In the development CLI, use the same `--format article`, `--format image`, or `--format cards` for `check`, `preview`, and `publish`; in the Obsidian preview use the format selector. A choice applies to the current operation or plugin session and takes precedence over optional document metadata; the file is not changed. With no choice, legacy metadata applies and otherwise the default is article. Image posts need images; cards need the supported section structure. Review the resulting preview before delivery. These capabilities are still under acceptance and not a released installer.
+## Use a standalone article theme (CLI development build)
+
+Built-in themes work offline. To use a content-only theme bundle from someone you trust, run `publy theme add ./theme.json`, then `publy theme preview THEME_ID` and use `--theme THEME_ID` when rendering. `publy theme ls` lists installed article themes. To replace one, run `publy theme update ./new-theme.json`; to remove it, run `publy theme remove THEME_ID`. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. Obsidian running as the same system user can select validated installed article themes: reopen the plugin settings or preview panel after installation. The CLI manages the shared local bundle; the plugin does not download themes itself.
+
+For an HTTPS bundle, obtain its complete-file SHA-256 independently from a trusted source and run `publy theme add https://example.com/theme.json --sha256 HASH`. A matching hash checks the downloaded bytes against that value; it does not establish who created them. Redirects are refused. These are content-only JSON files, not executable packages; they are limited to scoped `#publy` article styles and a conservative subset of CSS. Remote assets, CSS imports, scripts, and CSS escapes are rejected. This is not a signed gallery or an automatic updater.
+
+To create a bundle from your own CSS, save a file containing styles such as `#publy p { color: #123456; }`, then run:
+
+```sh
+publy theme pack my.css --id my-style --theme-version 1.0.0 --name "My style" --license MIT --output my-style.json
+```
+
+The command validates the content, refuses to overwrite an existing output and prints the bundle's SHA-256. Include a suitable licence for styles you share. The original CSS and Markdown files are not modified. Themes are stored in `~/.publy/themes`; back up any bundles you want to keep.
+
+To migrate an older local theme, keep a backup of its CSS and licence, then use `theme pack` on a copy. Adapt unsupported selectors or declarations explicitly; Publy rejects them rather than silently weakening validation. A CSS file you personally trust can still be used for a one-off render with `--custom-theme /path/to/theme.css`; that older path reads CSS as trusted input and is not the bundle safety boundary. Do not run an old package's install scripts. The bundle flow does not import npm packages automatically.
+
+## Where are my notes and drafts?
+
+Publy does not create a notebook or provide a dashboard for browsing and
+editing notes. Continue to find, edit, organize and back up your original
+Markdown and images in Typora, Obsidian or your file manager. Publy reads the
+file you choose for checking and formatting; it does not migrate your notes.
+
+After delivery, sign in to the **WeChat Official Account platform** and open
+the selected account's draft box to review, edit and manage the draft. Publy
+does not publish it publicly. If the outcome is unknown, check that draft box
+before deciding whether to submit again: a missing server record does not prove
+that WeChat did not receive the draft.
+
+A self-hosted server also has an operator page at `/admin` for service users,
+WeChat accounts, scheduled draft tasks, historical orders and events. The
+**Draft tasks** view shows pending, confirmed and unknown outcomes, plus
+recent delivery events. The event list is limited and may be affected by log
+retention; it does not replace checking the WeChat draft box.
+It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
+open. Access it over HTTPS or a trusted private network and keep the admin key
+private. See the [operator guide](operator-guide.md) for login and page-by-page instructions, and [operations and backups](operations.md) for server details.
+
 ## Your first successful session
 
 1. Install from the source instructions and preview a non-sensitive Markdown article locally before configuring delivery.
@@ -36,9 +81,9 @@ source-build functionality, **not yet a no-setup public installer**.
 
 ## Data, backup and recovery
 
-Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Restore and test on an isolated server; do not replay an unknown-outcome job before checking remote draft/history state.
+Publy removes generated formula, SVG and card intermediates after they are consumed by the CLI or plugin. A preview HTML file deliberately created for you to open is an output and can contain your content; delete it when finished. Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Before restoration, stop all writers and isolate the server. A job pending in an older backup may already have been delivered; follow the [restore procedure](operations.md#backup-and-restore-developer-self-hosted-deployments) to quarantine jobs and reconcile draft and account changes since the snapshot.
 
-When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity first (`publy publish-result <key>`, or the query action in the plugin) and only then retry the same request — the server reconciles against its idempotency record instead of creating a duplicate draft. Interrupted scheduled jobs never auto-rerun after a restart; retry them explicitly with `publy jobs retry <id>`.
+When a delivery loses its connection, the outcome is "unknown", not "failed": query the original request identity (`publy publish-result <key>`, or the plugin query action), then check the WeChat draft box. The server records a success only after receiving a confirmation; submitting again can create a duplicate even with the same request identity. Check the draft box before taking any action on an interrupted scheduled job too.
 
 ## Network, keys and privacy
 

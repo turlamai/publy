@@ -23,6 +23,49 @@ On Windows, the executable is named `publy-racket-probe.exe`. The distribution i
 
 The GitHub Actions workflow [racket-probe.yml](../.github/workflows/racket-probe.yml) builds/test-packages the probe on Windows/macOS/Linux and uploads temporary **CI artifacts**, not signed public GitHub Releases. CI success on its runner is not clean-user-machine acceptance.
 
+## No-npm Node packaging probe — 2026-11-03
+
+On macOS 26.6.2 arm64, a local candidate was built with Node 26.12.0 and
+pnpm 11.8.0 using `pnpm --filter @turlamai/publy --prod deploy --legacy`.
+The deployed CLI was run using the official Node **22.23.4** macOS arm64
+binary with an empty temporary home and a system-only PATH: `capabilities
+--json` and offline card `preview --json` completed, and preview reported
+`networkUsed:false` and `submitted:false`. One deploy-generated symlink
+pointed back into the source checkout; the probe removed that link and
+repeated the preview successfully. The dependency folder was approximately
+101 MiB and the Node executable 116 MiB before compression.
+
+The internal script `scripts/build-portable-probe.mjs` now reproduces
+this packaging approach using a supplied matching Node binary and its licence.
+It refuses to overwrite an existing output directory, removes only pnpm workspace-index links pointing to known source packages and
+rejects other links escaping the package.
+The launcher, capability query, card preview and a Markdown article with
+Chinese paths, local image and formula were exercised with an empty home and a
+system-only PATH. The article source hash remained unchanged. The runtime must be authenticated and supplied
+by the build operator; the script does not authenticate it. The developer
+workflow `portable-probe.yml` exercises the candidate on Linux, macOS and
+Windows CI; only an actual passing run is evidence. The revised PowerShell launcher and metacharacter-path test passed on Windows CI;
+the Linux and macOS portable probes also passed on integration commit
+`7b9df13`. A Windows VM later showed that the PowerShell launcher is blocked
+by the default execution policy. A native console launcher was then tested in
+an isolated Windows 11 ARM64 virtual machine using the x64 Node 22.23.4 runtime:
+an article with a local image and formula passed offline check and preview,
+including a source filename with Chinese characters and `&`; source bytes were
+unchanged. Argument forwarding and exit status were also tested. The Node
+archive matched the official HTTPS checksum manifest, whose signature was not
+independently verified. This is a development probe, not a signed installer,
+and does not establish clean-machine installation, upgrade or uninstall.
+
+The downloaded archive's SHA-256 matched Node's HTTPS checksum manifest:
+`037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad`.
+The signed manifest was not independently verified. This is a local developer
+probe, not a reproducible installer or a release asset. A real package must
+eliminate external symlinks by construction, authenticate the runtime,
+include all required licences, test article/media/math/cards and failure
+paths without source/developer dependencies, and be verified on clean target
+machines including install, update, rollback and uninstall. Clean-machine
+Windows/Linux and x64 acceptance, executable signing and notarization remain untested.
+
 ## Gate before a full Racket migration
 
 Compare the native probe to a no-npm packaged version of the existing CLI, then verify strict compatibility on synthetic markdown/WeChat HTML, code/math, fonts, image cards, attachment references, `--json`, exit codes and network failure/idempotency semantics. Measure archive size, startup time, memory, install/update/uninstall, native OS warnings and licenses. Only migrate the renderer/server incrementally if those tests prove a net user benefit.

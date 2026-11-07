@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { loadTheme, loadThemeFromCss, BUILTIN_THEMES } from "./theme.js";
+import { loadTheme, loadThemeFromCss, loadHighlightCss, BUILTIN_THEMES } from "./theme.js";
 
 test("claude theme resolves all variables to literals", () => {
   const theme = loadTheme("claude");
@@ -23,6 +23,23 @@ test("every builtin theme resolves cleanly", () => {
 
 test("unknown theme throws with the builtin list", () => {
   assert.throws(() => loadTheme("nope"), /Built-in themes/);
+});
+
+test("built-in theme IDs cannot bypass the allowlist through relative paths", () => {
+  // Previously '../themes/claude' normalized to the same existing file, so
+  // an untrusted frontmatter ID could be used as a filesystem path.
+  assert.throws(() => loadTheme("../themes/claude"), /Built-in themes/);
+  assert.throws(() => loadTheme("../theme/claude"), /Built-in themes/);
+  assert.throws(() => loadTheme("..\\\\themes\\\\claude"), /Built-in themes/);
+  assert.throws(() => loadTheme("claude/../claude"), /Built-in themes/);
+  assert.equal(loadTheme("claude").id, "claude");
+});
+
+test("highlight theme names cannot traverse outside the stylesheet directory", () => {
+  assert.throws(() => loadHighlightCss("../styles/github"), /Invalid highlight theme id/);
+  assert.throws(() => loadHighlightCss("..\\\\styles\\\\github"), /Invalid highlight theme id/);
+  assert.throws(() => loadHighlightCss("/tmp/private"), /Invalid highlight theme id/);
+  assert.ok(loadHighlightCss("github").length > 0, "ordinary installed highlight CSS must keep working");
 });
 
 test("loadThemeFromCss resolves variables from arbitrary css", () => {

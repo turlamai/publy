@@ -7,6 +7,15 @@ import path from "node:path";
 const TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
 const ADD_MATERIAL_URL = "https://api.weixin.qq.com/cgi-bin/material/add_material";
 const DRAFT_ADD_URL = "https://api.weixin.qq.com/cgi-bin/draft/add";
+const DRAFT_BATCHGET_URL = "https://api.weixin.qq.com/cgi-bin/draft/batchget";
+
+/** Read-only summary of one WeChat draft. Titles are the operator-visible
+ *  identity; media_id is the value a confirmed draft must retain. */
+export interface WechatDraftSummary {
+  mediaId: string;
+  title: string;
+  updateTime: number;
+}
 
 export class WechatError extends Error {
   constructor(public errcode: number, public errmsg: string) {
@@ -27,7 +36,7 @@ interface TokenCache {
 
 /** File-backed token cache with in-flight dedupe (600 s buffer before expiry). */
 export class TokenManager {
-  private cache: TokenCache = {};
+  private cache: TokenCache = Object.create(null) as TokenCache;
   private inflight = new Map<string, Promise<string>>();
   private file: string;
 
@@ -35,9 +44,16 @@ export class TokenManager {
     fs.mkdirSync(cacheDir, { recursive: true });
     this.file = path.join(cacheDir, "token.json");
     try {
-      this.cache = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      const parsed: unknown = JSON.parse(fs.readFileSync(this.file, "utf-8"));
+      // A parseable JSON value is not necessarily a token dictionary.
+      // Null/array/primitive legacy files must not break credential recovery.
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        // Keep a prototype-free dictionary: app IDs must never resolve to
+        // inherited keys such as constructor or mutate __proto__ on save.
+        Object.assign(this.cache, parsed);
+      }
     } catch {
-      /* first run */
+      /* first run or unreadable cache: refresh from the API */
     }
   }
 
@@ -48,7 +64,10 @@ export class TokenManager {
   async get(appId: string, appSecret: string): Promise<string> {
     const now = Date.now() / 1000;
     const hit = this.cache[appId];
-    if (hit && hit.expireAt > now + 600) return hit.accessToken;
+    // Older versions could persist an absent or malformed token after HTTP 200.
+    // Never trust disk cache shape without validating the credential itself.
+    if (hit && typeof hit.accessToken === "string" && hit.accessToken.trim() &&
+        Number.isFinite(hit.expireAt) && hit.expireAt > now + 600) return hit.accessToken;
 
     const pending = this.inflight.get(appId);
     if (pending) return pending;
@@ -58,6 +77,12 @@ export class TokenManager {
       const res = await fetch(url);
       const data = await res.json() as any;
       assertOk(data);
+      // A successful HTTP response (even errcode: 0) is not proof that the
+      // token endpoint returned a usable credential. Never cache or return an
+      // absent/non-string token: the caller must see an explicit failure.
+      if (!data || typeof data.access_token !== "string" || !data.access_token.trim()) {
+        throw new Error("WeChat token response missing a valid access_token");
+      }
       this.cache[appId] = {
         accessToken: data.access_token,
         expireAt: now + (data.expires_in ?? 7200),
@@ -100,6 +125,61 @@ export async function draftAdd(accessToken: string, article: Record<string, unkn
   assertOk(data);
   if (!data.media_id) throw new Error(`draft/add returned no media_id: ${JSON.stringify(data)}`);
   return data.media_id as string;
+}
+
+/**
+ * List one page of the account's draft box. This is the only way an operator
+ * can prove which drafts really exist after an ambiguous submission, so it is
+ * deliberately read-only and never creates or edits anything.
+ *
+ * WeChat returns at most 20 items per call; ask for no_content to keep the
+ * response small while retaining titles and media IDs.
+ */
+export async function draftBatchGet(accessToken: string, offset = 0, count = 20): Promise<{ totalCount: number; items: WechatDraftSummary[] }> {
+  const safeCount = Math.min(Math.max(Math.trunc(count) || 20, 1), 20);
+  const safeOffset = Math.max(Math.trunc(offset) || 0, 0);
+  const res = await fetch(`${DRAFT_BATCHGET_URL}?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ offset: safeOffset, count: safeCount, no_content: 1 }),
+  });
+  const data = await res.json() as any;
+  assertOk(data);
+  // Evidence must be well formed: a missing total_count would make a partial
+  // listing look complete and could wrongly release a claim.
+  if (typeof data?.total_count !== "number" || !Number.isFinite(data.total_count)) {
+    throw new Error("draft/batchget returned no usable total_count");
+  }
+  const rawItems: any[] = Array.isArray(data.item) ? data.item : [];
+  const items: WechatDraftSummary[] = [];
+  for (const item of rawItems) {
+    const mediaId = item?.media_id;
+    if (typeof mediaId !== "string" || !mediaId) continue;
+    const newsItem = Array.isArray(item?.content?.news_item) ? item.content.news_item[0] : null;
+    const title = typeof newsItem?.title === "string" ? newsItem.title : "";
+    items.push({ mediaId, title, updateTime: Number(item?.update_time) || 0 });
+  }
+  return { totalCount: data.total_count, items };
+}
+
+/**
+ * Read up to `limit` drafts across pages. A partial listing is returned when
+ * WeChat reports fewer drafts than requested; callers must treat an empty
+ * result as "not seen on this page set", never as proof that a draft was
+ * never created outside the scanned range.
+ */
+export async function listDraftSummaries(accessToken: string, limit = 100): Promise<{ totalCount: number; items: WechatDraftSummary[] }> {
+  const max = Math.min(Math.max(Math.trunc(limit) || 100, 1), 200);
+  const pageSize = 20;
+  const items: WechatDraftSummary[] = [];
+  let totalCount = 0;
+  for (let offset = 0; offset < max; offset += pageSize) {
+    const page = await draftBatchGet(accessToken, offset, Math.min(pageSize, max - offset));
+    totalCount = Math.max(totalCount, page.totalCount);
+    items.push(...page.items);
+    if (page.items.length === 0 || items.length >= totalCount) break;
+  }
+  return { totalCount: Math.max(totalCount, items.length), items: items.slice(0, max) };
 }
 
 /** Connectivity check for novice onboarding: does this AppID/AppSecret work

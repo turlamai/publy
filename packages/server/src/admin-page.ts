@@ -1,6 +1,6 @@
 // Admin console — a zero-dependency single-page operator tool.
 //
-// Five tabs: overview, users, orders, accounts, and a LIVE feed wired to
+// Tabs for overview, scheduled drafts, users, orders, accounts, and a LIVE feed wired to
 // the publy-ws event gateway (same admin key). Auth is the admin key in
 // sessionStorage; every data call carries it as x-api-key.
 
@@ -26,12 +26,15 @@ export function adminPage(): string {
     <input id="key" type="password" style="flex:1" placeholder="粘贴后回车">
     <button class="btn" id="login-btn">进入</button>
   </div>
-  <div class="hint">key 只存本浏览器 sessionStorage，关掉标签页即清除。</div>
+  <div class="hint">仅限自托管运营者。请通过 HTTPS 或可信私有网络访问；密钥保存在本标签页的会话存储中。公开托管和收款尚未开放。</div>
 </div>
 
 <div id="app" style="display:none">
+  <div class="workspace-heading"><div><div class="workspace-eyebrow">PUBLY / SELF-HOSTED</div><h1>运营工作台</h1><p>管理公众号账号、草稿任务与服务状态。</p></div><span class="workspace-status">自托管 · 开发预览</span></div>
   <nav class="tabs" id="tabs">
     <button data-tab="overview" class="tab active">概览</button>
+    <button data-tab="jobs" class="tab">草稿任务</button>
+    <button data-tab="claims" class="tab">待核对</button>
     <button data-tab="users" class="tab">用户</button>
     <button data-tab="orders" class="tab">订单</button>
     <button data-tab="accounts" class="tab">账号</button>
@@ -39,16 +42,51 @@ export function adminPage(): string {
   </nav>
 
   <section id="tab-overview" class="panel">
+    <div id="overview-status" class="hint" role="status" aria-live="polite"></div>
     <div class="stat-grid" id="stat-grid"></div>
     <div class="card">
-      <h3>快捷入口</h3>
+      <h3>服务管理</h3>
+      <p class="hint">笔记仍在原来的文件夹或 Obsidian 笔记库中管理；公众号草稿请在微信后台查看。此处是自托管服务的开发期管理工具，订单功能仅用于历史数据及隔离测试。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('jobs')">查看草稿任务</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('claims')">核对未知结果</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('users')">开通 / 延期用户</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">确认收款</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">查看历史订单</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('accounts')">绑定公众号</button>
         <button class="btn btn-ghost btn-sm" onclick="switchTab('feed')">实时动态</button>
       </div>
       <div class="hint">概览数据在切回本页时自动刷新。</div>
+    </div>
+  </section>
+
+  <section id="tab-jobs" class="panel" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <h3>草稿任务</h3>
+        <button class="btn btn-ghost btn-sm" id="jobs-refresh">刷新</button>
+      </div>
+      <p class="hint">这里只显示服务端排程任务，时间按本机时区显示。已完成表示草稿已创建，不表示公开发布。结果未知时先检查微信公众号草稿箱，再决定后续操作。</p>
+      <div id="jobs-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th><th>操作</th></tr></thead>
+      <tbody id="j-rows"></tbody></table>
+      <h3 style="margin-top:28px">最近投递记录</h3>
+      <p class="hint">显示最近 100 条服务事件中的投递记录，可能受日志保留影响；请以公众号草稿箱和实际回执为准。</p>
+      <div id="history-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>时间</th><th>标题</th><th>公众号</th><th>结果</th></tr></thead>
+      <tbody id="h-rows"></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-claims" class="panel" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <h3>待核对的即时发布</h3>
+        <button class="btn btn-ghost btn-sm" id="claims-refresh">刷新</button>
+      </div>
+      <p class="hint">这些请求在提交时丢失了回执，草稿可能已经创建。核对会实时读取对应公众号的草稿箱；确认后，该请求编号才会被标记为已创建或释放，客户端才能安全地查询或重试。不要在没有核对的情况下重发草稿。</p>
+      <div id="claims-status" class="hint" role="status" aria-live="polite"></div>
+      <table><thead><tr><th>发生时间</th><th>用户</th><th>公众号</th><th>标题</th><th>请求编号</th><th>操作</th></tr></thead>
+      <tbody id="c-rows"></tbody></table>
     </div>
   </section>
 
@@ -70,7 +108,7 @@ export function adminPage(): string {
   <section id="tab-orders" class="panel" style="display:none">
     <div class="card">
       <div class="card-head">
-        <h3>订单</h3>
+        <h3>历史 / 测试订单</h3>
         <select id="o-filter" style="width:auto">
           <option value="pending">待确认</option>
           <option value="paid">已支付</option>
@@ -92,7 +130,7 @@ export function adminPage(): string {
       <table><thead><tr>
         <th>账号名</th><th>AppID</th><th>归属</th><th>来源</th>
       </tr></thead><tbody id="a-rows"></tbody></table>
-      <div class="hint">AppSecret 加密存储，任何接口都不回显。</div>
+      <div class="hint">数据库账号的 AppSecret 是否加密取决于服务器密钥配置；server.json 中的账号凭据按配置文件原样保存。请保护配置和备份。</div>
     </div>
   </section>
 
@@ -125,7 +163,7 @@ var H = function (extra) {
   return Object.assign({ 'x-api-key': KEY }, extra || {});
 };
 async function api(url, opts) {
-  var r = await fetch(url, Object.assign({ headers: H(opts && opts.headers) }, opts || {}));
+  var r = await fetch(url, Object.assign({}, opts || {}, { headers: H(opts && opts.headers) }));
   if (r.status === 401) { logout(); throw new Error('key 失效，请重新登录'); }
   return r;
 }
@@ -138,17 +176,31 @@ function toast(msg, kind) {
   setTimeout(function () { t.classList.add('show'); }, 10);
   setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 300); }, 3200);
 }
+var modalOpener = null;
+function showModal() {
+  modalOpener = document.activeElement;
+  document.getElementById('modal-mask').style.display = 'flex';
+  var focusTarget = document.querySelector('#modal input, #modal select, #modal button');
+  if (focusTarget) focusTarget.focus();
+}
 function confirmBox(text, onYes) {
   var mask = document.getElementById('modal-mask'), m = document.getElementById('modal');
   m.innerHTML = '<h3>确认操作</h3><p>' + esc(text) + '</p>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     + '<button class="btn btn-ghost btn-sm" id="cf-no">取消</button>'
     + '<button class="btn btn-sm btn-danger-solid" id="cf-yes">确认</button></div>';
-  mask.style.display = 'flex';
+  showModal();
   document.getElementById('cf-no').onclick = closeModal;
   document.getElementById('cf-yes').onclick = function () { closeModal(); onYes(); };
 }
-function closeModal() { document.getElementById('modal-mask').style.display = 'none'; }
+function closeModal() {
+  document.getElementById('modal-mask').style.display = 'none';
+  if (modalOpener && modalOpener.isConnected) modalOpener.focus();
+  modalOpener = null;
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && document.getElementById('modal-mask').style.display !== 'none') closeModal();
+});
 document.getElementById('modal-mask').onclick = function (e) { if (e.target.id === 'modal-mask') closeModal(); };
 function copyText(text, tip) {
   navigator.clipboard.writeText(text).then(function () { toast(tip || '已复制', 'ok'); },
@@ -166,6 +218,8 @@ function daysLeft(ts) { return Math.ceil((ts - Date.now()) / 86400000); }
 function logout() {
   sessionStorage.removeItem('publy_admin_key'); KEY = '';
   wsDown();
+  approvedWsOrigins.clear();
+  document.getElementById('key').value = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-card').style.display = 'block';
 }
@@ -180,7 +234,7 @@ async function login() {
   if (!KEY) return toast('请输入 key', 'err');
   try {
     var r = await fetch('/v1/admin/overview', { headers: H() });
-    if (r.status === 401) return toast('key 不对', 'err');
+    if (!r.ok) return toast(r.status === 401 ? 'key 不对' : '无法登录（HTTP ' + r.status + '）', 'err');
     sessionStorage.setItem('publy_admin_key', KEY);
     enter();
   } catch (e) { toast('网络错误：' + e.message, 'err'); }
@@ -200,6 +254,8 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
   document.getElementById('tab-' + name).style.display = 'block';
   if (name === 'overview') loadOverview();
+  if (name === 'jobs') refreshDrafts();
+  if (name === 'claims') loadClaims();
   if (name === 'users') loadUsers();
   if (name === 'orders') loadOrders();
   if (name === 'accounts') loadAccounts();
@@ -211,20 +267,103 @@ document.querySelectorAll('.tab').forEach(function (t) {
 
 /* ---------- overview ---------- */
 async function loadOverview() {
-  var d = await (await api('/v1/admin/overview')).json();
+  var status = document.getElementById('overview-status');
+  var g = document.getElementById('stat-grid');
+  status.textContent = '正在读取服务概览…';
+  g.innerHTML = '';
+  try {
+  var response = await api('/v1/admin/overview');
+  if (!response.ok) throw new Error('overview unavailable');
+  var d = await response.json();
   var cards = [
-    ['用户', d.users.total, d.users.pro + ' 个付费套餐生效' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
-    ['本月发布', d.publishes.monthTotal, '全部用户合计'],
-    ['待确认订单', d.orders.pending, d.orders.paid + ' 笔已支付 · 收入 ¥' + (d.orders.revenueFen / 100).toFixed(0)],
-    ['公众号账号', d.accounts.total, 'AppSecret 加密存储'],
+    ['用户', d.users.total, d.users.pro + ' 条旧版套餐记录' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
+    ['本月草稿', d.publishes.monthTotal, '全部用户合计'],
+    ['历史待确认订单', d.orders.pending, d.orders.paid + ' 笔历史已支付标记'],
+    ['公众号账号', d.accounts.total, '请保护凭据与备份'],
+    ['待核对发布', (d.claims || {}).pending || 0, '回执丢失，需要人工核对'],
     ['今日事件', d.eventsToday, '审计流 24h 窗口']
   ];
-  var g = document.getElementById('stat-grid');
   g.innerHTML = cards.map(function (c) {
     return '<div class="stat"><div class="stat-n">' + esc(c[1]) + '</div>'
       + '<div class="stat-t">' + esc(c[0]) + '</div><div class="stat-s">' + esc(c[2]) + '</div></div>';
   }).join('');
+  status.textContent = '';
+  } catch (error) { status.textContent = '无法读取服务概览，请检查连接后刷新。'; }
 }
+
+/* ---------- scheduled drafts ---------- */
+async function loadJobs() {
+  var status = document.getElementById('jobs-status'), rows = document.getElementById('j-rows');
+  status.textContent = '正在读取任务…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/jobs');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.jobs)) throw new Error('任务数据格式错误');
+    var labels = { pending: '等待投递', running: '投递中', done: '草稿已确认',
+      failed: '失败，请核对', cancelled: '已取消', interrupted: '结果未知，请检查草稿箱' };
+    if (!data.jobs.length) {
+      rows.innerHTML = '<tr><td colspan="6" class="empty">暂无排程任务</td></tr>';
+    } else {
+      rows.innerHTML = data.jobs.map(function (job, index) {
+        var when = new Date(job.runAt);
+        var label = Object.prototype.hasOwnProperty.call(labels, job.status) ? labels[job.status] : '状态未知，请检查';
+        var action = job.status === 'pending' && typeof job.id === 'string'
+          ? '<button class="btn btn-ghost btn-sm" data-cancel-job="' + index + '">取消任务</button>' : '—';
+        return '<tr><td>' + esc(job.title) + '</td><td>' + esc(job.account) + '</td><td>'
+          + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
+          + esc(label) + '</td><td class="key">' + esc(job.id) + '</td><td>' + action + '</td></tr>';
+      }).join('');
+      rows.querySelectorAll('[data-cancel-job]').forEach(function (button) {
+        var job = data.jobs[Number(button.dataset.cancelJob)];
+        button.onclick = function () { confirmCancelJob(job); };
+      });
+    }
+    status.textContent = '共 ' + data.jobs.length + ' 个任务';
+  } catch (error) {
+    status.textContent = '无法读取任务，请检查服务连接和权限后刷新。';
+  }
+}
+function confirmCancelJob(job) {
+  confirmBox('取消「' + (job.title || '未命名任务') + '」的排程？已开始投递的任务无法在此取消。', async function () {
+    try {
+      var response = await api('/v1/jobs/' + encodeURIComponent(job.id), { method: 'DELETE' });
+      if (!response.ok) throw new Error('not cancelled');
+      var result = await response.json();
+      if (result.ok !== true) throw new Error('not confirmed');
+      toast('任务已取消', 'ok');
+    } catch (error) {
+      toast('未能确认取消结果，请刷新任务状态后再操作。', 'err');
+    }
+    refreshDrafts();
+  });
+}
+async function loadDraftHistory() {
+  var status = document.getElementById('history-status'), rows = document.getElementById('h-rows');
+  status.textContent = '正在读取记录…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/history?limit=100');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.history)) throw new Error('记录格式错误');
+    var labels = { published: '草稿已确认', 'scheduled-published': '排程草稿已确认',
+      failed: '失败，请核对', 'scheduled-failed': '排程失败，请核对',
+      'outcome-unknown': '结果未知，请检查草稿箱', 'scheduled-outcome-unknown': '结果未知，请检查草稿箱',
+      deduped: '重复请求已处理，请核对任务', 'scheduled-deduped': '排程草稿已确认', scheduled: '已排程', cancelled: '已取消' };
+    var records = data.history.filter(function (entry) { return entry && Object.prototype.hasOwnProperty.call(labels, entry.event); }).reverse();
+    if (!records.length) rows.innerHTML = '<tr><td colspan="4" class="empty">最近没有可显示的投递记录</td></tr>';
+    else rows.innerHTML = records.map(function (entry) {
+      var when = new Date(entry.ts);
+      return '<tr><td>' + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
+        + esc(entry.title) + '</td><td>' + esc(entry.account) + '</td><td>' + esc(labels[entry.event]) + '</td></tr>';
+    }).join('');
+    status.textContent = '显示 ' + records.length + ' 条记录';
+  } catch (error) { status.textContent = '无法读取记录，请检查服务连接和权限后刷新。'; }
+}
+function refreshDrafts() { void loadJobs(); void loadDraftHistory(); }
+document.getElementById('jobs-refresh').onclick = refreshDrafts;
 
 /* ---------- users ---------- */
 var usersCache = [];
@@ -270,10 +409,11 @@ function renderUsers() {
       var target = usersCache.find(function (u) { return u.id === b.dataset.dis; });
       var toDisabled = !target.disabled;
       confirmBox('确定' + (toDisabled ? '停用' : '启用') + '用户「' + target.contact + '」？', async function () {
-        await api('/v1/admin/users/' + b.dataset.dis + '/disable', {
+        var r = await api('/v1/admin/users/' + b.dataset.dis + '/disable', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ disabled: toDisabled })
         });
+        if (!r.ok) return toast('操作未完成（HTTP ' + r.status + '）', 'err');
         toast(toDisabled ? '已停用' : '已启用', 'ok');
         loadUsers();
       });
@@ -306,7 +446,7 @@ document.getElementById('u-search').addEventListener('input', renderUsers);
 function openModal(html) {
   var mask = document.getElementById('modal-mask'), m = document.getElementById('modal');
   m.innerHTML = html;
-  mask.style.display = 'flex';
+  showModal();
 }
 function openExtend(target) {
   openModal('<h3>开通 / 延期</h3>'
@@ -318,20 +458,30 @@ function openExtend(target) {
     + '<button class="btn btn-ghost btn-sm" onclick="closeModal()">取消</button>'
     + '<button class="btn btn-sm" id="m-go">执行</button></div>');
   document.getElementById('m-go').onclick = async function () {
-    var r = await api('/v1/admin/users', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ contact: gv('m-contact'), plan: gv('m-plan'), months: +gv('m-months') })
-    });
-    var d = await r.json();
-    if (d.apiKey) {
-      document.getElementById('m-out').innerHTML =
-        '<span class="success">✅ ' + (d.extended ? '已延期，到期 ' : '已开通，key: ') + '</span>'
-        + (d.extended ? esc(d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : '') : '<span class="key" data-k2="' + esc(d.apiKey) + '">' + esc(d.apiKey) + '</span>');
-      var k = document.querySelector('[data-k2]');
-      if (k) k.onclick = function () { copyText(k.dataset.k2, '完整 key 已复制'); };
-      loadUsers();
-    } else {
-      document.getElementById('m-out').textContent = JSON.stringify(d);
+    var button = this, out = document.getElementById('m-out'), completed = false;
+    button.disabled = true;
+    out.style.display = 'block';
+    out.textContent = '处理中…';
+    try {
+      var r = await api('/v1/admin/users', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contact: gv('m-contact'), plan: gv('m-plan'), months: +gv('m-months') })
+      });
+      var d = await r.json();
+      if (r.ok && d.apiKey) {
+        completed = true;
+        out.innerHTML = '<span class="success">' + (d.extended ? '已延期，到期 ' : '已开通，key: ') + '</span>'
+          + (d.extended ? esc(d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : '') : '<span class="key" data-k2="' + esc(d.apiKey) + '">' + esc(d.apiKey) + '</span>');
+        var k = document.querySelector('[data-k2]');
+        if (k) k.onclick = function () { copyText(k.dataset.k2, '完整 key 已复制'); };
+        loadUsers();
+      } else {
+        out.textContent = '操作未完成：' + (d.message || d.code || r.status);
+      }
+    } catch (e) {
+      out.textContent = '连接中断，操作结果可能未知。请先刷新用户列表确认，再决定是否重试。';
+    } finally {
+      button.disabled = completed;
     }
   };
 }
@@ -351,20 +501,10 @@ async function loadOrders() {
       + '<td>' + esc(o.provider || '—') + '</td>'
       + '<td>' + relTime(o.createdAt) + '</td>'
       + '<td class="td-actions">'
-      + (o.status === 'paid'
-        ? '<span class="badge badge-green">已支付</span>'
-        : '<button class="btn btn-sm" data-pay="' + o.id + '" data-c="' + esc(o.contact) + '">确认收款</button>')
+      + '<span class="badge badge-gray">' + esc(o.status === 'paid' ? '已支付（历史）' : '待确认（历史/测试）') + '</span>'
       + '</td></tr>';
   }).join('');
-  tb.querySelectorAll('[data-pay]').forEach(function (b) {
-    b.onclick = function () {
-      confirmBox('确认已收到「' + b.dataset.c + '」的款项并开通所购套餐？', async function () {
-        await api('/v1/admin/orders/' + b.dataset.pay + '/complete', { method: 'POST' });
-        toast('已开通', 'ok');
-        loadOrders();
-      });
-    };
-  });
+
 }
 document.getElementById('o-filter').onchange = loadOrders;
 
@@ -375,7 +515,7 @@ async function loadAccounts() {
   if (!(d.accounts ?? []).length) { tb.innerHTML = '<tr><td colspan="4" class="empty">还没有账号</td></tr>'; return; }
   tb.innerHTML = d.accounts.map(function (a) {
     return '<tr><td><b>' + esc(a.name) + '</b></td><td class="key">' + esc(a.appId) + '</td>'
-      + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">公共</span>') + '</td>'
+      + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">管理员</span>') + '</td>'
       + '<td>' + esc(a.source === 'config' ? 'server.json' : '数据库') + '</td></tr>';
   }).join('');
 }
@@ -383,8 +523,8 @@ document.getElementById('acc-btn').onclick = function () {
   openModal('<h3>新增公众号账号</h3>'
     + '<label>账号名</label><input id="a-name">'
     + '<label>AppID</label><input id="a-appid" placeholder="wx 开头">'
-    + '<label>AppSecret</label><input id="a-secret" placeholder="重置后复制">'
-    + '<label>所属用户联系方式（留空=公共）</label><input id="a-owner">'
+    + '<label>AppSecret</label><input id="a-secret" type="password" autocomplete="off" placeholder="从公众号平台获取">'
+    + '<label>所属用户联系方式（留空=管理员账号）</label><input id="a-owner">'
     + '<div class="msg" id="a-out"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">'
     + '<button class="btn btn-ghost btn-sm" id="a-verify">① 验证连通性</button>'
@@ -412,8 +552,150 @@ document.getElementById('acc-btn').onclick = function () {
   };
 };
 
+/* ---------- unresolved immediate claims ---------- */
+var claimsCache = [];
+async function loadClaims() {
+  var status = document.getElementById('claims-status'), rows = document.getElementById('c-rows');
+  status.textContent = '正在读取待核对请求…';
+  rows.innerHTML = '';
+  try {
+    var response = await api('/v1/admin/claims');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    if (!Array.isArray(data.claims)) throw new Error('待核对数据格式错误');
+    claimsCache = data.claims;
+    if (!claimsCache.length) {
+      rows.innerHTML = '<tr><td colspan="6" class="empty">当前没有待核对的发布</td></tr>';
+      status.textContent = '';
+      return;
+    }
+    rows.innerHTML = claimsCache.map(function (claim, index) {
+      var when = claim.createdAt ? new Date(claim.createdAt) : null;
+      return '<tr><td>' + esc(when && !Number.isNaN(when.getTime()) ? when.toLocaleString() : '—') + '</td>'
+        + '<td>' + esc(claim.ownerContact || claim.owner) + '</td>'
+        + '<td>' + esc(claim.account || '—') + '</td>'
+        + '<td>' + esc(claim.title || '—') + '</td>'
+        + '<td class="key">' + esc(claim.key) + '</td>'
+        + '<td><button class="btn btn-ghost btn-sm" data-inspect="' + index + '">核对草稿箱</button></td></tr>';
+    }).join('');
+    rows.querySelectorAll('[data-inspect]').forEach(function (button) {
+      var claim = claimsCache[Number(button.dataset.inspect)];
+      button.onclick = function () { openClaimInspection(claim); };
+    });
+    status.textContent = '共 ' + claimsCache.length + ' 条待核对';
+  } catch (error) {
+    status.textContent = '无法读取待核对请求，请检查服务连接和权限后刷新。';
+  }
+}
+function claimErrorText(code, message) {
+  var known = {
+    CLAIM_NOT_VERIFIED: '该草稿不在当前公众号的草稿箱中。请重新读取草稿箱后再选。',
+    CLAIM_STILL_PRESENT: '草稿箱里仍有同标题草稿，不能按「不存在」处理；如果就是它，请确认草稿存在。',
+    CLAIM_ABSENCE_UNPROVEN: '草稿箱没有完整读取，无法证明草稿不存在。请归档旧草稿后重试，或按 media_id 确认。',
+    CLAIM_CONTEXT_MISSING: '这条请求缺少公众号或标题上下文，无法自动核对。请保持原样，不要重发。',
+    CLAIM_NOT_PENDING: '这条请求已经被处理或过期，请刷新列表。',
+    ACCOUNT_NOT_FOUND: '这条请求的公众号已不在本服务中，无法读取草稿箱。请保持原样。',
+    NOT_FOUND: '服务端没有这条待核对请求，请刷新列表。'
+  };
+  if (Object.prototype.hasOwnProperty.call(known, code)) return known[code];
+  if (typeof code === 'string' && code.indexOf('WECHAT_') === 0) {
+    return '微信接口暂时不可用（' + code + '），没有修改任何状态，请稍后再核对。';
+  }
+  if (typeof message === 'string' && message) return message;
+  return '操作未完成，请稍后刷新再试。';
+}
+function openClaimInspection(claim) {
+  openModal('<h3>核对微信草稿箱</h3>'
+    + '<p class="hint">公众号：' + esc(claim.account || '未知') + '　标题：' + esc(claim.title || '未知') + '</p>'
+    + '<p class="hint">请求编号 <span class="key">' + esc(claim.key) + '</span></p>'
+    + '<div id="claim-body"><div class="hint">读取草稿箱是只读操作，不会修改微信内容。请先读取，再根据结果确认「已存在」或「不存在」。</div>'
+    + '<button class="btn btn-sm" id="claim-load">读取草稿箱</button></div>');
+  document.getElementById('claim-load').onclick = function () { void inspectClaim(claim, false); };
+}
+async function inspectClaim(claim, includeAll) {
+  var body = document.getElementById('claim-body');
+  body.innerHTML = '<div class="hint">正在读取微信草稿箱…</div>';
+  try {
+    var response = await api('/v1/admin/claims/' + encodeURIComponent(claim.key) + '/candidates' + (includeAll ? '?includeAll=1' : ''));
+    var data = await response.json();
+    if (!response.ok) throw new Error(claimErrorText(data.code, data.message));
+    renderClaimCandidates(claim, data, includeAll);
+  } catch (error) {
+    body.innerHTML = '<div class="msg" style="display:block">无法读取草稿箱：' + esc(error.message) + '。该请求仍保持待核对，不要直接重发。</div>'
+      + '<button class="btn btn-ghost btn-sm" id="claim-retry">重新读取</button>';
+    document.getElementById('claim-retry').onclick = function () { void inspectClaim(claim, includeAll); };
+  }
+}
+function renderClaimCandidates(claim, data, includeAll) {
+  var body = document.getElementById('claim-body');
+  var items = data.candidates || [];
+  var head = '<p class="hint">已读取 ' + esc(data.scanned) + ' / ' + esc(data.totalCount) + ' 个草稿'
+    + (data.complete ? '' : '（未能完整读取，暂不能确认「不存在」）')
+    + (data.sameTitleCount === 0 ? '；没有同标题草稿' : '；同标题 ' + esc(data.sameTitleCount) + ' 个') + '。</p>';
+  var list = items.length
+    ? items.map(function (candidate, index) {
+        return '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--surface-2)">'
+          + '<input type="radio" name="claim-pick" value="' + index + '">'
+          + '<span><b>' + esc(candidate.title || '（无标题）') + '</b>'
+          + '<span class="dim" style="display:block">' + esc(candidate.mediaId) + '</span></span></label>';
+      }).join('')
+    : '<div class="hint">当前列表中没有草稿。</div>';
+  body.innerHTML = head
+    + (includeAll
+      ? '<button class="btn btn-ghost btn-sm" id="claim-same">只看同标题草稿</button>'
+      : '<button class="btn btn-ghost btn-sm" id="claim-all">显示该账号全部草稿</button>')
+    + '<div style="max-height:36vh;overflow:auto;margin:12px 0">' + list + '</div>'
+    + '<label>核对说明（必填，会写入审计记录）</label>'
+    + '<textarea id="claim-note" rows="2" style="width:100%" placeholder="例如：已按标题和创建时间在草稿箱核对"></textarea>'
+    + '<div class="msg" id="claim-out" style="display:none"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px">'
+    + '<button class="btn btn-ghost btn-sm" id="claim-absent">没有这篇草稿</button>'
+    + '<button class="btn btn-sm" id="claim-delivered">确认是这篇草稿</button></div>';
+  var allButton = document.getElementById('claim-all'), sameButton = document.getElementById('claim-same');
+  if (allButton) allButton.onclick = function () { void inspectClaim(claim, true); };
+  if (sameButton) sameButton.onclick = function () { void inspectClaim(claim, false); };
+  document.getElementById('claim-delivered').onclick = function () {
+    var picked = body.querySelector('input[name="claim-pick"]:checked');
+    if (!picked) {
+      toast('请先选中草稿箱里的那篇草稿', 'err');
+      return;
+    }
+    return reconcileClaim(claim, 'delivered', items[Number(picked.value)].mediaId);
+  };
+  document.getElementById('claim-absent').onclick = function () { return reconcileClaim(claim, 'absent', null); };
+}
+async function reconcileClaim(claim, outcome, mediaId) {
+  var out = document.getElementById('claim-out');
+  var note = gv('claim-note');
+  if (note.length < 4) {
+    out.style.display = 'block';
+    out.textContent = '请先填写核对说明（至少 4 个字），说明你是怎么核对的。';
+    return;
+  }
+  out.style.display = 'block';
+  out.textContent = '正在提交核对结果…';
+  var payload = { outcome: outcome, note: note };
+  if (mediaId) payload.mediaId = mediaId;
+  try {
+    var response = await api('/v1/admin/claims/' + encodeURIComponent(claim.key) + '/reconcile', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    var data = await response.json();
+    if (!response.ok) {
+      out.textContent = claimErrorText(data.code, data.message);
+      return;
+    }
+    toast(outcome === 'delivered' ? '已确认草稿存在，原请求会去重' : '已确认草稿不存在，原请求可以重试', 'ok');
+    closeModal();
+    loadClaims();
+  } catch (error) {
+    out.textContent = '提交失败：' + error.message + '。请刷新后再核对，不要直接重发草稿。';
+  }
+}
+document.getElementById('claims-refresh').onclick = loadClaims;
+
 /* ---------- live feed (publy-ws gateway) ---------- */
-var ws = null, wsTimer = null;
+var ws = null, wsTimer = null, wsGeneration = 0, approvedWsOrigins = new Set();
 var EV_CLS = { published: 'ok', failed: 'err', scheduled: '', cancelled: 'dim', deduped: 'dim', 'purchase-paid': 'gold', 'purchase-completed': 'gold', bound: 'ok' };
 function wsUrl() {
   var saved = localStorage.getItem('publy_ws_url');
@@ -428,6 +710,9 @@ function wsSetState(state, text) {
   st.textContent = text;
 }
 function wsDown() {
+  wsGeneration++;
+  var badge = document.getElementById('conn-badge');
+  if (badge) badge.style.display = 'none';
   if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
   if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
   var dot = document.getElementById('ws-dot');
@@ -439,14 +724,35 @@ function wsEnsure() {
   if (ws && (ws.readyState === 1 || ws.readyState === 0)) return;
   wsConnect();
 }
-function wsConnect() {
+async function wsConnect() {
   var url = document.getElementById('ws-url').value.trim();
   if (!url) return;
   localStorage.setItem('publy_ws_url', url);
   wsDown();
-  wsSetState('wait', '连接中…');
-  try { ws = new WebSocket(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(KEY)); }
-  catch (e) { wsSetState('err', '地址无效'); return; }
+  wsSetState('wait', '获取连接凭证…');
+  var keyAtStart = KEY, generation = wsGeneration;
+  try {
+    var target = new URL(url);
+    if ((target.protocol !== 'ws:' && target.protocol !== 'wss:') || target.username || target.password || target.hash)
+      throw new Error('网关地址无效，请使用 ws 或 wss 地址');
+    if (location.protocol === 'https:' && target.protocol !== 'wss:') throw new Error('HTTPS 页面需要加密的 wss 连接');
+    var localTarget = ['localhost', '127.0.0.1', '[::1]'].indexOf(target.hostname) !== -1;
+    var needsApproval = target.hostname !== location.hostname || (target.protocol === 'ws:' && !localTarget);
+    if (needsApproval && !approvedWsOrigins.has(target.origin)) {
+      if (!window.confirm('实时动态将连接到 ' + target.origin + ' 并发送临时连接凭证。'
+          + (target.protocol === 'ws:' ? '此连接未加密。' : '') + '请确认这是你的网关。')) {
+        wsSetState('', '未连接'); return;
+      }
+      approvedWsOrigins.add(target.origin);
+    }
+    var response = await api('/v1/ws-ticket', { method: 'POST' });
+    if (!response.ok) throw new Error('无法获取短期凭证（HTTP ' + response.status + '）');
+    var data = await response.json();
+    if (!KEY || KEY !== keyAtStart || generation !== wsGeneration) return;
+    target.searchParams.set('key', data.ticket);
+    wsSetState('wait', '连接中…');
+    ws = new WebSocket(target.toString());
+  } catch (e) { if (generation === wsGeneration) wsSetState('err', '连接失败：' + e.message); return; }
   ws.onopen = function () {
     wsSetState('on', '已连接');
     document.getElementById('conn-badge').style.display = 'inline-block';
@@ -493,31 +799,49 @@ if (KEY) {
 }
 
 const ADMIN_CSS = `
-  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(13,13,13,.92);
+  :root { --bg:#f6f8f3; --surface:#fff; --surface-2:#edf3ec; --border:#dce6db;
+    --border-light:#ccd9ce; --text:#172b20; --text-2:#51665a; --text-3:#6d8074;
+    --accent:#176842; --accent-hover:#0d5030; --accent-dim:#e4f2e7; --danger:#b63737;
+    --radius:14px; --radius-sm:8px; }
+  body { font-size:15px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline:3px solid #d99445; outline-offset:3px;
+  }
+  #login-card { max-width:520px; margin:72px auto; padding:32px; }
+  #login-card h3 { font-size:22px; }
+  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(248,250,246,.94);
     backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
-  .tb-inner { max-width: 1080px; margin: 0 auto; padding: 14px 20px;
+  .tb-inner { max-width: 1180px; margin: 0 auto; padding: 16px 24px;
     display: flex; align-items: center; justify-content: space-between; }
   .brand { font-size: 17px; font-weight: 700; }
   .brand span { color: var(--accent); }
   .tb-right { display: flex; gap: 10px; align-items: center; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 36px 24px 72px; }
+  .workspace-heading { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:28px; }
+  .workspace-eyebrow { color:var(--accent); font-size:11px; letter-spacing:.13em; font-weight:700; }
+  .workspace-heading h1 { font-size:28px; letter-spacing:-.03em; margin:4px 0; }
+  .workspace-heading p { color:var(--text-2); font-size:14px; }
+  .workspace-status { color:var(--accent); background:var(--accent-dim); border-radius:999px; padding:6px 12px; font-size:12px; white-space:nowrap; }
   .btn-sm { padding: 7px 14px; font-size: 13px; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
   .tab { background: transparent; border: 0; color: var(--text-2); font-size: 14px;
     padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .panel .card { margin-bottom: 16px; }
+  .panel .card { margin-bottom: 16px; overflow-x: auto; box-shadow:0 8px 24px #1a38250a; }
+  .panel .hint { font-size:13px; }
+  .tabs { overflow-x: auto; }
+  .tab { white-space: nowrap; }
   .card-head { display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .card-head h3 { border: 0; padding: 0; margin: 0; font-size: 15px; }
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px; margin-bottom: 16px; }
   .stat { background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 18px 20px; }
+    border-radius: var(--radius); padding: 22px; box-shadow:0 8px 24px #1a38250a; }
   .stat-n { font-size: 30px; font-weight: 700; line-height: 1.2; }
   .stat-t { font-size: 13px; color: var(--text-2); margin-top: 2px; }
-  .stat-s { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+  .stat-s { font-size: 12px; color: var(--text-3); margin-top: 6px; }
   .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
     margin-bottom: 4px; width: 120px; display: inline-block; vertical-align: middle; }
   .bar-in { height: 100%; background: var(--accent); border-radius: 3px; }
@@ -559,6 +883,14 @@ const ADMIN_CSS = `
   .ev-b.gold { background: rgba(234,179,8,.12); color: #eab308; }
   .ev-b.dim { background: var(--surface-2); color: var(--text-3); }
   .ev-main { flex: 1; word-break: break-all; }
+  @media (max-width:640px) {
+    .wrap { padding:24px 18px 56px; }
+    .workspace-heading { align-items:flex-start; flex-direction:column; gap:12px; }
+    .workspace-heading h1 { font-size:24px; }
+    .card-head { flex-wrap:wrap; gap:12px; }
+    #u-search, #ws-url { max-width:100%; }
+    table { min-width:620px; }
+  }
   select { width: auto; padding: 8px 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 13px; }
 `;

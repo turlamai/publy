@@ -20,22 +20,47 @@ publy check "/path/to/article.md" --json
 publy preview "/path/to/article.md" --json --out "/tmp/publy-review.html"
 publy render "/path/to/article.md" --json
 publy theme ls --json
+publy theme preview medium --json
 publy account list --json
+publy account add Work --theme claude --json  # explicit local mutation; user approval required
 publy quota --json
 publy jobs list --json
 publy history --json
+publy tunnel --json  # explicit network action; starts/configures SSH
 ```
 
 `capabilities --json` runs without a network connection, account, browser or
-side effects and returns a **versioned** manifest. Each command declares
-`json` support and whether it reads, writes local output, may access the
-network or performs a draft-creating/mutating action. **Do not guess** that
-every command supports `--json`: `theme preview` and some legacy commands are still human-oriented.
+side effects and returns a **versioned** manifest. Each command declares its
+`json` support, `network` behavior, `effect`, `usage` example,
+`prerequisites` (stable tokens such as `markdown-file`, `configured-server`,
+`api-key`, `wechat-account`, `config.tunnel`) and `requiresUserApproval`.
+Every advertised command currently supports `--json`; treat the manifest, not
+this document, as the source of truth for a given build.
+`account add <name> --json` returns an `account-add` object with `ACCOUNT_SAVED`, `ACCOUNT_NAME_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`. It does not echo App IDs, author metadata or configuration contents; omitted options preserve existing fields. This local mutation requires explicit user approval.
+
+`publy tunnel --json` reports `status:"up"` with `localPort`, `remotePort` and
+`server`, or `ok:false` with `TUNNEL_NOT_CONFIGURED` (no config; exit 1) or
+`TUNNEL_UNREACHABLE` (exit 5). `startedByThisCall` and `networkUsed` are false
+when the local port was already listening, so a read does not claim network
+use. The command may start SSH and therefore requires explicit user approval.
+
+A `DRAFT_OUTCOME_UNKNOWN` response to `publish --json` is reported as
+`status:"unknown"` with the original request ID (exit 5). The server keeps an
+unresolved keyed immediate request blocked after restart; query its result and
+inspect WeChat drafts rather than replaying it. This is a development-source
+contract, not an exactly-once guarantee. A specific `WECHAT_<code>` response
+from the server is an explicit rejection and is reported as `rejected`;
+unrecognized server failures remain unknown.
+
 `config set <key> <value> --json` returns a single `config-set` object (`CONFIG_SAVED`, `CONFIG_KEY_INVALID`, `CONFIG_INVALID` or `CONFIG_WRITE_FAILED`) without ever echoing values, including API keys or credential-bearing URLs. This is a local mutation and requires the operator's approval.
 `jobs cancel --json` and `jobs retry --json` now return structured results,
 but are **mutating operations requiring explicit user approval**. If their
 network outcome is uncertain, they return `status:"unknown"` with the original
 job ID; query `jobs list --json` before deciding what to do next.
+An interrupted draft job is never blindly re-submitted: retry only reconciles
+an exact confirmed local record, or re-admits a proven pre-submission failure.
+HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` requires remote
+draft inspection; retain the original account, job and request identity.
 Those remaining commands' `json:false` entry is deliberate, not hidden implementation detail.
 
 ## Structured local review
@@ -59,6 +84,10 @@ blocking problems may still be written for human review, but exits with 4
 and has `ok:false` in JSON mode. Neither `check` nor `preview` creates
 a WeChat draft.
 
+### Publication format
+
+When `capabilities --json` advertises `publicationFormats`, pass the same `--format article|image|cards` to `check`, `preview`, and `publish` to choose one operation without modifying the Markdown. `formatSource` identifies an explicit choice, existing frontmatter, or the article default. Invalid values return `FORMAT_INVALID` before submission. Inspect the preview for the selected format; do not infer it from length or images. The reusable [Publy publishing skill](../skills/publy-publish/SKILL.md) describes the agent workflow.
+
 ## Raw HTML export and bundled theme discovery
 
 `render --json` creates a permission-limited local HTML file and returns
@@ -69,9 +98,13 @@ submission workflow; it is not automatically paste-ready. The source never
 changes, an existing output requires explicit `--force`, and the command
 never uploads or publishes anything.
 
-`theme ls --json` returns only bundled article/card theme names with
-`source:"bundled"` and `networkUsed:false`. Legacy human-readable
-`theme ls` may attempt registry lookup, but the Agent JSON command does not.
+`theme ls --json` returns bundled article/card names plus `installedArticleThemes` metadata with `source:"bundled"` and `networkUsed:false`. Listing remains offline. `theme pack`, `add`, `update` and `remove` write local files and require the user's approval. Pack refuses to overwrite an output. HTTPS add/update requires a caller-supplied full-file `--sha256`, does not follow redirects and reports `networkUsed`; local sources remain offline. Successful mutations return `kind:"theme-bundle"`, `ok:true` and a stable `code`; invalid bundles or failed writes return specific `THEME_*` codes (exit 2), including `THEME_HASH_MISMATCH`, `THEME_UNSAFE_CSS`, `THEME_EXISTS` and `THEME_NOT_FOUND`. A checksum does not authenticate an author. See the [theme instructions](USER-GUIDE.md#use-a-standalone-article-theme-cli-development-build).
+
+`theme preview <name> --json` renders a private HTML sample without network
+access or opening a browser, returning `kind:"theme-preview"`, `output`, the
+theme type, and `networkUsed:false`. Unknown themes return `UNKNOWN_THEME`
+(exit 2); rendering failures return `THEME_PREVIEW_FAILED` (exit 3). If an
+article and card theme share a name, the existing card-first rule applies.
 
 ## Network submission and reconciliation
 

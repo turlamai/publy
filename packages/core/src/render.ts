@@ -50,6 +50,8 @@ export interface RenderResult {
   cover?: string;
   attachments: Attachment[];
   warnings: string[];
+  /** Remove only internally generated intermediate files after consuming attachments. */
+  cleanup(): void;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -156,6 +158,22 @@ class AttachmentCollector {
 }
 
 export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderResult {
+  const generatedDirs = new Set<string>();
+  const cleanup = () => {
+    for (const dir of generatedDirs) fs.rmSync(dir, { recursive: true, force: true });
+    generatedDirs.clear();
+  };
+  try {
+    return renderMarkdownWithCleanup(raw, opts, generatedDirs, cleanup);
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}
+
+function renderMarkdownWithCleanup(
+  raw: string, opts: RenderOptions, generatedDirs: Set<string>, cleanup: () => void,
+): RenderResult {
   const warnings: string[] = [];
   const { meta, body } = parseSource(raw);
   const baseDir = opts.baseDir ?? process.cwd();
@@ -264,6 +282,7 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     let name = mathNames.get(hex);
     if (!name) {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-math-"));
+      generatedDirs.add(outDir);
       const outPath = path.join(outDir, `formula-${hex}.png`);
       fs.writeFileSync(outPath, img.png);
       name = collector.add(outPath);
@@ -271,12 +290,12 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     }
     $(el).attr("src", `${ATTACHMENT_SCHEME}${name}`);
     // inline style wins over theme `img` rules — themes set display:block on
-    // images, which would tear an inline formula out of the text line
+    // images and add block-image margins, which would enlarge the text line
     $(el).attr(
       "style",
       display
         ? `display:block;margin:12px auto;width:${img.widthPx}px`
-        : `display:inline-block;width:${img.widthPx}px;vertical-align:${img.valignPx}px;border-radius:0`,
+        : `display:inline-block;margin:0;padding:0;width:${img.widthPx}px;vertical-align:${img.valignPx}px;border-radius:0`,
     );
     $(el).removeAttr("data-tex data-display data-hex");
   });
@@ -318,6 +337,7 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     if (filePath.toLowerCase().endsWith(".svg")) {
       try {
         filePath = svgToPng(filePath);
+        generatedDirs.add(path.dirname(filePath));
       } catch (e) {
         warnings.push(`SVG conversion failed for ${filePath}: ${(e as Error).message}`);
         return;
@@ -377,6 +397,7 @@ export function renderMarkdown(raw: string, opts: RenderOptions = {}): RenderRes
     cover,
     attachments: collector.attachments,
     warnings,
+    cleanup,
   };
 }
 

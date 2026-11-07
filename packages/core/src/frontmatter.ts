@@ -25,15 +25,39 @@ export interface ParsedSource {
   body: string;
 }
 
+export type PublicationFormat = "article" | "image" | "cards";
+
+/** Resolve one publishing operation without mutating the source metadata. */
+export function resolvePublication(meta: SourceMeta, choice?: PublicationFormat): {
+  format: PublicationFormat;
+  type: "article" | "image_post";
+  source: "choice" | "frontmatter" | "default";
+} {
+  if (choice !== undefined && !["article", "image", "cards"].includes(choice)) {
+    throw new Error("Unsupported publication format");
+  }
+  const type = typeof meta.type === "string" ? meta.type.toLowerCase() : "";
+  const mode = typeof meta.mode === "string" ? meta.mode.toLowerCase() : "";
+  const metadataFormat: PublicationFormat = type
+    ? (type === "image" || type === "image_post" ? (mode === "cards" ? "cards" : "image") : "article")
+    : (mode === "cards" ? "cards" : "article");
+  const format = choice ?? metadataFormat;
+  return { format, type: format === "article" ? "article" : "image_post",
+    source: choice ? "choice" : type || mode === "cards" ? "frontmatter" : "default" };
+}
+
 export function parseSource(raw: string): ParsedSource {
   const { data, content } = matter(raw);
   return { meta: data as SourceMeta, body: content };
 }
 
+/** The text accompanying an image post, using the same rules for all clients. */
+export function imagePostCaption(raw: string): string {
+  return parseSource(raw).body.split("\n")
+    .filter((line) => !/^\s*!\[\[|^\s*!\[/.test(line))
+    .join("\n").trim();
+}
+
 export function publishType(meta: SourceMeta): "article" | "image_post" {
-  // explicit type always wins (escape hatch); mode inference only fills the gap
-  const t = (meta.type ?? "").toLowerCase();
-  if (t) return t === "image" || t === "image_post" ? "image_post" : "article";
-  if ((meta.mode ?? "").toLowerCase() === "cards") return "image_post";
-  return "article";
+  return resolvePublication(meta).type;
 }

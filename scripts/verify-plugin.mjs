@@ -7,6 +7,7 @@
 // With an argument, the prepared plugin dir is used as-is (vault layout).
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import Module from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -21,24 +22,45 @@ const communityOnly = process.argv.includes("--community-only");
 // files fetched by Obsidian. Side-loaded ZIPs are a different contract.
 const args = process.argv.slice(2).filter((x) => x !== "--community-only");
 if (args.length > 1) throw new Error("usage: verify-plugin.mjs [--community-only] [plugin-directory]");
-const pluginDir = args[0] ?? fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-verify-"));
+const suppliedPluginDir = args[0];
+// A supplied directory represents an already-prepared install. Never replace
+// its files with local dist output or remove its sidecars: doing so could make
+// a broken release appear to pass, and would mutate the caller's vault.
+const pluginDir = suppliedPluginDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-verify-"));
+const communityFiles = ["main.js", "manifest.json", "styles.css"];
+// A supplied vault belongs to the caller. Only remove the synthetic directory
+// created by this harness, including on an explicit failure exit.
+if (suppliedPluginDir === undefined) {
+  process.once("exit", () => { try { fs.rmSync(pluginDir, { recursive: true, force: true }); } catch {} });
+}
 
-// prepare the vault plugin dir from dist (same layout as a real install)
-for (const f of (communityOnly
-  ? ["main.js", "manifest.json", "styles.css"]
-  : ["main.js", "manifest.json", "versions.json", "styles.css"])) {
-  fs.copyFileSync(path.join(distDir, f), path.join(pluginDir, f));
-}
-// No installed sidecars in community-only mode, even when a developer happens
-// to reuse an existing vault-like directory from a previous side-loaded build.
-for (const dir of ["node_modules", "fonts"]) {
-  fs.rmSync(path.join(pluginDir, dir), { recursive: true, force: true });
-}
-if (!communityOnly) {
-  for (const dir of ["node_modules", "fonts"]) {
-    if (fs.existsSync(path.join(distDir, dir))) {
-      fs.cpSync(path.join(distDir, dir), path.join(pluginDir, dir), { recursive: true });
+if (suppliedPluginDir === undefined) {
+  // Only synthesize an installation when no directory was supplied.
+  for (const f of (communityOnly
+    ? communityFiles
+    : [...communityFiles, "versions.json"])) {
+    fs.copyFileSync(path.join(distDir, f), path.join(pluginDir, f));
+  }
+  if (!communityOnly) {
+    for (const dir of ["node_modules", "fonts"]) {
+      if (fs.existsSync(path.join(distDir, dir))) {
+        fs.cpSync(path.join(distDir, dir), path.join(pluginDir, dir), { recursive: true });
+      }
     }
+  }
+}
+if (communityOnly) {
+  // The Community Directory downloads exactly three release files. Reject
+  // extra files/directories rather than silently deleting or ignoring them.
+  const actual = fs.readdirSync(pluginDir);
+  const missing = communityFiles.filter((name) => !actual.includes(name));
+  const unexpected = actual.filter((name) => !communityFiles.includes(name));
+  if (missing.length || unexpected.length) {
+    throw new Error(
+      "Community Directory install must contain exactly main.js, manifest.json, styles.css" +
+      "; missing: " + (missing.join(", ") || "none") +
+      "; unexpected: " + (unexpected.join(", ") || "none"),
+    );
   }
 }
 
@@ -46,11 +68,17 @@ if (!communityOnly) {
 
 const calls = [];
 let lastSubmitted = null;
+let nextPublishResponse = null;
+let nextPublishStatus = 200;
+let nextQueryResponse = null;
+let lastPreviewHtml = "";
+let settingTab;
+const dropdownOptions = [];
 
 class Component {
   replaceChildren(...children) { this.children = children; }
   empty() { this.children = []; }
-  createEl() { return { children: [], style: {} }; }
+  createEl() { const el = new Component(); el.style = {}; el.setText = () => {}; return el; }
   appendChild() {}
 }
 
@@ -61,7 +89,7 @@ class ItemView {
   getIcon() { return "send"; }
   async onOpen() {}
   async onClose() {}
-  setHtml(html) { calls.push("view.setHtml(" + html.length + " chars)"); }
+  setHtml(html) { lastPreviewHtml = html; calls.push("view.setHtml(" + html.length + " chars)"); }
   beginCards() { this.cards = []; calls.push("view.beginCards"); }
   appendCard(b64) { if (typeof b64 !== "string" || b64.length === 0) throw new Error("empty rendered card"); this.cards.push(b64); }
   finishCards(caption) { calls.push("view.setCards(" + this.cards.length + " cards)"); }
@@ -84,7 +112,7 @@ class Plugin {
   async saveData() {}
   addRibbonIcon() { calls.push("ribbon"); }
   addCommand(cmd) { calls.push("command:" + cmd.id); this.app.commands.commands[cmd.id] = { callback: cmd.callback }; }
-  addSettingTab() { calls.push("settingsTab"); }
+  addSettingTab(tab) { calls.push("settingsTab"); settingTab = tab; }
   registerView() {}
   registerEvent() {}
   addStatusBarItem() { calls.push("statusbar"); return { setText: (t) => calls.push("status:" + t) }; }
@@ -122,7 +150,16 @@ class Setting {
   setName() { return this; }
   setDesc() { return this; }
   addText() { return this; }
-  addDropdown() { return this; }
+  addToggle() { return this; }
+  addDropdown(callback) {
+    const drop = {
+      addOption(key, label) { dropdownOptions.push([key, label]); return this; },
+      addOptions(options) { for (const key in options) if (options.hasOwnProperty(key)) this.addOption(key, options[key]); return this; },
+      setValue() { return this; }, onChange() { return this; },
+    };
+    callback(drop);
+    return this;
+  }
   addButton() { return this; }
 }
 class Modal {
@@ -144,9 +181,20 @@ class Modal {
 }
 class TFile { path = ""; }
 const stub = { Plugin, ItemView, WorkspaceLeaf, Notice, PluginSettingTab, App, Setting, TFile, Modal, sanitizeHTMLToDom: (html) => ({ html }), requestUrl: async (req) => {
+  calls.push("server-request:" + req.method + ":" + new URL(req.url).pathname);
   if (req.method === "POST" && new URL(req.url).pathname === "/v1/publish") {
     lastSubmitted = JSON.parse(req.body);
     calls.push("request:publish");
+    const response = nextPublishResponse ?? { mediaId: "SYNTHETIC-DRAFT", account: lastSubmitted.account, title: lastSubmitted.title, requestId: lastSubmitted.idempotencyKey };
+    nextPublishResponse = null;
+    const status = nextPublishStatus;
+    nextPublishStatus = 200;
+    return { json: response, status };
+  }
+  if (new URL(req.url).pathname.startsWith("/v1/publish-result/")) {
+    const response = nextQueryResponse ?? { status: "unknown" };
+    nextQueryResponse = null;
+    return { json: response, status: 200 };
   }
   return { json: {}, status: 200 };
 } };
@@ -156,11 +204,29 @@ const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === "obsidian") return stub;
   if (request === "electron") return { shell: { openPath: async (p) => { calls.push("shell.openPath:" + p); return ""; } } };
+  if (communityOnly && !Module.isBuiltin(request) &&
+      path.resolve(request) !== path.join(pluginDir, "main.js")) {
+    throw new Error("unexpected runtime package require: " + request);
+  }
   return origLoad.apply(this, arguments);
 };
 
 // --- drive the plugin --------------------------------------------------------
 
+// Deny network from bundle evaluation through onload and local rendering.
+const realFetch = globalThis.fetch;
+let renderNetworkAttempts = 0;
+globalThis.fetch = async (url) => {
+  // Satori decodes its embedded Yoga WASM through a data URL. This is
+  // bundle-local bytes, not a network or filesystem resource.
+  if (typeof url === "string" && url.startsWith("data:")) return realFetch(url);
+  renderNetworkAttempts++;
+  throw new Error("offline Obsidian rendering attempted a network fetch");
+};
+// Obsidian may already have loaded its own incompatible MathJax. The
+// bundled renderer must neither call its loader nor replace its state.
+const hostMathJax = Object.freeze({ version: "host-mathjax", loader: Object.freeze({}) });
+globalThis.MathJax = hostMathJax;
 const mainJs = path.join(pluginDir, "main.js");
 const req = createRequire(import.meta.url);
 const mod = req(path.resolve(mainJs));
@@ -181,14 +247,131 @@ await inst.onload();
 if (!calls.includes("ribbon")) fail("ribbon not registered");
 if (!calls.some((c) => c.startsWith("command:"))) fail("commands not registered");
 
+// Clipboard preflight must never report success with unresolved attachment://
+// references or unrendered formulas. No remote account or OS clipboard touched.
+{
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const originalClipboardItem = Object.getOwnPropertyDescriptor(globalThis, "ClipboardItem");
+  const writes = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true, value: { clipboard: { write: async (items) => { writes.push(items); } } },
+  });
+  Object.defineProperty(globalThis, "ClipboardItem", {
+    configurable: true, value: class ClipboardItem { constructor(data) { this.data = data; } },
+  });
+  const imageName = "publy-clipboard-smoke-" + process.pid + ".png";
+  const imagePath = path.join(os.tmpdir(), imageName);
+  fs.writeFileSync(imagePath, Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  ));
+  const copy = async (file, source) => {
+    const filePath = "samples/" + file + ".md";
+    app.vaultContentByPath[filePath] = source;
+    await inst.copyRenderedHtml({ path: filePath, basename: file, extension: "md" });
+  };
+  try {
+    await copy("copy-plain", "# A safe note\n\nHello **world**.");
+    if (writes.length !== 1) fail("plain text-only copy should use clipboard exactly once");
+    const copiedHtml = await writes[0][0].data["text/html"].text();
+    if (!copiedHtml.includes("Hello") || !/<strong\b[^>]*>world<\/strong>/.test(copiedHtml)) {
+      fail("successful text-only copy lost the rendered content");
+    }
+    await copy("copy-valid-formula", "# Formula\n\nInline $E=mc^2$.");
+    if (writes.length !== 1) fail("rendered formula attachments must not copy unresolved links");
+    await copy("copy-invalid-formula", String.raw`Bad formula $\frac{$ should not silently become pasted text.`);
+    if (writes.length !== 1) fail("invalid formula must not modify clipboard");
+    await copy("copy-image", "# Attachment\n\n![tiny](" + imageName + ")");
+    if (writes.length !== 1) fail("image attachments must not copy unusable attachment:// URLs");
+    await copy("copy-missing-image", "# Missing\n\n![lost](missing-publy-clipboard.png)");
+    if (writes.length !== 1) fail("missing images must not modify clipboard");
+  } finally {
+    fs.rmSync(imagePath, { force: true });
+    if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+    else delete globalThis.navigator;
+    if (originalClipboardItem) Object.defineProperty(globalThis, "ClipboardItem", originalClipboardItem);
+    else delete globalThis.ClipboardItem;
+  }
+}
+
+
 // article render into the in-app preview view
 app.workspace.activeFile = { path: "samples/article-sample.md", basename: "article-sample", extension: "md" };
 await inst.previewCurrentNote(); // smart dispatch -> article
 if (!calls.some((c) => c.startsWith("view.setHtml("))) fail("article preview did not render — calls: " + calls.join(" | "));
 
+// Only the synthetic run owns this theme directory. Never touch a supplied vault
+// or the user's actual installed theme store.
+if (suppliedPluginDir === undefined) {
+  const themeDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-plugin-theme-"));
+  const original = process.env.PUBLY_THEME_DIR; process.env.PUBLY_THEME_DIR = themeDir;
+  const cleanupTheme = () => { try { fs.rmSync(themeDir, { recursive: true, force: true }); } catch {} };
+  process.once("exit", cleanupTheme);
+  try {
+    const css = "#publy p { color: #123456 }";
+    const bundle = { format: "publy-theme-v1", id: "fixture", version: "1.0.0", name: "Fixture", license: "MIT", css,
+      cssSha256: crypto.createHash("sha256").update(css).digest("hex") };
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    dropdownOptions.length = 0;
+    settingTab.display();
+    if (!dropdownOptions.some(([id, label]) => id === "fixture" && label.includes("Fixture"))) {
+      fail("installed theme is missing from Obsidian settings");
+    }
+    inst.settings.theme = "fixture"; lastPreviewHtml = "";
+    await inst.previewCurrentNote();
+    if (!lastPreviewHtml.includes("#123456")) fail("installed theme did not affect the plugin article preview");
+    bundle.css = "#publy p { color: red }"; // digest no longer matches
+    fs.writeFileSync(path.join(themeDir, "fixture.json"), JSON.stringify(bundle));
+    const count = calls.filter(c => c.startsWith("view.setHtml(")).length;
+    const notices = calls.filter(c => c.startsWith("notice:Publy:")).length;
+    await inst.previewCurrentNote();
+    if (calls.filter(c => c.startsWith("view.setHtml(")).length !== count ||
+        calls.filter(c => c.startsWith("notice:Publy:")).length !== notices + 1) {
+      fail("tampered installed theme must not render or silently fall back");
+    }
+  } finally {
+    inst.settings.theme = "claude";
+    if (original === undefined) delete process.env.PUBLY_THEME_DIR; else process.env.PUBLY_THEME_DIR = original;
+    cleanupTheme(); process.removeListener("exit", cleanupTheme);
+  }
+}
+
+// Valid TeX must become real PNGs, not a raw-TeX fallback that merely makes
+// article preview appear successful when MathJax is absent.
+app.vaultContentByPath["samples/math.md"] = "# Math\n\nInline $E=mc^2$.\n\n$$\n\\int_0^1 x^2 \\, dx = \\frac{1}{3}\n$$\n";
+app.workspace.activeFile = { path: "samples/math.md", basename: "math", extension: "md" };
+await inst.previewCurrentNote();
+const mathPngs = [...lastPreviewHtml.matchAll(/src="data:image\/png;base64,([^"\s]+)"/g)];
+if (mathPngs.length !== 2) fail("inline and block math must render two PNGs without sidecars");
+for (const [, data] of mathPngs) {
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.length < 500 || !bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) {
+    fail("formula output is not a nonempty PNG");
+  }
+}
+if (calls.some((c) => c.startsWith("server-request:"))) fail("local preview contacted the server");
+
 // card deck render into the in-app preview view (wasm + satori + harfbuzzjs)
 app.workspace.activeFile = { path: "samples/card-sample.md", basename: "card-sample", extension: "md" };
-await inst.previewCurrentNote(); // smart dispatch -> card deck
+try {
+  await inst.previewCurrentNote(); // smart dispatch -> card deck
+  // Resvg retains module state across disable/enable. A second onload must
+  // accept already-initialized WASM and still render formula PNGs.
+  delete req.cache[req.resolve(path.resolve(mainJs))];
+  const ReloadedPlugin = req(path.resolve(mainJs)).default;
+  const reloaded = new ReloadedPlugin(app, inst.manifest);
+  await reloaded.onload();
+  lastPreviewHtml = "";
+  app.workspace.activeFile = { path: "samples/math.md", basename: "math", extension: "md" };
+  await reloaded.previewCurrentNote();
+  if ([...lastPreviewHtml.matchAll(/src="data:image\/png;base64,/g)].length !== 2) {
+    fail("math preview failed after plugin reload");
+  }
+} finally {
+  globalThis.fetch = realFetch;
+}
+if (globalThis.MathJax !== hostMathJax) fail("plugin replaced the host MathJax instance");
+if (renderNetworkAttempts !== 0) fail("offline initialization/preview attempted a network fetch");
 if (!calls.some((c) => c.startsWith("view.setCards("))) fail("card preview did not render — calls: " + calls.join(" | "));
 
 // history view renders from the (stub) server API
@@ -202,6 +385,34 @@ await inst.publishCurrentNote();
 if (!calls.some((c) => c.includes("WeChat drafts"))) fail("publish success toast missing — calls: " + calls.join(" | "));
 const dupes = calls.filter((c) => c.includes("WeChat drafts")).length;
 if (dupes !== 1) fail("unexpected publish toast count: " + dupes);
+
+// A bare HTTP 200 or a confirmation without a media ID is not proof.
+const confirmedBefore = calls.filter((c) => c.startsWith("notice:✅")).length;
+nextPublishResponse = {};
+await inst.publishCurrentNote();
+const ambiguousKey = lastSubmitted?.idempotencyKey;
+if (!ambiguousKey || inst.lastAttempt?.key !== ambiguousKey) fail("empty acknowledgement must remain unknown");
+if (calls.filter((c) => c.startsWith("notice:✅")).length !== confirmedBefore) fail("empty acknowledgement was treated as confirmed");
+nextQueryResponse = { status: "confirmed" };
+await inst.queryLastAttempt();
+if (inst.lastAttempt?.key !== ambiguousKey) fail("confirmation without a media ID must remain unknown");
+
+// A clear validation rejection is not confused with a lost draft response.
+inst.lastAttempt = null;
+nextPublishResponse = { code: "ACCOUNT_NOT_OWNED" };
+nextPublishStatus = 403;
+await inst.publishCurrentNote();
+if (inst.lastAttempt !== null) fail("explicit account rejection must not become an unknown draft");
+if (!calls.some((c) => c.includes("ACCOUNT_NOT_OWNED"))) fail("explicit account rejection was not shown");
+nextPublishResponse = { code: "WECHAT_40001" };
+nextPublishStatus = 502;
+await inst.publishCurrentNote();
+if (inst.lastAttempt !== null) fail("explicit WeChat rejection must not become an unknown draft");
+nextPublishResponse = { code: "DRAFT_OUTCOME_UNKNOWN" };
+nextPublishStatus = 409;
+await inst.publishCurrentNote();
+if (!inst.lastAttempt?.key) fail("server unknown response must preserve the request identity");
+inst.lastAttempt = null;
 
 // The broken image may be previewed locally, but must never be submitted.
 const beforeBlocked = calls.filter((c) => c === "request:publish").length;
@@ -244,6 +455,23 @@ try {
   if (!matched || matched.contentType !== "image/png" || matched.data !== png.toString("base64")) {
     fail("frontmatter-only cover was not included as exact PNG material");
   }
+  const pathKey = "samples/format-choice.md";
+  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + path.basename(coverPath) + ")";
+  app.vaultContentByPath[pathKey] = source;
+  app.workspace.activeFile = { path: pathKey, basename: "format-choice", extension: "md", stat: { mtime: Date.now() } };
+  inst.chooseFormat(pathKey, "image");
+  lastPreviewHtml = "";
+  await inst.previewCurrentNote();
+  if (!lastPreviewHtml.includes("data:image/png;base64,") || !lastPreviewHtml.includes("A short caption")) {
+    fail("chosen image format did not preview its images and caption");
+  }
+  await inst.publishCurrentNote();
+  if (lastSubmitted?.type !== "image_post" || lastSubmitted.images?.length !== 1 ||
+      !lastSubmitted.html?.includes("A short caption") || lastSubmitted.html.includes("<img")) {
+    fail("chosen image format did not submit the same image-and-caption payload");
+  }
+  if (app.vaultContentByPath[pathKey] !== source) fail("format choice modified the original note");
+  inst.chooseFormat(pathKey, "auto");
 } finally {
   fs.rmSync(coverPath, { force: true });
 }
@@ -311,4 +539,4 @@ try {
   fs.rmSync(idCover, { force: true });
 }
 
-console.log(`PASS — ${communityOnly ? "simulated Community Directory three-file install" : "side-loaded development bundle"}: onload, article preview, card deck preview, history, publish`);
+console.log(`PASS — ${communityOnly ? "simulated Community Directory three-file install" : "side-loaded development bundle"}: onload, offline article/math/card preview, history, simulated publish`);

@@ -4,7 +4,7 @@
 //   admin key (server.json apiKey) — full access, no quota
 //   user key (publy_…)             — publish to owned accounts, monthly quota
 //
-// Commercial loop: /purchase page → payment provider → callback → auto key
+// Historical checkout is disabled by default and is not hosted billing.
 // issuance; /admin console for the operator. See docs/business.md.
 
 import crypto from "node:crypto";
@@ -16,9 +16,10 @@ import { pathToFileURL } from "node:url";
 import Fastify from "fastify";
 import type { FastifyError, FastifyReply } from "fastify";
 import type { JobInfo, JobStatus, PublishRequest, PublishResponse, PublishResultInfo } from "@publy/shared";
-import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, type AccountCredential } from "@publy/core";
-import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type Plan, type UserRow } from "./store.js";
+import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, listDraftSummaries, type AccountCredential, type WechatDraftSummary } from "@publy/core";
+import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
+import { requestHostedCheckout } from "./commerce-checkout-request.js";
 import { purchasePage } from "./pages.js";
 import { adminPage } from "./admin-page.js";
 
@@ -31,6 +32,8 @@ export interface ServerAccount {
 
 export interface ServerConfig {
   port: number;
+  /** Loopback by default; opt into an external bind explicitly. */
+  host?: string;
   /** admin key: full access, no quota (the operator) */
   apiKey: string;
   accounts: ServerAccount[];
@@ -44,6 +47,12 @@ export interface ServerConfig {
   secretKey?: string;
   /** scheduler poll interval; tests shorten it to exercise the job runner */
   jobPollMs?: number;
+  /** In-process sandbox fixture only. loadServerConfig never reads this field. */
+  sandboxCheckout?: {
+    endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
+    appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
+    fetcher?: typeof fetch;
+  };
   payments?: {
     /** Old checkout is off by default. This opt-in permits only isolated tests. */
     enableLegacyCheckout?: boolean;
@@ -101,7 +110,16 @@ export function verifyWsTicket(secretKey: string, ticket: string): string | null
 export function loadServerConfig(configPath?: string): ServerConfig {
   const file = configPath ?? process.env.PUBLY_SERVER_CONFIG ?? DEFAULT_CONFIG_PATH;
   const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+  // The historical manual checkout returns credentials and does not establish
+  // verified payment rights. It is only exercised by in-process test fixtures;
+  // no server configuration file may enable it on a listening service.
+  if (raw.payments?.enableLegacyCheckout === true) {
+    throw new Error("legacy checkout is available only to isolated in-process tests; public billing requires Commerce/Permit");
+  }
   if (!raw.apiKey) throw new Error(`server config ${file} is missing "apiKey"`);
+  if (raw.host !== undefined && (typeof raw.host !== "string" || !raw.host.trim())) {
+    throw new Error("server config host must be a non-empty string");
+  }
   if (!Array.isArray(raw.accounts) || raw.accounts.length === 0) {
     throw new Error(`server config ${file} must declare at least one account`);
   }
@@ -112,6 +130,7 @@ export function loadServerConfig(configPath?: string): ServerConfig {
   }
   return {
     port: raw.port ?? 8081,
+    host: raw.host ?? "127.0.0.1",
     apiKey: raw.apiKey,
     accounts: raw.accounts,
     dataDir: raw.dataDir ?? path.join(path.dirname(file), "server-data"),
@@ -153,6 +172,9 @@ interface StoredJob {
   status: JobStatus;
   attempts: number;
   nextAttemptAt: number;
+  /** Only pre-publish failures may be retried. Legacy failed jobs without
+   * this marker must not be assumed safe: they may be older remote failures. */
+  safeToRetry?: boolean;
   /** admission idempotency: same key never enqueues two jobs, and a retry of
    *  an interrupted run reconciles against the same record before re-sending */
   idempotencyKey?: string;
@@ -177,6 +199,74 @@ function jobInfo(j: StoredJob): JobInfo {
 /** resolved caller: admin, or a user row */
 type Caller = { admin: true } | { admin: false; user: UserRow };
 
+interface IdempotencyRecord {
+  mediaId: string;
+  at: number;
+  account: string;
+  title: string;
+  type: string;
+  /** owning user (null = admin) — records are not visible across callers */
+  userId: string | null;
+  /** verified request body hash; absent only in pre-v2 persisted records */
+  requestFingerprint?: string;
+}
+
+/** Reject syntactically valid but damaged entries as well as broken JSON.
+ * A null job can crash boot reconciliation; an incomplete job or draft record
+ * can silently erase the ability to recover an already-submitted draft. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+function isPersistedJob(key: string, value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.body)) return false;
+  const body = value.body;
+  return typeof value.id === "string" && value.id === key &&
+    typeof value.runAt === "number" && Number.isFinite(value.runAt) &&
+    typeof value.nextAttemptAt === "number" && Number.isFinite(value.nextAttemptAt) &&
+    typeof value.attempts === "number" && Number.isInteger(value.attempts) && value.attempts >= 0 &&
+    (value.userId === null || typeof value.userId === "string") &&
+    typeof value.status === "string" &&
+    ["pending", "running", "done", "failed", "cancelled", "interrupted"].includes(value.status) &&
+    typeof body.account === "string" && body.account.length > 0 &&
+    typeof body.title === "string" && typeof body.type === "string" &&
+    (value.idempotencyKey === undefined || typeof value.idempotencyKey === "string") &&
+    (value.error === undefined || typeof value.error === "string") &&
+    (value.result === undefined || isRecord(value.result));
+}
+
+function isPersistedIdempotency(_key: string, value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.mediaId === "string" && value.mediaId.length > 0 &&
+    typeof value.at === "number" && Number.isFinite(value.at) &&
+    typeof value.account === "string" && value.account.length > 0 &&
+    typeof value.title === "string" && typeof value.type === "string" &&
+    (value.userId === null || typeof value.userId === "string") &&
+    (value.requestFingerprint === undefined || typeof value.requestFingerprint === "string");
+}
+
+/** Persistent recovery state must fail closed: missing on first run is fine,
+ * but malformed/unreadable existing files are NOT an empty queue/history.
+ * Continuing would conceal scheduled jobs or allow repeated WeChat drafts. */
+function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY", validEntry: (key: string, value: unknown) => boolean): Record<string, T> {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return Object.create(null) as Record<string, T>;
+    // Never echo raw data, filenames or parser excerpts: state may hold credentials.
+    throw new Error(`PUBLY_${kind}_STATE_READ_FAILED`);
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed) || !Object.entries(parsed).every(([key, entry]) => validEntry(key, entry))) {
+      throw new Error("invalid recovery state");
+    }
+    return Object.assign(Object.create(null) as Record<string, T>, parsed);
+  } catch {
+    throw new Error(`PUBLY_${kind}_STATE_INVALID`);
+  }
+}
+
 export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
@@ -187,6 +277,10 @@ export function buildApp(config: ServerConfig) {
   const app = Fastify({ bodyLimit: 30 * 1024 * 1024 });
   const dataDir = config.dataDir ?? path.join(os.homedir(), ".publy", "server-data");
   fs.mkdirSync(dataDir, { recursive: true });
+  // Inspect both files BEFORE opening SQLite or starting the scheduler. If
+  // either state file is corrupt, startup stops without rewriting it.
+  const persistedJobs = readPersistedMap<StoredJob>(path.join(dataDir, "jobs.json"), "JOBS", isPersistedJob);
+  const persistedIdempotency = readPersistedMap<IdempotencyRecord>(path.join(dataDir, "idempotency.json"), "IDEMPOTENCY", isPersistedIdempotency);
 
   // every unhandled error leaves this server redacted: fetch/undici messages
   // can embed full URLs with tokens/secrets (#7 — secrets stay out of logs)
@@ -261,12 +355,7 @@ export function buildApp(config: ServerConfig) {
   // --- scheduled jobs --------------------------------------------------------
 
   const jobsFile = path.join(dataDir, "jobs.json");
-  let jobs: Record<string, StoredJob> = {};
-  try {
-    jobs = JSON.parse(fs.readFileSync(jobsFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const jobs: Record<string, StoredJob> = persistedJobs;
   // crash-mid-run reconciliation (#8): a job found "running" at boot has an
   // unknown draft outcome — the process must not silently re-issue a second
   // publish. Surface it as interrupted; retry is an explicit endpoint that
@@ -275,28 +364,32 @@ export function buildApp(config: ServerConfig) {
   for (const job of Object.values(jobs)) {
     if (job.status === "running") {
       job.status = "interrupted";
-      job.error = "interrupted by restart — draft outcome unknown; retry explicitly (idempotency-checked)";
+      job.error = "interrupted by restart — draft outcome unknown; inspect WeChat drafts before any further action";
       reconciled += 1;
     }
   }
-  if (reconciled > 0) audit({ event: "jobs-reconciled", interrupted: reconciled });
   const saveJobs = () => fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), { mode: 0o600 });
+  if (reconciled > 0) {
+    // Persist the fail-closed recovery decision immediately. Otherwise a
+    // second crash leaves jobs.json saying "running" despite the in-memory
+    // state being "interrupted", and the state does not survive restart.
+    saveJobs();
+    audit({ event: "jobs-reconciled", interrupted: reconciled });
+  }
 
   async function runJob(job: StoredJob): Promise<void> {
     job.status = "running";
     saveJobs();
+    job.safeToRetry = false;
+    // Once the remote publish pipeline starts, an error might mean WeChat
+    // accepted the draft but its response was lost. No automatic re-send.
+    let publishAttempted = false;
     const body = job.body;
     const caller: Caller = job.userId ? { admin: false, user: store.findUserById(job.userId)! } : { admin: true };
     const cred = resolveAccount(body.account, caller);
     try {
       if (!cred) throw new PublishError("ACCOUNT_NOT_FOUND", `Unknown account "${body.account}"`);
-      if (!caller.admin) {
-        const user = caller.user;
-        if (user.disabledAt) throw new PublishError("USER_DISABLED", "account disabled");
-        const limit = planLimit(user);
-        const used = store.getUsage(user);
-        if (used >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
-      }
+      if (!caller.admin && caller.user.disabledAt) throw new PublishError("USER_DISABLED", "account disabled");
       // idempotency reconciliation before sending: a previous lost run (crash
       // after draft/add, before the status save) may already have delivered
       // this job's draft — a fresh hit means done, never a second draft
@@ -315,6 +408,12 @@ export function buildApp(config: ServerConfig) {
           return;
         }
       }
+      // Recovering a confirmed draft does not consume a new quota unit.
+      if (!caller.admin) {
+        const limit = planLimit(caller.user);
+        if (store.getUsage(caller.user) >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
+      }
+      publishAttempted = true;
       const result = await publishToWechat(body, cred, tokens, materials);
       job.status = "done";
       job.result = result;
@@ -328,14 +427,25 @@ export function buildApp(config: ServerConfig) {
       notifyWebhook(body.account, "publish", { title: body.title, mediaId: result.mediaId, jobId: job.id, scheduled: true });
     } catch (err) {
       job.attempts += 1;
-      job.error = (err as Error).message;
-      audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
-      if (job.attempts >= JOB_MAX_ATTEMPTS) {
-        job.status = "failed";
-        notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+      if (publishAttempted) {
+        // The failure could be after draft/add committed remotely (including a
+        // failed local state write). A server-side key cannot query an unknown
+        // WeChat draft; automatically retrying could create duplicates.
+        job.status = "interrupted";
+        job.safeToRetry = false;
+        job.error = "draft outcome unknown after publish attempt; inspect WeChat drafts before any further action";
+        audit({ event: "scheduled-outcome-unknown", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts });
       } else {
-        job.status = "pending";
-        job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        job.safeToRetry = true;
+        job.error = redactSecrets((err as Error).message);
+        audit({ event: "scheduled-failed", account: body.account, title: body.title, jobId: job.id, attempts: job.attempts, error: job.error });
+        if (job.attempts >= JOB_MAX_ATTEMPTS) {
+          job.status = "failed";
+          notifyWebhook(body.account, "failed", { title: body.title, jobId: job.id, error: job.error, scheduled: true });
+        } else {
+          job.status = "pending";
+          job.nextAttemptAt = Date.now() + JOB_RETRY_DELAY_MS * job.attempts;
+        }
       }
     }
     saveJobs();
@@ -353,25 +463,8 @@ export function buildApp(config: ServerConfig) {
 
   // --- idempotency ------------------------------------------------------------
 
-  interface IdempotencyRecord {
-    mediaId: string;
-    at: number;
-    account: string;
-    title: string;
-    type: string;
-    /** owning user (null = admin) — records are not visible across callers */
-    userId: string | null;
-    /** verified request body hash; absent only in pre-v2 persisted records */
-    requestFingerprint?: string;
-  }
-
   const idempotencyFile = path.join(dataDir, "idempotency.json");
-  let idempotency: Record<string, IdempotencyRecord> = {};
-  try {
-    idempotency = JSON.parse(fs.readFileSync(idempotencyFile, "utf-8"));
-  } catch {
-    /* first run */
-  }
+  const idempotency: Record<string, IdempotencyRecord> = persistedIdempotency;
   const saveIdempotency = () => fs.writeFileSync(idempotencyFile, JSON.stringify(idempotency), { mode: 0o600 });
 
   const idempotencyFresh = (key: string): IdempotencyRecord | null => {
@@ -532,6 +625,43 @@ export function buildApp(config: ServerConfig) {
     return { plan: caller.user.plan, used: store.getUsage(caller.user), limit, expiresAt: caller.user.expiresAt || undefined };
   });
 
+  // Sandbox-only integration seam: no configuration file can enable this
+  // route. It prepares a signed order, never confirms payment or grants rights.
+  const sandboxCheckoutAttempts = new Map<string, number[]>();
+  app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
+    const sandbox = config.sandboxCheckout;
+    if (!sandbox) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
+    const caller = (req as unknown as { caller: Caller }).caller;
+    if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).sort().join(",") !== "offer,requestId") return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
+    const value = body as Record<string, unknown>;
+    const offers: Record<string, number> = Object.freeze({
+      "publy-personal-monthly": 2900, "publy-personal-annual": 29000,
+      "publy-studio-monthly": 7900, "publy-studio-annual": 79000,
+    });
+    if (typeof value.offer !== "string" || !Object.hasOwn(offers, value.offer) ||
+        typeof value.requestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.requestId)) {
+      return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
+    }
+    const subject = store.resolveHostedSubject(caller.user.id);
+    if (!subject) return reply.code(403).send({ code: "HOSTED_IDENTITY_NOT_ENROLLED" });
+    const now = Date.now();
+    const attempts = (sandboxCheckoutAttempts.get(caller.user.id) ?? []).filter((t) => now - t < 3600_000);
+    if (attempts.length >= 20) return reply.code(429).send({ code: "RATE_LIMITED" });
+    attempts.push(now);
+    sandboxCheckoutAttempts.set(caller.user.id, attempts);
+    // Namespacing prevents one user's request ID from colliding with another's.
+    const requestId = crypto.createHash("sha256").update(subject).update("\0").update(value.requestId).digest("hex");
+    const result = await requestHostedCheckout({
+      ...sandbox, environment: "sandbox", requestId, amountFen: offers[value.offer],
+      scope: { issuer: sandbox.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
+    });
+    reply.header("cache-control", "no-store");
+    return result.status === "ready" ? result : reply.code(503).send({ code: "CHECKOUT_OUTCOME_UNKNOWN" });
+  });
+
   // self-serve account binding: the customer validates their own AppID +
   // AppSecret from THIS server (which also surfaces the IP-whitelist step)
   // and binds the account to their user — no operator in the loop.
@@ -556,7 +686,12 @@ export function buildApp(config: ServerConfig) {
     // plan account limit
     const limit = store.planAllowance(user).accounts;
     if (store.countAccountsOwnedBy(user.id) >= limit) {
-      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${limit} account(s) — upgrade to bind more` });
+      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `account limit is ${limit}; contact your server operator for help` });
+    }
+
+    const name = (accountName ?? appId).trim().slice(0, 40) || appId;
+    if (config.accounts.some((account) => account.name === name) || store.findAccount(name)) {
+      return reply.code(409).send({ code: "ACCOUNT_NAME_TAKEN", message: "This account name is already in use; choose another name." });
     }
 
     // live validation from this server (surfaces the IP-whitelist step)
@@ -570,8 +705,17 @@ export function buildApp(config: ServerConfig) {
       });
     }
 
-    const name = (accountName ?? appId).trim().slice(0, 40) || appId;
-    store.upsertAccount({ name, appId, appSecret, ownerUserId: user.id });
+    // Recheck authority and allowance after the remote validation. Insert
+    // conditionally in SQLite; never overwrite another owner's account.
+    const currentUser = store.findUserById(user.id);
+    if (!currentUser || currentUser.disabledAt || currentUser.apiKey !== user.apiKey) {
+      return reply.code(403).send({ code: "USER_DISABLED", message: "account access changed during validation" });
+    }
+    const currentLimit = store.planAllowance(currentUser).accounts;
+    if (!store.insertOwnedAccount({ name, appId, appSecret, ownerUserId: user.id }, currentLimit)) {
+      if (store.findAccount(name)) return reply.code(409).send({ code: "ACCOUNT_NAME_TAKEN", message: "This account name is already in use; choose another name." });
+      return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${currentLimit} account(s)` });
+    }
     audit({ event: "bound", contact: user.contact, appId, accountName: name });
     return { ok: true, accountName: name };
   });
@@ -603,10 +747,15 @@ export function buildApp(config: ServerConfig) {
     const quotaExceeded = !caller.admin && store.getUsage(caller.user) >= quotaLimit!;
     const quotaReply = () => reply.code(429).send({
       code: "QUOTA_EXCEEDED",
-      message: `monthly limit ${quotaLimit} reached — upgrade at ${publicUrl}`,
+      message: `monthly limit ${quotaLimit} reached; contact your server operator for help`,
     });
 
     const key = body.idempotencyKey;
+    if (key !== undefined && (typeof key !== "string" || key.length < 1 || key.length > 256)) {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "idempotencyKey must be a non-empty string up to 256 characters" });
+    }
+    const owner = caller.admin ? "admin" : `user:${caller.user.id}`;
+    const fingerprint = key ? draftIdempotencyKey(body) : "";
     if (key) {
       const hit = idempotencyFresh(key);
       if (hit) {
@@ -619,8 +768,22 @@ export function buildApp(config: ServerConfig) {
         // re-delivery of a request whose draft already landed — the response
         // names the original destination so a caller that lost the first
         // response can reconcile instead of sending a second publish (#7)
+        const pending = store.getImmediateClaim(key);
+        if (pending && pending.state === "pending" && pending.owner === owner && pending.fingerprint === fingerprint && hit.requestFingerprint === fingerprint) {
+          store.confirmImmediate(key, owner, fingerprint, hit.mediaId, hit.at);
+        }
         audit({ event: "deduped", key, account: body.account, title: body.title });
         return { mediaId: hit.mediaId, deduped: true, account: hit.account || body.account, title: hit.title || body.title, requestId: key };
+      }
+      const prior = store.getImmediateClaim(key);
+      if (prior && (prior.state === "pending" || !prior.mediaId || prior.completedAt === null || Date.now() - prior.completedAt < IDEMPOTENCY_TTL_MS)) {
+        if (prior.owner !== owner || prior.fingerprint !== fingerprint) {
+          return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
+        }
+        if (prior.state === "confirmed" && prior.mediaId) {
+          return { mediaId: prior.mediaId, deduped: true, account: body.account, title: body.title, requestId: key };
+        }
+        return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The original draft outcome is unknown. Inspect WeChat drafts before another submission.", requestId: key });
       }
     }
 
@@ -655,15 +818,30 @@ export function buildApp(config: ServerConfig) {
     }
 
     if (quotaExceeded) return quotaReply();
+    if (key && Object.values(jobs).some((j) => j.idempotencyKey === key && ["pending", "running", "interrupted"].includes(j.status))) {
+      return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key already identifies a scheduled draft." });
+    }
 
+    let claimed = false, draftStarted = false;
     try {
       const cred = resolveAccount(body.account, caller);
       if (!cred) {
         const code = caller.admin ? "ACCOUNT_NOT_FOUND" : "ACCOUNT_NOT_OWNED";
         return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${body.account}"` });
       }
-      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials);
       if (key) {
+        const outcome = store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS, { account: body.account, title: body.title });
+        if (outcome !== "claimed") {
+          const prior = store.getImmediateClaim(key);
+          if (!prior || prior.owner !== owner || prior.fingerprint !== fingerprint) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
+          if (prior.state === "confirmed" && prior.mediaId) return { mediaId: prior.mediaId, deduped: true, account: body.account, title: body.title, requestId: key };
+          return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The original draft outcome is unknown. Inspect WeChat drafts before another submission.", requestId: key });
+        }
+        claimed = true;
+      }
+      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials, () => { draftStarted = true; });
+      if (key) {
+        store.confirmImmediate(key, owner, fingerprint, result.mediaId, Date.now());
         idempotency[key] = { mediaId: result.mediaId, at: Date.now(), account: body.account, title: body.title, type: body.type, userId: caller.admin ? null : caller.user.id, requestFingerprint: draftIdempotencyKey(body) };
         saveIdempotency();
       }
@@ -674,6 +852,16 @@ export function buildApp(config: ServerConfig) {
       // request so clients cannot attach them to the wrong preview (#7)
       return { ...result, account: body.account, title: body.title, requestId: key };
     } catch (err) {
+      if (claimed && key && (!draftStarted || err instanceof WechatError)) {
+        // Before draft/add, or on an explicit WeChat rejection, no draft was
+        // created. Release the claim so the user can correct and retry.
+        store.releaseImmediate(key, owner, fingerprint);
+        claimed = false;
+      }
+      if (claimed) {
+        audit({ event: "outcome-unknown", account: body.account, type: body.type, title: body.title, key });
+        return reply.code(409).send({ code: "DRAFT_OUTCOME_UNKNOWN", message: "The draft outcome cannot be confirmed. Inspect WeChat drafts before another submission.", requestId: key });
+      }
       audit({ event: "failed", account: body.account, type: body.type, title: body.title, error: (err as Error).message });
       notifyWebhook(body.account, "failed", { title: body.title, error: (err as Error).message });
       if (err instanceof PublishError) {
@@ -694,10 +882,16 @@ export function buildApp(config: ServerConfig) {
     const caller = (req as unknown as { caller: Caller }).caller;
     const key = (req.params as { key: string }).key;
     const hit = idempotencyFresh(key);
-    if (!hit || (!caller.admin && hit.userId !== caller.user.id)) {
+    if (hit && (caller.admin || hit.userId === caller.user.id)) {
+      return { status: "confirmed", mediaId: hit.mediaId, account: hit.account, title: hit.title, requestId: key };
+    }
+    // The SQLite claim survives a lost local JSON write or another process.
+    const claim = store.getImmediateClaim(key);
+    const owner = caller.admin ? "admin" : `user:${caller.user.id}`;
+    if (!claim || (!caller.admin && claim.owner !== owner) || claim.state !== "confirmed" || !claim.mediaId || claim.completedAt === null || Date.now() - claim.completedAt >= IDEMPOTENCY_TTL_MS) {
       return { status: "unknown" };
     }
-    return { status: "confirmed", mediaId: hit.mediaId, account: hit.account, title: hit.title, requestId: key };
+    return { status: "confirmed", mediaId: claim.mediaId, requestId: key };
   });
 
   // accounts visible to the caller: names only — secrets and appIds never
@@ -757,10 +951,11 @@ export function buildApp(config: ServerConfig) {
     return { ok: true };
   });
 
-  // explicit retry of an interrupted/failed job: the scheduler never auto-reruns
-  // interrupted work (#8), but the owner may re-admit it. The original
-  // idempotency key rides along, so if the lost run actually created the draft
-  // the retry dedupes against it instead of making a second draft.
+  // A possibly delivered draft cannot be safely retried just because
+  // someone clicks retry: WeChat has no server-side idempotency contract.
+  // Only a *locally confirmed*, matching draft can be reconciled without
+  // sending any network request. A missing/expired record stays interrupted.
+  // Known pre-publish failures retain the existing bounded retry path.
   app.post<{ Params: { id: string } }>("/v1/jobs/:id/retry", async (req, reply) => {
     const caller = (req as unknown as { caller: Caller }).caller;
     const job = jobs[(req.params as { id: string }).id];
@@ -768,6 +963,49 @@ export function buildApp(config: ServerConfig) {
     if (!caller.admin && job.userId !== caller.user.id) return reply.code(403).send({ code: "NOT_OWNED", message: "job belongs to another user" });
     if (job.status !== "interrupted" && job.status !== "failed") {
       return reply.code(400).send({ code: "NOT_RETRYABLE", message: `job is ${job.status}` });
+    }
+    if (job.status === "interrupted") {
+      const hit = job.idempotencyKey ? idempotencyFresh(job.idempotencyKey) : null;
+      if (!hit) {
+        return reply.code(409).send({
+          code: "DRAFT_OUTCOME_UNKNOWN",
+          message: "Remote draft outcome is unknown. Inspect WeChat drafts manually; this endpoint cannot safely resend an interrupted job.",
+          jobId: job.id,
+        });
+      }
+      // A pre-v2 idempotency record with no fingerprint is insufficient
+      // evidence of byte-identical content; do not trust a title match.
+      if (!hit.requestFingerprint ||
+          hit.requestFingerprint !== draftIdempotencyKey(job.body) ||
+          !hit.mediaId ||
+          !sameDraftIdentity(hit, job.body, job.userId)) {
+        return reply.code(409).send({
+          code: "IDEMPOTENCY_CONFLICT",
+          message: "Recorded draft identity does not match this job; no retry attempted.",
+          jobId: job.id,
+        });
+      }
+      // The local delivery record already confirms this exact draft. Finish
+      // the job in place instead of enqueueing it or consuming quota again.
+      job.status = "done";
+      job.result = {
+        mediaId: hit.mediaId, deduped: true,
+        account: job.body.account, title: job.body.title,
+        requestId: job.idempotencyKey,
+      };
+      job.error = undefined;
+      saveJobs();
+      audit({ event: "job-reconciled", jobId: job.id, account: job.body.account, title: job.body.title });
+      return { ok: true, job: jobInfo(job), deduped: true };
+    }
+    if (job.safeToRetry !== true) {
+      // Older failures did not record whether draft/add was attempted.
+      // Treat missing provenance as unknown rather than risking a duplicate.
+      return reply.code(409).send({
+        code: "DRAFT_OUTCOME_UNKNOWN",
+        message: "Cannot prove that this failed job stopped before WeChat draft submission; no retry attempted.",
+        jobId: job.id,
+      });
     }
     job.status = "pending";
     job.attempts = 0;
@@ -909,6 +1147,7 @@ export function buildApp(config: ServerConfig) {
       publishes: { monthTotal },
       orders: { pending, paid: paid.length, revenueFen: paid.reduce((a, o) => a + o.amountFen, 0) },
       accounts: { total: (config.accounts ?? []).length + store.listAccounts().length },
+      claims: { pending: store.listImmediateClaims("pending", 500).length },
       eventsToday,
     };
   });
@@ -930,6 +1169,167 @@ export function buildApp(config: ServerConfig) {
         })),
     ];
     return { accounts: all };
+  });
+
+  // --- operator reconciliation of unresolved immediate requests -------------
+  //
+  // A submission whose response was lost can leave a pending claim forever.
+  // The operator may resolve it only with evidence read back from WeChat's
+  // draft box in this same request; a free-form console note alone is never
+  // evidence. "delivered" records the verified media_id so the original
+  // identity dedupes, while "absent" releases the claim only when no
+  // same-title draft is visible in a completely read box, letting the caller
+  // retry under the original identity.
+
+  /** Latest audit context per request key (legacy claims predate stored context). */
+  function latestAuditContext(): Map<string, { account?: string; title?: string }> {
+    const index = new Map<string, { account?: string; title?: string }>();
+    for (const entry of readHistory(2000)) {
+      if (!entry || typeof entry.key !== "string" || !entry.key) continue;
+      const account = typeof entry.account === "string" ? entry.account : undefined;
+      const title = typeof entry.title === "string" ? entry.title : undefined;
+      if (account || title) index.set(entry.key, { account, title });
+    }
+    return index;
+  }
+
+  function claimOwnerLabel(owner: string): string {
+    if (owner === "admin") return "operator";
+    const match = /^user:(.+)$/.exec(owner);
+    if (!match) return owner;
+    return store.findUserById(match[1])?.contact ?? "deleted user";
+  }
+
+  type DraftBoxRead =
+    | { ok: true; account: string; totalCount: number; complete: boolean; items: WechatDraftSummary[] }
+    | { ok: false; status: number; code: string; message: string };
+
+  async function readDraftBox(account: string): Promise<DraftBoxRead> {
+    const cred = resolveAccount(account, { admin: true });
+    if (!cred) return { ok: false, status: 404, code: "ACCOUNT_NOT_FOUND", message: `Unknown account "${account}"` };
+    try {
+      const token = await tokens.get(cred.appId, cred.appSecret);
+      const listing = await listDraftSummaries(token, 200);
+      return {
+        ok: true,
+        account: cred.name,
+        totalCount: listing.totalCount,
+        complete: listing.items.length >= listing.totalCount,
+        items: listing.items,
+      };
+    } catch (error) {
+      const code = error instanceof WechatError ? `WECHAT_${error.errcode}` : "WECHAT_UNAVAILABLE";
+      return { ok: false, status: 502, code, message: "Could not read the WeChat draft box; no claim state was changed." };
+    }
+  }
+
+  function claimContext(claim: ImmediateClaimRow, fallback: { account?: string; title?: string } | undefined): { account: string | null; title: string | null } {
+    return { account: claim.account ?? fallback?.account ?? null, title: claim.title ?? fallback?.title ?? null };
+  }
+
+  app.get<{ Querystring: { state?: string } }>("/v1/admin/claims", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const requested = (req.query as { state?: string }).state;
+    const state: "pending" | "confirmed" | "all" = requested === "all" || requested === "confirmed" ? requested : "pending";
+    const fallback = latestAuditContext();
+    const claims = store.listImmediateClaims(state, 200).map((claim) => {
+      const context = claimContext(claim, fallback.get(claim.key));
+      return {
+        key: claim.key,
+        owner: claim.owner,
+        ownerContact: claimOwnerLabel(claim.owner),
+        account: context.account,
+        title: context.title,
+        state: claim.state,
+        mediaId: claim.mediaId ?? undefined,
+        createdAt: claim.createdAt ?? undefined,
+        completedAt: claim.completedAt ?? undefined,
+      };
+    });
+    return { claims, pending: store.listImmediateClaims("pending", 500).length };
+  });
+
+  app.get<{ Params: { key: string }; Querystring: { includeAll?: string } }>("/v1/admin/claims/:key/candidates", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const key = (req.params as { key: string }).key;
+    const claim = store.getImmediateClaim(key);
+    if (!claim) return reply.code(404).send({ code: "NOT_FOUND", message: "no unresolved claim for this key" });
+    if (claim.state !== "pending") return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    const context = claimContext(claim, latestAuditContext().get(key));
+    if (!context.account) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no account context; keep it blocked and reconcile the account manually." });
+    }
+    const box = await readDraftBox(context.account);
+    if (!box.ok) return reply.code(box.status).send({ code: box.code, message: box.message });
+    const normalizedTitle = (context.title ?? "").trim();
+    const sameTitle = normalizedTitle ? box.items.filter((item) => item.title.trim() === normalizedTitle) : [];
+    const includeAll = (req.query as { includeAll?: string }).includeAll === "1";
+    const visible = includeAll ? box.items : sameTitle;
+    return {
+      key,
+      account: box.account,
+      title: context.title,
+      totalCount: box.totalCount,
+      scanned: box.items.length,
+      complete: box.complete,
+      sameTitleCount: sameTitle.length,
+      candidates: visible.map((item) => ({ mediaId: item.mediaId, title: item.title, updateTime: item.updateTime || undefined })),
+    };
+  });
+
+  app.post<{ Params: { key: string }; Body: { outcome?: string; mediaId?: string; note?: string } }>("/v1/admin/claims/:key/reconcile", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const key = (req.params as { key: string }).key;
+    const body = (req.body ?? {}) as { outcome?: string; mediaId?: string; note?: string };
+    if (body.outcome !== "delivered" && body.outcome !== "absent") {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "outcome must be delivered or absent" });
+    }
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (note.length < 4 || note.length > 500) {
+      return reply.code(400).send({ code: "BAD_REQUEST", message: "note must record how the WeChat draft box was checked (4-500 characters)" });
+    }
+    const claim = store.getImmediateClaim(key);
+    if (!claim) return reply.code(404).send({ code: "NOT_FOUND", message: "no unresolved claim for this key" });
+    if (claim.state !== "pending") return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    const context = claimContext(claim, latestAuditContext().get(key));
+    if (!context.account) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no account context; keep it blocked and reconcile the account manually." });
+    }
+    const box = await readDraftBox(context.account);
+    if (!box.ok) return reply.code(box.status).send({ code: box.code, message: box.message });
+
+    if (body.outcome === "delivered") {
+      const requestedMediaId = typeof body.mediaId === "string" ? body.mediaId.trim() : "";
+      if (!requestedMediaId || requestedMediaId.length > 512) {
+        return reply.code(400).send({ code: "BAD_REQUEST", message: "mediaId must be the media_id of a draft visible in this account" });
+      }
+      const match = box.items.find((item) => item.mediaId === requestedMediaId);
+      if (!match) {
+        return reply.code(409).send({ code: "CLAIM_NOT_VERIFIED", message: "That draft is not visible in this account's draft box; refresh the listing before resolving." });
+      }
+      if (!store.reconcileImmediateClaim(key, match.mediaId, Date.now())) {
+        return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+      }
+      audit({ event: "claim-reconciled", key, outcome: "delivered", account: box.account, title: match.title || context.title, owner: claim.owner, mediaId: match.mediaId, note });
+      return { ok: true, claim: { key, state: "confirmed", mediaId: match.mediaId } };
+    }
+
+    const normalizedTitle = (context.title ?? "").trim();
+    if (!normalizedTitle) {
+      return reply.code(409).send({ code: "CLAIM_CONTEXT_MISSING", message: "The claim has no title to compare; keep it blocked rather than guessing it was absent." });
+    }
+    if (!box.complete) {
+      return reply.code(409).send({ code: "CLAIM_ABSENCE_UNPROVEN", message: `The draft box has ${box.totalCount} drafts but only ${box.items.length} could be read; archive old drafts or resolve by media_id instead.` });
+    }
+    const present = box.items.find((item) => item.title.trim() === normalizedTitle);
+    if (present) {
+      return reply.code(409).send({ code: "CLAIM_STILL_PRESENT", message: "A draft with this title is still in the account's draft box; resolve it as delivered instead." });
+    }
+    if (!store.releaseImmediateClaimByOperator(key)) {
+      return reply.code(409).send({ code: "CLAIM_NOT_PENDING", message: "this claim is already resolved" });
+    }
+    audit({ event: "claim-reconciled", key, outcome: "absent", account: box.account, title: context.title, owner: claim.owner, scanned: box.items.length, note });
+    return { ok: true, claim: { key, state: "released" } };
   });
 
   // --- websocket tickets --------------------------------------------------------
@@ -968,11 +1368,18 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     } catch { console.error('[boot] could not persist secretKey — secrets stay encrypted only after manual key setup'); }
   }
   const app = buildApp(config);
-  await app.listen({ port: config.port, host: "0.0.0.0" });
-  console.log(`publy-server listening on :${config.port} (purchase page: ${config.publicUrl ?? "http://localhost:" + config.port}/ )`);
+  await app.listen({ port: config.port, host: config.host ?? "127.0.0.1" });
+  console.log(`publy-server listening on ${config.host ?? "127.0.0.1"}:${config.port}`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+// systemd commonly starts the server through an atomic release symlink.
+// Node resolves import.meta.url to the real file, so compare real paths rather
+// than silently exiting when argv contains the symlinked release directory.
+const invokedServerAs = (() => {
+  try { return process.argv[1] ? pathToFileURL(fs.realpathSync(path.resolve(process.argv[1]))).href : ""; }
+  catch { return ""; }
+})();
+if (import.meta.url === invokedServerAs) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

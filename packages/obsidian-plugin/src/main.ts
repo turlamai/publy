@@ -8,12 +8,22 @@ import {
   renderMarkdown,
   renderCards,
   captionToHtml,
+  imagePostCaption,
+  parseSource,
+  resolvePublication,
+  type PublicationFormat,
   blockingMediaWarning,
   draftIdempotencyKey,
   setPngRenderer,
-  setFontDir,
+  setEmbeddedFontSubsets,
   generateTitleCover,
+  listInstalledThemes,
+  readInstalledTheme,
+  BUILTIN_CARD_THEMES,
 } from "@publy/core";
+import { configureBundledMath } from "@publy/core/math-bundled";
+import { Resvg, initWasm } from "@resvg/resvg-wasm";
+import embeddedResvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
 // theme/highlight css inlined as text by esbuild (loader ".css": "text")
 import claudeThemeCss from "../../core/themes/claude.css";
 import mediumThemeCss from "../../core/themes/medium.css";
@@ -27,6 +37,10 @@ import terminalThemeCss from "../../core/themes/terminal.css";
 import newsThemeCss from "../../core/themes/news.css";
 import hljsGithubCss from "highlight.js/styles/github.css";
 import hljsGithubDarkCss from "highlight.js/styles/github-dark.css";
+// esbuild's binary loader embeds these two font subsets in main.js. Official
+// Community Directory installs do not fetch the dist/fonts sidecar.
+import embeddedRegularFont from "../../core/fonts/NotoSansSC-subset-Regular.otf";
+import embeddedBoldFont from "../../core/fonts/NotoSansSC-subset-Bold.otf";
 
 const THEME_CSS: Record<string, string> = {
   claude: claudeThemeCss,
@@ -89,11 +103,10 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   langAuto: { zh: "自动", en: "Auto" },
   langReload: { zh: "Publy: 界面语言已保存——命令名等将在重载插件后完全生效", en: "Publy: language saved — command names update fully after reload" },
   intro: {
-    zh: "三步开始发布：① 服务开通账号（自托管或购买托管）拿 Server 地址和 API key → ② 填在下面，点「测试连接」确认 → ③ 打开任意笔记，点左侧 send 图标发布（不配置也能用：预览排版、复制 rich text，均纯本地）。",
-    en: "Three steps to publish: (1) get a Server URL + API key (self-hosted or hosted) -> (2) fill them below and hit Test connection -> (3) open any note and click the send ribbon icon (preview & copy work locally with zero config).",
+    zh: "本地预览和复制富文本无需服务或账号。若要保存到公众号草稿箱，请先配置自己的 Publy 服务端、API key 和公众号账号，再测试连接；当前不提供可购买的托管服务。",
+    en: "Local preview and rich-text copy need no server or account. To save to WeChat drafts, configure your own Publy server, API key and WeChat account, then test the connection. Paid hosting is not currently available.",
   },
   guideLink: { zh: "使用手册", en: "Guide" },
-  buyLink: { zh: "购买托管服务", en: "Get the hosted service" },
   setServer: { zh: "Server 地址", en: "Server URL" },
   setServerDesc: { zh: "Publy 服务地址，带协议，例如 https://publy-api.example.com", en: "Publy server URL incl. protocol, e.g. https://publy-api.example.com" },
   setKey: { zh: "API key", en: "API key" },
@@ -105,7 +118,9 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   setMediaDesc: { zh: "本地图片查找目录；留空 = 自动跟随 vault 附件设置", en: "Where local images live; empty = follow the vault attachment setting" },
   setMediaPlaceholder: { zh: "自动（vault 附件目录）", en: "Auto (vault attachment folder)" },
   setTheme: { zh: "主题", en: "Theme" },
-  setThemeDesc: { zh: "文章排版主题；terminal 主题用深色代码高亮", en: "Article theme; terminal uses a dark code scheme" },
+  setThemeDesc: { zh: "文章排版主题；通过 CLI 安装的主题可在重新打开设置后选择。terminal 使用深色代码高亮。", en: "Article theme; themes installed by the CLI appear after reopening settings. Terminal uses dark code highlighting." },
+  themeLoadError: { zh: "已选主题不存在或已损坏，请重新安装主题或切换内置主题。", en: "The selected theme is missing or invalid. Reinstall it or select a built-in theme." },
+  themeListError: { zh: "无法读取已安装主题，请用命令行检查主题目录。", en: "Installed themes could not be read. Check the theme directory using the CLI." },
   setConn: { zh: "连接", en: "Connection" },
   setConnDesc: { zh: "检查服务可达性、API key 与套餐配额", en: "Check reachability, API key and plan quota" },
   btnTest: { zh: "测试连接", en: "Test connection" },
@@ -140,9 +155,11 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   deduped: { zh: "Publy: 10 分钟内已发过《{title}》——本次跳过（防重复）", en: "Publy: [{title}] was just published — skipped as duplicate" },
   netFail: { zh: "Publy: 发布失败 — {msg}", en: "Publy: publish failed — {msg}" },
   badServer: { zh: "Publy: Server 地址格式不对——需要带协议，例如 https://publy-api.example.com", en: "Publy: Server URL is malformed — include the protocol, e.g. https://publy-api.example.com" },
-  copyHasImages: { zh: "Publy: 笔记含本地图片，复制路径仅保留文字排版（图片请用发布功能或手动插图）", en: "Publy: the note has local images — rich-text copy keeps text only (publish to include them)" },
+  copyHasImages: { zh: "Publy: 笔记包含图片或公式附件，已取消复制以避免无效链接；请使用草稿交付功能", en: "Publy: copy cancelled — image or formula attachments need draft delivery, not unresolved clipboard links" },
+  copyMediaNotReady: { zh: "Publy: 图片或公式渲染未完成，已取消复制，剪贴板内容未修改", en: "Publy: copy cancelled — media or math could not be rendered; clipboard left unchanged" },
   copyOk: { zh: "Publy: 已复制排版 rich text — 到公众号编辑器 Ctrl+V 粘贴", en: "Publy: rich text copied — paste into the WeChat editor with Ctrl+V" },
   wasmDown: { zh: "Publy: 卡片渲染器不可用（wasm 初始化失败）——文章发布不受影响", en: "Publy: card renderer unavailable (wasm init failed) — article publishing is unaffected" },
+  previewCard: { zh: "预览卡片 {index}", en: "Preview card {index}" },
   cardsRendering: { zh: "Publy: 正在渲染图片消息卡片…", en: "Publy: rendering image-post cards…" },
   cardsFail: { zh: "Publy: 图片消息卡片渲染失败 — {msg}", en: "Publy: card rendering failed — {msg}" },
   wasmInitFail: { zh: "Publy: 卡片渲染器初始化失败（文章功能不受影响）——详情见开发者控制台", en: "Publy: card renderer failed to init (articles unaffected) — see the developer console" },
@@ -159,8 +176,13 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   cancelFail: { zh: "取消失败：{msg}", en: "Cancel failed: {msg}" },
   typeImagePost: { zh: "图片消息", en: "image post" },
   typeArticle: { zh: "文章", en: "article" },
+  formatLabel: { zh: "本次发布形式", en: "Format for this draft" },
+  formatAuto: { zh: "跟随文档（{format}）", en: "Follow document ({format})" },
+  formatArticle: { zh: "文章", en: "Article" },
+  formatImage: { zh: "图片与配文", en: "Images and caption" },
+  formatCards: { zh: "文字卡片", en: "Text cards" },
   acctFetchFail: { zh: "获取账号列表失败：{msg}", en: "Failed to list accounts: {msg}" },
-  acctNone: { zh: "这个 key 名下没有公众号账号——先在服务端绑定（购买页 /v1/bind 或 publy account add）", en: "No WeChat accounts under this key — bind one first (/v1/bind on the purchase page, or publy account add)" },
+  acctNone: { zh: "这个 key 名下没有公众号账号——请先在自托管服务端绑定（publy account add）", en: "No WeChat accounts under this key — bind one on your self-hosted server (publy account add)" },
   acctSwitched: { zh: "已切换到「{name}」", en: "Switched to [{name}]" },
   acctModalTitle: { zh: "切换公众号账号", en: "Switch WeChat account" },
   acctCurrent: { zh: "{name}（当前）", en: "{name} (current)" },
@@ -184,14 +206,11 @@ const STRINGS: Record<string, { zh: string; en: string }> = {
   resultFail: { zh: "发布失败", en: "Publish failed" },
   // #7: outcome-unknown is distinct from explicit failure — a dropped network
   // connection says nothing about whether the draft was created
-  resultUnknown: { zh: "结果未知 — 连接中断，草稿可能已创建；先查询，不要直接重发", en: "Outcome unknown — connection dropped; the draft may exist. Query first, don't blindly resend" },
+  resultUnknown: { zh: "结果未知 — 草稿可能已创建；请查询结果并检查公众号草稿箱，不要直接重发", en: "Outcome unknown — the draft may exist. Query and check WeChat drafts before submitting again" },
   btnQueryResult: { zh: "查询结果", en: "Query result" },
-  btnRetrySame: { zh: "原请求重试", en: "Retry same request" },
   queryConfirmed: { zh: "✅ 已确认《{title}》在「{account}」草稿箱（幂等命中，未重复创建）", en: "✅ Confirmed: [{title}] is in [{account}] drafts (idempotent hit, no duplicate)" },
-  queryUnknown: { zh: "服务端没有这次请求的记录（超出幂等窗口或未送达）— 可原样重试或到公众号草稿箱确认", en: "Server has no record of this request (outside the idempotency window or never arrived) — retry the same request or check your WeChat drafts" },
+  queryUnknown: { zh: "服务端无法确认结果；请先检查公众号草稿箱，再决定是否新建草稿", en: "Server cannot confirm the outcome. Check your WeChat drafts before deciding whether to submit again" },
   queryFail: { zh: "Publy: 查询失败 — {msg}", en: "Publy: query failed — {msg}" },
-  retrying: { zh: "Publy: 原请求重试中…", en: "Publy: retrying the same request…" },
-  retryStillUnknown: { zh: "Publy: 仍未送达 — 请求身份未变，稍后可安全重试", en: "Publy: still unreachable — same request identity, safe to retry later" },
   uploadingNamed: { zh: "Publy: 投递中 —《{title}》→「{account}」草稿箱", en: "Publy: delivering [{title}] → [{account}] drafts" },
   needAccount: { zh: "先选定公众号账号——不向未指定的默认账号投递（可在设置或「切换公众号账号」里选）", en: "Pick a WeChat account first — never submit to an unnamed default (Settings or the switch-account command)" },
   btnPublishNamed: { zh: "投递「{account}」草稿箱", en: "Deliver → [{account}] drafts" },
@@ -208,31 +227,26 @@ function t(key: string, vars?: Record<string, string | number>): string {
   return out;
 }
 
+/** Only validated content-only bundles are offered to the plugin. */
+function availableArticleThemes(): Record<string, string> {
+  const choices: Record<string, string> = Object.assign(Object.create(null), THEME_LABELS);
+  try {
+    for (const theme of listInstalledThemes()) {
+      if (!Object.hasOwn(choices, theme.id) && !Object.hasOwn(BUILTIN_CARD_THEMES, theme.id)) {
+        choices[theme.id] = `${theme.name} · ${theme.version}`;
+      }
+    }
+  } catch { new Notice(t("themeListError")); }
+  return choices;
+}
+function articleThemeCss(id: string): string {
+  if (Object.hasOwn(THEME_CSS, id)) return THEME_CSS[id];
+  try { return readInstalledTheme(id).css; }
+  catch { throw new Error(t("themeLoadError")); }
+}
+
 const VIEW_TYPE_PUBLY_PREVIEW = "publy-preview";
 const PUBLY_HISTORY_VIEW = "publy-history";
-
-// Obsidian evaluates plugin bundles with a synthetic module context
-// (module.filename = null, __dirname = electron.asar/renderer), so package
-// requires — top-level or relative — can never resolve. Node builtins still
-// work, so bootstrap the real resolver via createRequire and load the wasm
-// glue packages from the plugin dir by absolute path at runtime.
-type ResvgModule = typeof import("@resvg/resvg-wasm");
-let resvgModule: ResvgModule | null = null;
-
-function loadPluginModule<T>(pluginDir: string, rel: string): T {
-  const { createRequire } = require("node:module");
-  const req = createRequire(path.join(pluginDir, "manifest.json"));
-  return req(path.join(pluginDir, rel)) as T;
-}
-
-// manifest.dir is vault-relative in real Obsidian; createRequire and fs both
-// need absolute paths (and process.cwd() is the install dir, not the vault).
-function absolutePluginDir(plugin: Plugin): string {
-  const dir = plugin.manifest.dir ?? "";
-  return path.isAbsolute(dir)
-    ? dir
-    : path.join((plugin.app.vault.adapter as unknown as { getBasePath(): string }).getBasePath(), dir);
-}
 
 interface PublySettings {
   server: string;
@@ -311,6 +325,8 @@ interface JobEntry {
  *  not a dead end. */
 class PublyPreviewView extends ItemView {
   plugin: PublyPlugin;
+  notePath = "";
+  documentFormat: PublicationFormat = "article";
   /** re-renders the current preview; set on every render by the plugin */
   refresh: (() => Promise<void>) | null = null;
   private publishBtn: HTMLButtonElement | null = null;
@@ -437,11 +453,28 @@ class PublyPreviewView extends ItemView {
     const spacer = bar.createEl("div");
     spacer.addClass("publy-spacer");
 
+    const format = bar.createEl("select");
+    format.addClass("publy-select");
+    format.setAttribute("aria-label", t("formatLabel"));
+    format.setAttribute("title", t("formatLabel"));
+    const label = (id: PublicationFormat) => t(id === "article" ? "formatArticle" : id === "image" ? "formatImage" : "formatCards");
+    for (const [id, labelText] of [["auto", t("formatAuto", { format: label(this.documentFormat) })], ["article", label("article")], ["image", label("image")], ["cards", label("cards")]]) {
+      const option = format.createEl("option"); option.value = id; option.textContent = labelText;
+    }
+    format.value = this.plugin.formatForNote(this.notePath) ?? "auto";
+    format.addEventListener("change", () => {
+      const value = format.value;
+      if (value === "auto" || value === "article" || value === "image" || value === "cards") {
+        this.plugin.chooseFormat(this.notePath, value);
+        void this.refresh?.();
+      }
+    });
+
     // theme quick switch — re-renders instantly, same as the setting page
     const sel = bar.createEl("select");
     sel.addClass("publy-select");
     sel.setAttribute("title", t("tipTheme"));
-    for (const [id, label] of Object.entries(THEME_LABELS)) {
+    for (const [id, label] of Object.entries(availableArticleThemes())) {
       const opt = sel.createEl("option");
       opt.value = id;
       opt.textContent = label;
@@ -551,7 +584,10 @@ class PublyPreviewView extends ItemView {
 
   appendCard(base64: string): void {
     const img = this.cardStrip?.createEl("img");
-    if (img) img.src = "data:image/png;base64," + base64;
+    if (img) {
+      img.alt = t("previewCard", { index: String(this.cardDone + 1) });
+      img.src = "data:image/png;base64," + base64;
+    }
     this.cardDone += 1;
     if (this.cardCounter && this.cardTotal > 0) {
       this.cardCounter.setText(`${this.cardDone} / ${this.cardTotal}`);
@@ -559,6 +595,9 @@ class PublyPreviewView extends ItemView {
   }
 
   finishCards(caption: string): void {
+    // Completion replaces the loading status rather than leaving a false
+    // "rendering" message below an already usable deck.
+    this.cardCounter?.remove();
     if (this.cardStrip) {
       const canvas = this.cardStrip.parentElement;
       const cap = canvas?.createEl("div");
@@ -938,6 +977,12 @@ class ScheduleModal extends Modal {
 
 export default class PublyPlugin extends Plugin {
   settings: PublySettings;
+  private readonly formatChoices = new Map<string, PublicationFormat>();
+  formatForNote(path: string): PublicationFormat | undefined { return this.formatChoices.get(path); }
+  chooseFormat(path: string, value: PublicationFormat | "auto"): void {
+    if (!path) return;
+    if (value === "auto") this.formatChoices.delete(path); else this.formatChoices.set(path, value);
+  }
   wasmOk = false;
   statusBarItem: HTMLElement | null = null;
   /** session-local registry of images picked from this computer for covers
@@ -954,40 +999,27 @@ export default class PublyPlugin extends Plugin {
   private lastAttempt: { payload: Record<string, unknown>; key: string; title: string; account: string } | null = null;
 
   async onload(): Promise<void> {
+    // Initialize bundled fonts independent of side-loaded package directories.
+    // Rendering must remain offline even when the three-file install has no
+    // font directory. WASM availability is checked separately below.
+    setEmbeddedFontSubsets({ regular: embeddedRegularFont, bold: embeddedBoldFont });
     // WASM PNG renderer (community-plugin safe: no native binaries).
     // Graceful degradation: if wasm init fails, article publish/preview still
     // work — only the card renderer is unavailable.
     try {
-      const pluginDir = absolutePluginDir(this);
-      resvgModule = loadPluginModule<ResvgModule>(pluginDir, path.join("node_modules", "@resvg", "resvg-wasm", "index.js"));
-      const wasmFile = path.join(pluginDir, "node_modules", "@resvg", "resvg-wasm", "index_bg.wasm");
-      // BufferSource path — Node fetch() cannot read file:// URLs.
-      // Already-initialized is success: resvg's module state survives plugin
-      // disable/enable (require cache), so a second onload must not fail.
+      // Explicit bytes prevent resvg's default URL/fetch fallback. The glue
+      // and binary are part of main.js, including after disable/re-enable.
       try {
-        await resvgModule.initWasm(fs.readFileSync(wasmFile));
+        await initWasm(embeddedResvgWasm);
       } catch (err) {
         if (!/already initialized/i.test(String((err as Error)?.message ?? err))) throw err;
       }
-      // satori imports harfbuzzjs at bundle-eval time; the esbuild shim defers
-      // it behind a promise bridge, armed here with the real plugin dir.
-      const gp = globalThis as { __publyHarfbuzzBridge?: (p: Promise<unknown>) => void };
-      if (gp.__publyHarfbuzzBridge) {
-        gp.__publyHarfbuzzBridge(
-          Promise.resolve(loadPluginModule<unknown>(pluginDir, path.join("node_modules", "harfbuzzjs", "index.js"))),
-        );
-      }
-      const fontDir = path.join(pluginDir, "fonts");
-      const fontFiles = ["NotoSansSC-subset-Regular.otf", "NotoSansSC-subset-Bold.otf"]
-        .map((f) => path.join(fontDir, f))
-        .filter((p) => fs.existsSync(p));
-      setFontDir(fontDir);
-      // the wasm resvg build silently loads NOTHING from fontFiles (paths) —
-      // raw buffers work. family mappings route the generic families external
-      // diagrams request (sans-serif/monospace/…) to the shipped subsets
-      const fontBuffers = fontFiles.map((f) => new Uint8Array(fs.readFileSync(f)));
+      configureBundledMath();
+      // The wasm Resvg build requires raw font buffers, not fontPaths.
+      // Both are embedded in main.js and require no other installed files.
+      const fontBuffers = [embeddedRegularFont, embeddedBoldFont];
       setPngRenderer((svg, fitWidth) => {
-        const resvg = new resvgModule!.Resvg(svg, {
+        const resvg = new Resvg(svg, {
           font: {
             fontBuffers,
             defaultFontFamily: "Noto Sans SC",
@@ -1143,17 +1175,6 @@ export default class PublyPlugin extends Plugin {
     }
   }
 
-  /** frontmatter peek: explicit `type` wins, `mode: cards` fills the gap —
-   *  same precedence as core's publishType() */
-  private detectIsCards(raw: string): boolean {
-    const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    if (!m) return false;
-    const fm = m[1];
-    const t = fm.match(/^type:\s*(\S+)/m)?.[1];
-    if (t) return t === "image" || t === "image_post";
-    return (fm.match(/^mode:\s*(\S+)/m)?.[1] ?? "").toLowerCase() === "cards";
-  }
-
   /** publish needs server + key; everything else (preview/copy) is local-only.
    *  When unconfigured, open the settings tab right at the guide. */
   private ensureConfigured(): boolean {
@@ -1180,7 +1201,7 @@ export default class PublyPlugin extends Plugin {
       baseDir: this.basePath(),
       mediaDirs: this.mediaDirs(),
       theme: this.settings.theme || "claude",
-      themeCss: THEME_CSS[this.settings.theme || "claude"] ?? claudeThemeCss,
+      themeCss: articleThemeCss(this.settings.theme || "claude"),
       highlightCss: this.settings.theme === "terminal" ? hljsGithubDarkCss : hljsGithubCss,
     };
   }
@@ -1190,8 +1211,10 @@ export default class PublyPlugin extends Plugin {
     if (!f) throw new Error(t("errNoActiveNote"));
     const raw = await this.app.vault.cachedRead(f);
     const rendered = renderMarkdown(raw, this.renderOptions());
-    for (const w of rendered.warnings) console.warn("[publy] " + w);
-    return this.inlineImages(rendered.html, rendered.attachments);
+    try {
+      for (const w of rendered.warnings) console.warn("[publy] " + w);
+      return this.inlineImages(rendered.html, rendered.attachments);
+    } finally { rendered.cleanup(); }
   }
 
   /** preview-only: core emits attachment://<name> refs that publishing swaps
@@ -1325,7 +1348,17 @@ export default class PublyPlugin extends Plugin {
     const raw = await this.app.vault.cachedRead(f);
     if (gen !== this.previewGen) return; // user moved on while we read
     this.livePreviewPath = f.path;
-    if (this.detectIsCards(raw)) {
+    let docFormat: PublicationFormat;
+    let format: PublicationFormat;
+    try {
+      const meta = parseSource(raw).meta;
+      docFormat = resolvePublication(meta).format;
+      format = resolvePublication(meta, this.formatForNote(f.path)).format;
+    } catch {
+      new Notice(t("renderFail", { msg: "Invalid document metadata" }));
+      return;
+    }
+    if (format === "cards") {
       await this.previewCardDeck(f, raw, gen);
       return;
     }
@@ -1334,15 +1367,25 @@ export default class PublyPlugin extends Plugin {
     if (gen !== this.previewGen) return;
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      if (gen !== this.previewGen) return;
-      const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
-      view.refresh = () => this.previewCurrentNote(f);
-      view.setHtml(this.inlineImages(rendered.html, rendered.attachments), {
-        title: rendered.title || f.basename,
-        author: rendered.meta.author,
-        account: this.settings.account || undefined,
-      });
+      try {
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        if (format === "image" && (!rendered.attachments.length || rendered.warnings.some(blockingMediaWarning))) {
+          throw new Error(t("mediaNotReady"));
+        }
+        if (gen !== this.previewGen) return;
+        const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
+        view.notePath = f.path;
+        view.documentFormat = docFormat;
+        view.refresh = () => this.previewCurrentNote(f);
+        const html = format === "image"
+          ? `<div>${rendered.attachments.map((a) => `<img alt="" src="data:${a.contentType};base64,${fs.readFileSync(a.path).toString("base64")}">`).join("")}${captionToHtml(imagePostCaption(raw))}</div>`
+          : this.inlineImages(rendered.html, rendered.attachments);
+        view.setHtml(html, {
+          title: rendered.title || f.basename,
+          author: rendered.meta.author,
+          account: this.settings.account || undefined,
+        });
+      } finally { rendered.cleanup(); }
     } catch (err) {
       if (gen === this.previewGen) new Notice(`Publy: ${(err as Error).message}`);
     }
@@ -1361,16 +1404,20 @@ export default class PublyPlugin extends Plugin {
     const raw = rawArg ?? (await this.app.vault.cachedRead(f));
     const stale = () => gen !== undefined && gen !== this.previewGen;
     if (stale()) return;
+    let outDir: string | undefined;
     try {
-      const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
+      outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
-      view.refresh = () => this.previewCardDeck(f);
+      view.notePath = f.path;
+      view.documentFormat = resolvePublication(parseSource(raw).meta).format;
+      view.refresh = () => this.previewCurrentNote(f);
       // progressive: the panel skeleton appears immediately and each card
       // pops in as its rasterization lands — 9-card decks stop feeling
       // like a 9x wait
       view.beginCards();
       const result = await renderCards(raw, {
         outDir,
+        offline: true, // Never download a full font during offline plugin preview.
         onCard: (card) => {
           if (stale()) return; // drop late cards instead of overpainting
           try {
@@ -1387,6 +1434,8 @@ export default class PublyPlugin extends Plugin {
       }
     } catch (err) {
       new Notice(t("cardsFail", { msg: (err as Error).message }));
+    } finally {
+      if (outDir) fs.rmSync(outDir, { recursive: true, force: true });
     }
   }
 
@@ -1400,16 +1449,24 @@ export default class PublyPlugin extends Plugin {
     const raw = await this.app.vault.cachedRead(f);
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      if (rendered.attachments.length > 0) {
-        new Notice(t("copyHasImages"));
-      }
-      const item = new ClipboardItem({
-        "text/html": new Blob([rendered.html], { type: "text/html" }),
-        "text/plain": new Blob([f.basename], { type: "text/plain" }),
-      });
-      await navigator.clipboard.write([item]);
-      new Notice(t("copyOk"));
+      try {
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        // A successful copy should be directly usable in the target editor:
+        // unavailable formulas/media and attachment:// placeholders are not.
+        // The draft workflow uploads assets and replaces placeholders safely.
+        if (rendered.warnings.some(blockingMediaWarning)) {
+          throw new Error(t("copyMediaNotReady"));
+        }
+        if (rendered.attachments.length > 0 || rendered.html.includes("attachment://")) {
+          throw new Error(t("copyHasImages"));
+        }
+        const item = new ClipboardItem({
+          "text/html": new Blob([rendered.html], { type: "text/html" }),
+          "text/plain": new Blob([f.basename], { type: "text/plain" }),
+        });
+        await navigator.clipboard.write([item]);
+        new Notice(t("copyOk"));
+      } finally { rendered.cleanup(); }
     } catch (err) {
       new Notice(`Publy: ${(err as Error).message}`);
     }
@@ -1495,77 +1552,83 @@ export default class PublyPlugin extends Plugin {
     let author: string | undefined;
     try {
       const rendered = renderMarkdown(raw, this.renderOptions());
-      for (const w of rendered.warnings) console.warn("[publy] " + w);
-      const problems = rendered.warnings.filter(blockingMediaWarning);
-      if (problems.length) {
-        throw new Error(t("mediaNotReady") + " " + problems.join("; "));
-      }
-      type = rendered.type;
-      title = rendered.title || f.basename;
-      author = rendered.meta.author;
-      if (type === "image_post" && rendered.meta.mode?.toLowerCase() === "cards") {
-        if (!this.wasmOk) throw new Error(t("wasmDown"));
-        const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
-        try {
-          const cards = await renderCards(raw, { outDir });
-          if (!cards.lint.ok) {
-            throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
-          }
-          payloadAttachments = cards.cards.map((card) => ({
-            name: card.name,
-            data: fs.readFileSync(card.file).toString("base64"),
-            contentType: "image/png",
-          }));
-          if (!payloadAttachments.length) {
-            throw new Error(t("mediaNotReady") + " No cards were generated.");
-          }
-          html = captionToHtml(cards.caption);
-          coverName = payloadAttachments[0].name;
-        } finally {
-          // The POST payload now owns the base64 data. Avoid leaving copies
-          // of private note content in the system temp directory.
-          fs.rmSync(outDir, { recursive: true, force: true });
+      try {
+        for (const w of rendered.warnings) console.warn("[publy] " + w);
+        const problems = rendered.warnings.filter(blockingMediaWarning);
+        if (problems.length) {
+          throw new Error(t("mediaNotReady") + " " + problems.join("; "));
         }
-      } else {
-        payloadAttachments = rendered.attachments.map((a) => ({
-          name: a.name,
-          data: fs.readFileSync(a.path).toString("base64"),
-          contentType: a.contentType,
-        }));
-        if (type === "image_post" && !payloadAttachments.length) {
-          throw new Error(t("mediaNotReady") + " No local images found for image post.");
-        }
-        if (rendered.cover) {
-          const existing = rendered.attachments.find((a) => a.path === rendered.cover);
-          if (existing) {
-            coverName = existing.name;
-            explicitCover = true;
-          } else {
-            // The cover can be a standalone frontmatter image, not in body.
-            const ext = path.extname(rendered.cover).toLowerCase();
-            const data = fs.readFileSync(rendered.cover);
-            const png = ext === ".png" &&
-              data.length > 8 && data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-            const jpg = (ext === ".jpg" || ext === ".jpeg") &&
-              data.length > 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
-            if (!png && !jpg) {
-              throw new Error(t("coverFormatBad", { path: path.basename(rendered.cover) }));
+        const selection = resolvePublication(rendered.meta, this.formatForNote(f.path));
+        type = selection.type;
+        title = rendered.title || f.basename;
+        author = rendered.meta.author;
+        if (selection.format === "cards") {
+          if (!this.wasmOk) throw new Error(t("wasmDown"));
+          const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
+          try {
+            const cards = await renderCards(raw, { outDir, offline: true });
+            if (!cards.lint.ok) {
+              throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
             }
-            const basename = path.basename(rendered.cover);
-            const name = payloadAttachments.some((attachment) => attachment.name === basename)
-              ? `cover-${crypto.createHash("sha256").update(data).digest("hex").slice(0,12)}${ext}`
-              : basename;
-            payloadAttachments.unshift({
-              name,
-              data: data.toString("base64"),
-              contentType: png ? "image/png" : "image/jpeg",
-            });
-            coverName = name;
-            explicitCover = true;
+            payloadAttachments = cards.cards.map((card) => ({
+              name: card.name,
+              data: fs.readFileSync(card.file).toString("base64"),
+              contentType: "image/png",
+            }));
+            if (!payloadAttachments.length) {
+              throw new Error(t("mediaNotReady") + " No cards were generated.");
+            }
+            html = captionToHtml(cards.caption);
+            coverName = payloadAttachments[0].name;
+          } finally {
+            // The POST payload now owns the base64 data. Avoid leaving copies
+            // of private note content in the system temp directory.
+            fs.rmSync(outDir, { recursive: true, force: true });
           }
+        } else {
+          payloadAttachments = rendered.attachments.map((a) => ({
+            name: a.name,
+            data: fs.readFileSync(a.path).toString("base64"),
+            contentType: a.contentType,
+          }));
+          if (type === "image_post" && !payloadAttachments.length) {
+            throw new Error(t("mediaNotReady") + " No local images found for image post.");
+          }
+          if (type === "image_post") {
+            coverName = payloadAttachments[0]?.name;
+            html = captionToHtml(imagePostCaption(raw));
+          } else if (rendered.cover) {
+            const existing = rendered.attachments.find((a) => a.path === rendered.cover);
+            if (existing) {
+              coverName = existing.name;
+              explicitCover = true;
+            } else {
+              // The cover can be a standalone frontmatter image, not in body.
+              const ext = path.extname(rendered.cover).toLowerCase();
+              const data = fs.readFileSync(rendered.cover);
+              const png = ext === ".png" &&
+                data.length > 8 && data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+              const jpg = (ext === ".jpg" || ext === ".jpeg") &&
+                data.length > 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+              if (!png && !jpg) {
+                throw new Error(t("coverFormatBad", { path: path.basename(rendered.cover) }));
+              }
+              const basename = path.basename(rendered.cover);
+              const name = payloadAttachments.some((attachment) => attachment.name === basename)
+                ? `cover-${crypto.createHash("sha256").update(data).digest("hex").slice(0,12)}${ext}`
+                : basename;
+              payloadAttachments.unshift({
+                name,
+                data: data.toString("base64"),
+                contentType: png ? "image/png" : "image/jpeg",
+              });
+              coverName = name;
+              explicitCover = true;
+            }
+          }
+          if (type === "article") html = rendered.html;
         }
-        html = rendered.html;
-      }
+      } finally { rendered.cleanup(); }
     } catch (err) {
       progress.hide();
       this.status("");
@@ -1648,35 +1711,28 @@ export default class PublyPlugin extends Plugin {
       progress.hide();
       this.status("");
       view?.setPublishing(false);
-      // some requestUrl builds throw on HTTP errors instead of returning —
-      // any error that carries a status is the server answering, i.e. an
-      // explicit, explainable failure (#7); only status-less errors are
-      // network-level drops with an unknown outcome
-      const e = err as { httpStatus?: number; status?: number; statusCode?: number };
-      const httpStatus = e.httpStatus ?? e.status ?? e.statusCode;
-      if (typeof httpStatus === "number" && httpStatus >= 400) {
-        const msg = (err as Error).message;
-        view?.setPublishResult("error", t("resultFail") + " — " + msg);
-        new Notice(t("publishFail", { msg }), 8000);
+      const rejection = err as { safeRejection?: boolean; code?: string };
+      if (rejection.safeRejection && rejection.code) {
+        view?.setPublishResult("error", `${t("resultFail")} ·《${title}》→「${submitAccount}」 · ${rejection.code}`);
+        new Notice(t("publishFail", { msg: rejection.code }), 8000);
         return;
       }
-      // network-level failure: the server may or may not have delivered the
+      // Other errors may occur after the remote draft attempt. Treat them
+      // conservatively until the original result is reconciled.
+      // The server may or may not have delivered the
       // draft — outcome UNKNOWN, never treated as permission to re-send (#7)
       const key = String(payload.idempotencyKey);
       this.lastAttempt = { payload, key, title, account: submitAccount };
       view?.setPublishResult("unknown", `${t("resultUnknown")} ·《${title}》→「${submitAccount}」`, [
         { label: t("btnQueryResult"), onClick: () => void this.queryLastAttempt() },
-        { label: t("btnRetrySame"), onClick: () => void this.retryLastAttempt() },
       ]);
-      new Notice(t("netFail", { msg: (err as Error).message }), 8000);
+      new Notice(t("resultUnknown"), 8000);
     } finally {
       this.status("");
     }
   }
 
-  /** one POST /v1/publish with a fixed request identity. Rejects on
-   *  network-level failure only — HTTP error statuses resolve normally so
-   *  the caller can tell explicit failure from unknown outcome. */
+  /** Submit once; an incomplete acknowledgement leaves the outcome unknown. */
   private async submitPayload(payload: Record<string, unknown>): Promise<PublishResponse> {
     const base = new URL(this.settings.server);
     const res = await requestUrl({
@@ -1684,11 +1740,23 @@ export default class PublyPlugin extends Plugin {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": this.settings.apiKey },
       body: JSON.stringify(payload),
+      throw: false,
     });
-    const body = res.json as PublishResponse;
-    if (res.status >= 400) {
-      const msg = `${body.code ?? res.status}: ${body.message ?? ""}`;
-      throw Object.assign(new Error(msg), { httpStatus: res.status });
+    const body = res.json as PublishResponse | null;
+    const code = body && typeof body.code === "string" ? body.code : "";
+    const knownRejection = ((res.status === 400 || res.status === 403 || res.status === 409 || res.status === 429) &&
+      ["BAD_REQUEST", "ACCOUNT_NOT_FOUND", "ACCOUNT_NOT_OWNED", "QUOTA_EXCEEDED", "IDEMPOTENCY_CONFLICT"].includes(code)) ||
+      (res.status === 502 && /^WECHAT_[0-9]{1,12}$/.test(code));
+    if (knownRejection) throw Object.assign(new Error(code), { safeRejection: true, code });
+    const validResult = body && typeof body === "object" &&
+      (body.scheduled === true
+        ? typeof payload.publishAt === "string" && typeof body.jobId === "string" && body.jobId.trim().length > 0
+        : typeof body.mediaId === "string" && body.mediaId.trim().length > 0) &&
+      (body.account === undefined || body.account === payload.account) &&
+      (body.title === undefined || body.title === payload.title) &&
+      (body.requestId === undefined || body.requestId === payload.idempotencyKey);
+    if (res.status < 200 || res.status >= 300 || !validResult) {
+      throw new Error("Unverified draft outcome; inspect the original request and WeChat drafts");
     }
     return body;
   }
@@ -1735,7 +1803,10 @@ export default class PublyPlugin extends Plugin {
         return;
       }
       const info = res.json as PublishResultInfo;
-      if (info.status === "confirmed") {
+      if (info?.status === "confirmed" && typeof info.mediaId === "string" && info.mediaId.trim().length > 0 &&
+          (info.account === undefined || info.account === a.account) &&
+          (info.title === undefined || info.title === a.title) &&
+          (info.requestId === undefined || info.requestId === a.key)) {
         this.lastAttempt = null;
         view?.setPublishResult("ok", t("queryConfirmed", { title: info.title ?? a.title, account: info.account ?? a.account }));
         new Notice(t("queryConfirmed", { title: info.title ?? a.title, account: info.account ?? a.account }), 8000);
@@ -1747,34 +1818,7 @@ export default class PublyPlugin extends Plugin {
     }
   }
 
-  /** re-issue the EXACT lost request: same payload, same idempotency key. If
-   *  the original run actually delivered, the server answers deduped with the
-   *  original media id instead of creating a second draft (#7). */
-  async retryLastAttempt(): Promise<void> {
-    const a = this.lastAttempt;
-    if (!a || this.publishInFlight) return;
-    this.publishInFlight = true;
-    const progress = new Notice(t("retrying"), 0);
-    const view = this.previewView();
-    view?.setPublishing(true);
-    const t0 = Date.now();
-    try {
-      const body = await this.submitPayload(a.payload);
-      this.lastAttempt = null;
-      progress.hide();
-      view?.setPublishing(false);
-      this.handlePublishResponse(body, view, t0, a.title, a.account);
-    } catch (err) {
-      // still unreachable — the request identity is unchanged, so retrying
-      // again later stays safe
-      progress.hide();
-      view?.setPublishing(false);
-      new Notice(t("retryStillUnknown"), 8000);
-    } finally {
-      this.status("");
-      this.publishInFlight = false;
-    }
-  }
+
 }
 
 class PublySettingTab extends PluginSettingTab {
@@ -1823,8 +1867,6 @@ class PublySettingTab extends PluginSettingTab {
       a.target = "_blank";
     };
     mkLink(t("guideLink"), "https://publy.jrtx.site");
-    links.appendText(" · ");
-    mkLink(t("buyLink"), "https://publy-api.jrtx.site/");
     links.style.marginTop = "4px";
 
     new Setting(containerEl).setName(t("setServer")).setDesc(t("setServerDesc")).addText((text) =>
@@ -1876,17 +1918,18 @@ class PublySettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }),
     );
-    new Setting(containerEl).setName(t("setTheme")).setDesc(t("setThemeDesc")).addDropdown((drop) =>
-      drop
-        .addOptions(THEME_LABELS)
-        .setValue(this.plugin.settings.theme || "claude")
+    new Setting(containerEl).setName(t("setTheme")).setDesc(t("setThemeDesc")).addDropdown((drop) => {
+      // Obsidian's addOptions calls hasOwnProperty on its argument; our
+      // null-prototype lookup deliberately does not inherit that method.
+      for (const [id, label] of Object.entries(availableArticleThemes())) drop.addOption(id, label);
+      drop.setValue(this.plugin.settings.theme || "claude")
         .onChange(async (v) => {
           this.plugin.settings.theme = v;
           await this.plugin.saveSettings();
           // live re-render if the preview is open
-          void this.plugin.previewCurrentNote();
-        }),
-    );
+          if (this.plugin.app.workspace.getActiveFile()) void this.plugin.previewCurrentNote();
+        });
+    });
     const connResult = containerEl.createEl("div");
     connResult.style.cssText = "font-size:13px;padding:2px 0 10px";
     new Setting(containerEl)

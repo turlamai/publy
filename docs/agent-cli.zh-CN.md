@@ -19,19 +19,32 @@ publy check "D:/Notes/article.md" --json
 publy preview "D:/Notes/article.md" --json
 publy render "D:/Notes/article.md" --json
 publy theme ls --json
+publy theme preview medium --json
 publy account list --json
+publy account add Work --theme claude --json  # 本地写入，必须先得到用户授权
 publy quota --json
 publy jobs list --json
 publy history --json
+publy tunnel --json  # 明确的联网操作：启动/确认 SSH 隧道
 ```
 
 `capabilities --json` 离线返回版本化的能力列表：每个命令是否
-支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿。
-**没有声明 JSON 的命令不要凭猜测去解析：**目前 `config set`、`theme preview` 等剩余命令仍偏向人类使用。
+支持 JSON、是否可能联网、是否修改本地文件或真正创建草稿，并声明
+`usage` 示例、`prerequisites`（如 `markdown-file`、`configured-server`、
+`api-key`、`wechat-account`、`config.tunnel`）与 `requiresUserApproval`。
+当前所有已声明命令都支持 `--json`；以具体版本的 manifest 为准，不要只看本文档。
+`config set <key> <value> --json` 已支持结构化回执，不回显 API key 等配置值；这是需经操作者授权的本地修改。
 `jobs cancel <jobId> --json` 和 `jobs retry <jobId> --json` 现在能返回
 结构化回执，但**属于修改服务器状态的操作，Agent 必须先获得用户授权**。
+`publy tunnel --json` 成功时返回 `status:"up"`、`localPort`、`remotePort`
+与 `server`；未配置返回 `TUNNEL_NOT_CONFIGURED`（退出 1），启动失败返回
+`TUNNEL_UNREACHABLE`（退出 5）。本地端口本来就已监听时，
+`startedByThisCall` 与 `networkUsed` 为 false，不虚报联网。该命令可能启动
+SSH，必须取得用户明确授权。
 若网络异常而结果不确定，返回 `status:"unknown"` 与原 jobId，
 应先通过 `jobs list --json` 对账，不能盲目反复操作。
+中断草稿的 retry 只对账内容完全匹配的本地确认记录，或重新接入可证明尚未提交的失败。
+HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远端草稿；保留原账号、jobId 和请求身份。
 对 Agent 公开真实能力，不虚报“所有命令已统一”。
 
 ## 安全检查和本地预览
@@ -49,6 +62,10 @@ publy history --json
 仍可生成带错误提示的预览，但 JSON 中 `ok:false`、退出码为 4。
 检查和预览都不会创建公众号草稿。
 
+### 发布形式
+
+当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 区分本次选择、既有 frontmatter 和默认文章。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
+
 ## HTML 导出与离线主题列表
 
 `render --json` 生成权限受限的本地 HTML，stdout 返回
@@ -59,9 +76,9 @@ publy history --json
 原文绝不修改；覆盖现有 HTML 必须显式 `--force`。
 命令不会上传文章，也不会创建公众号草稿。
 
-`theme ls --json` 仅列出随程序内置的文章/卡片主题，
-返回 `source:"bundled"`、`networkUsed:false`，不会访问主题仓库；
-旧的人工 `theme ls` 则可能联网查询注册表。
+`theme ls --json` 返回内置文章/卡片主题及已安装文章主题元数据 `installedArticleThemes`，保留 `source:"bundled"`、`networkUsed:false`；列出时不访问网络。`theme pack`、`add`、`update`、`remove` 会写入本地文件，必须先得到用户授权；pack 不覆盖已有文件。HTTPS 添加或更新必须提供完整文件的 `--sha256`，不跟随重定向，并通过 `networkUsed` 报告联网情况；本地来源保持离线。成功返回 `kind:"theme-bundle"`、`ok:true` 和稳定 `code`；包无效或写入失败返回 具体的 `THEME_*` 错误码（退出码 2），包括 `THEME_HASH_MISMATCH`、`THEME_UNSAFE_CSS`、`THEME_EXISTS` 与 `THEME_NOT_FOUND`。摘要不能证明作者身份。使用方法见[主题说明](USER-GUIDE.zh-CN.md#使用独立文章主题cli-开发版)。
+
+`theme preview <name> --json` 离线生成私有 HTML，返回 `kind:"theme-preview"`、`output`、主题类型及 `networkUsed:false`；不会打开浏览器或创建草稿。未知主题返回 `UNKNOWN_THEME`（退出码 2），无法渲染返回 `THEME_PREVIEW_FAILED`（退出码 3）。文章与卡片同名时沿用卡片优先规则。
 
 ## 发布和“结果未知”的恢复
 
@@ -99,3 +116,7 @@ publy publish-result <requestId> --json
 投递草稿 → 查询与恢复**。
 
 `config set <key> <value> --json` 是需要用户授权的本地配置变更，输出单个 `config-set` JSON 对象。`CONFIG_SAVED`、`CONFIG_KEY_INVALID`、`CONFIG_INVALID`、`CONFIG_WRITE_FAILED` 均不回显值（包括 API Key、含凭据的 URL）。
+
+`account add <name> --json` 返回单个 `account-add` 对象，成功码为 `ACCOUNT_SAVED`，错误码为 `ACCOUNT_NAME_INVALID`、`CONFIG_INVALID` 或 `CONFIG_WRITE_FAILED`。输出不包含 App ID、作者元数据或配置原文；未指定参数会保留原有字段。此操作修改本地配置，Agent 须事先获得用户明确授权。
+
+`publish --json` 收到 `DRAFT_OUTCOME_UNKNOWN` 时返回 `status:"unknown"`、原请求 ID 和退出码 5。服务端会在重启后继续阻止未解决的带键即时请求；请先查询并检查微信草稿箱，不要盲目重发。服务端返回明确的 `WECHAT_<code>` 拒绝时报告 `rejected`；无法识别的服务错误仍视为未知。这是开发版契约，不代表端到端恰好一次。

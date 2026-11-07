@@ -20,6 +20,11 @@ export function svgToPng(svgPath: string, targetWidth = 1080): string {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-svg-"));
   const outName = `${crypto.randomBytes(4).toString("hex")}-${path.basename(svgPath, ".svg")}.png`;
   const outPath = path.join(outDir, outName);
-  fs.writeFileSync(outPath, png);
-  return outPath;
+  try {
+    fs.writeFileSync(outPath, png);
+    return outPath;
+  } catch (error) {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    throw error;
+  }
 }

@@ -2,6 +2,12 @@
 
 > 当前决策：2026-10-23 interaction review。本文件负责产品形态与交互，商业权益以 `PRICING.md` / `PRICING.zh-CN.md` 为准，实际可用性以用户指南和发行/运营证据为准。下述当前范围优先于早期设想；旧里程碑勾选不是公开上线证明。
 
+## Publication format decision / 发布形式决定 — 2026-11-05
+
+Markdown is the product input; a particular editor or agent is never required. For each operation, an explicit article, image-and-caption, or card choice overrides optional frontmatter; otherwise retain the declared legacy format and default to article. Do not silently switch format based on length or pictures. The CLI, agent skill and Obsidian preview use the same decision; preview and submission must agree. The choice is session/operation scoped and never modifies the source. This is a development candidate, not evidence of a released installer or a public service.
+
+Markdown 是产品输入，不要求用户依赖特定编辑器或 Agent。本次明确选择文章、图片配文或文字卡片时覆盖可选 frontmatter；否则沿用现有字段，无声明时默认文章。不能根据字数或是否含图悄悄切换。CLI、Agent 技能和 Obsidian 预览共享规则，预览与投递须一致；本次选择不改原文。此决定不代表安装包或公开服务已发布。
+
 ## Editor-independent commercial product decision / 跨编辑器商业产品决定 — 2026-10-30
 
 **The editor is a source, not the product.** Obsidian is one integration,
@@ -63,6 +69,10 @@ Do one slice from [issue #7](https://github.com/turlamai/publy/issues/7) at a ti
 The historical rationale and unshipped ideas below are context. Theme-marketplace revenue, new multi-account/mass-send surfaces and old hosted pricing are not the current implementation queue. Reuse validated rendering/theme-package mechanisms; restoring a historical idea requires a separate product decision.
 
 以下早期论证和未交付设想作为背景保留。主题市场收入、新多账号/群发操作面和旧托管定价不再是当前实施队列；已验证的渲染/主题包机制可继续复用。恢复历史设想需另做产品决定。
+
+### Standalone article theme CLI contract (development)
+
+`theme ls` and `theme preview` remain offline; listing includes installed content-only article bundles. `theme pack` writes a new bundle without overwriting; `theme add`, `update` and `remove` explicitly mutate the local theme directory. Local files use no network. HTTPS add/update requires the full bundle SHA-256 and refuses redirects; the digest does not authenticate the author. All four support `--json` and return a single `theme-bundle` object with `ok`, `code`, `networkUsed` and `submitted:false`; failures exit 2. Agent callers must obtain user approval before these local writes or remote fetches. Obsidian may select a validated bundle installed by the CLI under the same system user; it does not download bundles. No gallery or signing infrastructure is implied.
 
 ## 0. 一句话
 
@@ -139,6 +149,12 @@ wenyan（文颜）验证了 CLI + server 路线可行（tlai-wechat-publish 技�
 
 ## 3. CLI 契约（agent-first）
 
+**开发版即时草稿保护：** 带 `idempotencyKey` 的即时请求先在服务端
+SQLite 中持久占位；并发重复或结果未知的原请求不会自动再次投递。
+`DRAFT_OUTCOME_UNKNOWN` 是未知结果，CLI `--json` 报告 `unknown`、
+原请求 ID 与退出码 5；先查并核对微信草稿箱。无键的旧请求不具备此
+保护。该机制尚不是跨实例运营验收或端到端恰好一次保证。
+
 **2026-10-30 新增开发版命令：** `publy check <file> [--json]`，
 离线检查原始 Markdown 的图片、封面、卡片结构和渲染准备情况，不配置服务器
 也能使用，不修改源文件、不创建草稿。标准 Markdown 按源文档目录优先解析
@@ -150,7 +166,7 @@ wenyan（文颜）验证了 CLI + server 路线可行（tlai-wechat-publish 技�
 
 
 
-设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前已有 `capabilities --json`、`check --json`、`preview --json`、`card --json`、`publish --json`、`publish-result --json`、`account list --json`、`jobs list --json`、`history --json`、`quota --json`；其余命令以 `capabilities` 报告的真实 `json:false` 为准。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
+设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前所有已声明命令均支持 `--json`，包括 `capabilities`、`check`、`render`、`preview`、`card`、`publish`、`publish-result`、`account list/add`、`config set`、`jobs list/cancel/retry`、`history`、`quota`、`theme ls/pack/add/update/remove/preview` 与 `tunnel`；每个入口同时声明 `usage`、`prerequisites` 与 `requiresUserApproval`，以 `capabilities --json` 为唯一事实来源。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
 
 ```bash
 publy render a.md --theme claude -o out.html   # Markdown → 公众号 HTML（免费路径，可贴入后台）
@@ -171,6 +187,12 @@ publy quota                                    # 群发配额余量
 - 服务端不可达时 stderr 必须带底层原因（`ECONNREFUSED` / TLS 握手 / 超时分类不同），并给出下一步（检查 `--server` 或 `publy tunnel`）
 - 输入兼容 Obsidian：`![[img.png|650]]`、`[[wikilink|别名]]` 原生解析（`--media-dir` 指定资源目录）；frontmatter 的 `title` / `cover` / `type` / `theme` 直接消费
 - 密钥管理：配置文件只存环境变量名引用（`--secret-env`），与 tlai 技能的 `${VAR}` 约定一致
+
+Core callers that use `renderMarkdown` must read any generated attachment files before calling `result.cleanup()` in a `finally` block. That cleanup removes only renderer-owned intermediate files, never source assets. CLI and plugin paths do this automatically; deliberately created preview HTML remains an output for the user to remove.
+
+### Agent theme preview (development)
+
+`theme preview <name> --json` writes a private offline sample and returns one `theme-preview` JSON object; it never opens a browser or submits a draft. Unknown themes exit 2 and rendering failures exit 3. See [the Agent CLI contract](agent-cli.md).
 
 ### 3.1 从 tlai 技能继承的实战经验（内置为默认行为）
 
@@ -260,6 +282,9 @@ POST /v1/publish          # 发布（JSON，≤30MB）
 GET  /v1/publish-result/:key   # 按幂等键查询结果：confirmed | unknown（超时恢复入口）
 POST /v1/jobs/:id/retry        # 显式重试 interrupted/failed 任务（幂等键随行）
 POST /v1/admin/users/:id/rotate-key  # 用户 key 轮换（旧 key 立即失效）
+GET  /v1/admin/claims          # 运营者：待核对的即时发布（需 admin key）
+GET  /v1/admin/claims/:key/candidates  # 只读读取该账号草稿箱，供核对
+POST /v1/admin/claims/:key/reconcile   # 依据草稿箱证据标记 delivered / absent
 POST /v1/ws-ticket             # 换取短时 WS 票据（替代 URL 携带长期 key）
 ```
 

@@ -16,6 +16,7 @@
 
 .publy-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   padding: 8px 12px;
@@ -24,9 +25,19 @@
   position: sticky;
   top: 0;
   z-index: 5;
+  overflow-x: visible;
 }
 .publy-spacer {
-  flex: 1;
+  flex: 1 1 0;
+}
+.publy-toolbar .publy-btn-primary {
+  max-width: 100%;
+}
+.publy-toolbar .publy-btn-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
 }
 
 .publy-btn {
@@ -183,6 +194,10 @@
 
 /* --- article paper (the WeChat article simulation) ---------------------- */
 
+.workspace-leaf-content[data-type="publy-preview"] .view-content {
+  container-type: inline-size;
+}
+
 .publy-canvas {
   background: var(--background-secondary);
   padding: 28px 18px 48px;
@@ -204,6 +219,18 @@
   max-width: 390px;
   padding: 24px 20px 32px;
   border-radius: 14px;
+}
+
+/* Obsidian opens the preview in a resizable sidebar. Leave room for the
+   article itself when that panel is narrow, while keeping controls reachable. */
+@container (max-width: 480px) {
+  .publy-canvas {
+    padding: 12px 8px 32px;
+  }
+  .publy-paper,
+  .publy-paper.is-mobile {
+    padding: 20px 14px 28px;
+  }
 }
 .publy-paper .publy-title {
   margin: 0 0 14px;

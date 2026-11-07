@@ -27,6 +27,21 @@ test("embed resolves against media dir and keeps alt", () => {
   });
 });
 
+test("Obsidian embed never resolves a directory as an image attachment", () => {
+  withMediaDir((dir) => {
+    fs.mkdirSync(path.join(dir, "assets"));
+    fs.writeFileSync(path.join(dir, "real.png"), "synthetic-image");
+    const source = "![[assets]]\n\n![[real.png]]";
+    const result = preprocessObsidian(source, [dir]);
+    assert.deepEqual(result.missing, ["assets"]);
+    assert.deepEqual(result.assets, [path.join(dir, "real.png")]);
+    assert.match(result.body, /!\[assets\]\(assets\)/);
+    const rendered = renderMarkdown(source, { baseDir: dir });
+    assert.deepEqual(rendered.attachments.map((a) => a.path), [path.join(dir, "real.png")]);
+    assert.ok(rendered.warnings.some((warning) => warning.includes("Assets not found: assets")));
+  });
+});
+
 test("embed without alt falls back to file base name", () => {
   withMediaDir((dir) => {
     fs.writeFileSync(path.join(dir, "pic.png"), "x");
@@ -66,5 +81,73 @@ test("Obsidian embeds preserve filenames with spaces, parentheses, hashes and pe
     assert.deepEqual(rendered.attachments.map((a) => a.path), [actual]);
     assert.match(rendered.html, /attachment:\/\//);
     assert.ok(!rendered.html.includes("file:///"), "file URLs must not escape into the draft");
+  });
+});
+
+test("Obsidian code examples remain literal and do not create false missing-media warnings", () => {
+  withMediaDir((dir) => {
+    const file = path.join(dir, "real.png");
+    fs.writeFileSync(file, "synthetic-image");
+    const source = [
+      "Outside ![[real.png|实际图片]] and [[Note|alias]]",
+      "`![[missing-inline.png]]` and ``![[missing-double.png]]``",
+      "~~~markdown",
+      "![[missing-tilde.png]] [[NotALink|example]]",
+      "~~~",
+      "````md",
+      "![[missing-backtick.png]]",
+      "````",
+      "    ![[missing-indented.png]]",
+      "Outside again ![[real.png]]",
+    ].join("\n");
+    const pre = preprocessObsidian(source, [dir]);
+    assert.deepEqual(pre.missing, []);
+    assert.deepEqual(pre.assets, [file, file]);
+    assert.ok(pre.body.includes("Outside ![实际图片]("));
+    assert.match(pre.body, /alias/);
+    for (const literal of [
+      "`![[missing-inline.png]]`",
+      "``![[missing-double.png]]``",
+      "![[missing-tilde.png]]",
+      "[[NotALink|example]]",
+      "![[missing-backtick.png]]",
+      "    ![[missing-indented.png]]",
+    ]) assert.ok(pre.body.includes(literal), `code literal was rewritten: ${literal}`);
+
+    const rendered = renderMarkdown(source, { baseDir: dir });
+    assert.deepEqual(rendered.warnings, []);
+    assert.deepEqual(rendered.attachments.map((a) => a.path), [file, file]);
+  });
+});
+
+test("escaped and unmatched backticks do not hide real Obsidian embeds", () => {
+  withMediaDir((dir) => {
+    const file = path.join(dir, "real.png");
+    fs.writeFileSync(file, "synthetic-image");
+    const source = "\\` ![[real.png]] and unmatched ` ![[real.png]]";
+    const pre = preprocessObsidian(source, [dir]);
+    assert.deepEqual(pre.missing, []);
+    assert.deepEqual(pre.assets, [file, file]);
+  });
+});
+
+
+test("indented paragraph continuation remains an active embed", () => {
+  withMediaDir((dir) => {
+    const file = path.join(dir, "real.png");
+    fs.writeFileSync(file, "image");
+    const result = preprocessObsidian("Paragraph\n    ![[real.png]]", [dir]);
+    assert.deepEqual(result.assets, [file]);
+    assert.deepEqual(result.missing, []);
+  });
+});
+
+
+test("unmatched backticks do not hide embeds in a later paragraph", () => {
+  withMediaDir((dir) => {
+    const file = path.join(dir, "real.png");
+    fs.writeFileSync(file, "image");
+    const result = preprocessObsidian("unmatched `\n\n`literal` ![[real.png]]", [dir]);
+    assert.deepEqual(result.assets, [file]);
   });
 });

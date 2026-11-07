@@ -4,10 +4,10 @@
 
 [English user guide](USER-GUIDE.md) · [中文使用指南](USER-GUIDE.zh-CN.md)
 
-## 1. 当前发布阻塞
+## 1. 当前发布阻塞与已关闭安全项
 
-- [#12](https://github.com/turlamai/publy/issues/12)：标准社区安装只获取 Release 的 `main.js`、`manifest.json`、`styles.css`。当前插件卡片/WASM/字体依赖 ZIP 中的 `node_modules/` 和 `fonts/`；**ZIP 侧载通过不等于社区目录安装通过**。必须先完成只用三个文件的干净库实机验收。
-- [#13](https://github.com/turlamai/publy/issues/13)：`MarkdownIt({html:true})` → `innerHTML` 的原生 HTML 预览需要安全边界和回归测试。
+- [#12](https://github.com/turlamai/publy/issues/12)：标准社区安装只获取 Release 的 `main.js`、`manifest.json`、`styles.css`。开发分支已将卡片/WASM/字体及 MathJax 嵌入 `main.js`，三平台自动 smoke 负责验证闭包；这不是已发布资产或真实桌面证据。**ZIP 侧载通过不等于社区目录安装通过**。必须先完成只用三个文件的干净库实机验收。
+- 已关闭的安全项 [#13](https://github.com/turlamai/publy/issues/13)：原生 HTML 预览安全边界经 [#24](https://github.com/turlamai/publy/pull/24)、[#41](https://github.com/turlamai/publy/pull/41) 和 [#43](https://github.com/turlamai/publy/pull/43) 加固；真实桌面验收仍由 #15 跟踪。
 - [#14](https://github.com/turlamai/publy/issues/14)：仓库主线源码现为 `0.8.7`，但最后一个公开插件 Release 为 `0.8.3`。统一的根/子目录清单只表示源码元数据一致；**还需要从已审查 SHA 创建相同版本的 Release** 才能提审。
 - [#15](https://github.com/turlamai/publy/issues/15)：需要增补真实 Obsidian 桌面安装/交互测试；现有 Node stub 不是原生测试。
 
@@ -27,7 +27,7 @@
 
 ## 3. 发布前的机器可验证门禁
 
-1. `pnpm install --frozen-lockfile && pnpm -r build && pnpm -r test`；执行 `node scripts/check-plugin-metadata.mjs` 和 `node scripts/verify-plugin.mjs`。后者只是使用额外依赖的侧载布局模拟 Obsidian API 的 Node smoke。正式发行前还必须执行 `node scripts/verify-plugin.mjs --community-only`（只复制 main.js、manifest.json、styles.css，严格拒绝任何额外 node_modules/ 和 fonts/）；也可以在 Actions 手动运行 **Obsidian Community Directory three-file gate**。**当前预期因卡片/WASM 依赖而失败**，这不是绿灯；该脚本仍只模拟 Obsidian，成功后也必须通过真实桌面库验收。
+1. `pnpm install --frozen-lockfile && pnpm -r build && pnpm -r test`；执行 `node scripts/check-plugin-metadata.mjs` 和 `node scripts/verify-plugin.mjs`。后者模拟 Obsidian API，不能替代桌面测试。正式发行前还必须执行 `node scripts/verify-plugin.mjs --community-only`（只复制 main.js、manifest.json、styles.css，严格拒绝任何额外 node_modules/ 和 fonts/）；Actions 的 **Obsidian Community Directory three-file gate** 在每次 PR/main 推送时验证 Windows/macOS/Linux，也可手动运行。它拒绝外部网络及运行时包加载，并检查真实公式 PNG、卡片和重新加载；该脚本仍只模拟 Obsidian，成功后也必须通过真实桌面库验收。
 2. 确认仓库根 `manifest.json` 与 `packages/obsidian-plugin/manifest.json` 完全一致；根/子 `versions.json` 一致，`packages/obsidian-plugin/package.json` 版本匹配。当前源码的 `0.8.7` **不是**已发布版本。
 3. 从审核通过的确切 commit SHA 构建；以相同版本号创建 Git tag 和 GitHub Release，上传构建产物 `main.js`、`manifest.json`、`styles.css`。确保 Release assets 实际与本次构建内容一致，并记录校验和；不要使用旧 Release 附件。
 4. **重要**：在干净的真实 Obsidian 桌面库中，仅复制社区安装会取得的三个文件，禁止额外字体、模块或 ZIP；重启后验证离线预览、富文本复制、图片卡片、数学公式、加载/卸载、更新和错误提示，覆盖实际支持的操作系统。当前这一步尚未通过（#12）。
