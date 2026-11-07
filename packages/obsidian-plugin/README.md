@@ -28,7 +28,7 @@ For source development: use Node.js 22+, pnpm 11, `pnpm install --frozen-lockfil
 
 ## Source module layout
 
-The plugin entry point is `src/main.ts` (views, modals, controller and settings tab). Pure helpers live in reviewable modules and are type-checked before every bundle:
+The plugin entry point is `src/main.ts` (the controller: settings load, registration, render orchestration and publish state). Views, modals, settings and pure helpers live in reviewable modules and are type-checked before every bundle:
 
 | Module | Owns |
 | --- | --- |
@@ -36,8 +36,11 @@ The plugin entry point is `src/main.ts` (views, modals, controller and settings 
 | `src/i18n.ts` | bilingual strings and the applied language preference |
 | `src/image-input.ts` | image MIME helpers, base64 conversion, native file picker |
 | `src/article-themes.ts` | built-in theme CSS/labels and installed-bundle selection |
+| `src/views.ts` | preview and history leaves |
+| `src/modals.ts` | account, cover and schedule pickers |
+| `src/settings-tab.ts` | settings form and connection test |
 
-`pnpm --filter @publy/obsidian-plugin build` runs `tsc --noEmit` against `tsconfig.json`/`env.d.ts` and then esbuild. The type check catches cross-module references that a bundler-only build would silently keep. Splitting views, modals, the account/identity state and the network gateway out of `main.ts` remains tracked in #15; this layout is a first, behavior-preserving step.
+`pnpm --filter @publy/obsidian-plugin build` runs `tsc --noEmit` against `tsconfig.json`/`env.d.ts` and then esbuild. The type check catches cross-module references that a bundler-only build would silently keep. The controller still owns account/identity state, publishing idempotency and the network gateway; extracting those, plus real Obsidian clean-vault smoke and note-switch/accessibility regressions, remains tracked in #15.
 
 ## Report an issue
 
