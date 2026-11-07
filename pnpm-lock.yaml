@@ -125,6 +125,9 @@ importers:
         specifier: 0.33.5
         version: 0.33.5
     devDependencies:
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
       esbuild:
         specifier: ^0.24.0
         version: 0.24.2
@@ -137,6 +140,9 @@ importers:
       obsidian:
         specifier: latest
         version: 1.14.4(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/server:
     dependencies:
