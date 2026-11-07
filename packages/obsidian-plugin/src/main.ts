@@ -22,303 +22,19 @@ import {
   BUILTIN_CARD_THEMES,
 } from "@publy/core";
 import { configureBundledMath } from "@publy/core/math-bundled";
+import { t, setLanguage } from "./i18n.js";
+import { availableArticleThemes, articleThemeCss } from "./article-themes.js";
+import { imageContentType, fileToBase64, pickLocalImageFiles } from "./image-input.js";
+import { VIEW_TYPE_PUBLY_PREVIEW, PUBLY_HISTORY_VIEW, DEFAULT_SETTINGS, type PublySettings, type PublishResponse, type PublishResultInfo, type HistoryEntry, type JobEntry } from "./types.js";
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
 import embeddedResvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
-// theme/highlight css inlined as text by esbuild (loader ".css": "text")
-import claudeThemeCss from "../../core/themes/claude.css";
-import mediumThemeCss from "../../core/themes/medium.css";
-import wechatThemeCss from "../../core/themes/wechat.css";
-import inkThemeCss from "../../core/themes/ink.css";
-import techThemeCss from "../../core/themes/tech.css";
-import roseThemeCss from "../../core/themes/rose.css";
-import officialThemeCss from "../../core/themes/official.css";
-import fortuneThemeCss from "../../core/themes/fortune.css";
-import terminalThemeCss from "../../core/themes/terminal.css";
-import newsThemeCss from "../../core/themes/news.css";
+// highlight css inlined as text by esbuild (loader ".css": "text")
 import hljsGithubCss from "highlight.js/styles/github.css";
 import hljsGithubDarkCss from "highlight.js/styles/github-dark.css";
 // esbuild's binary loader embeds these two font subsets in main.js. Official
 // Community Directory installs do not fetch the dist/fonts sidecar.
 import embeddedRegularFont from "../../core/fonts/NotoSansSC-subset-Regular.otf";
 import embeddedBoldFont from "../../core/fonts/NotoSansSC-subset-Bold.otf";
-
-const THEME_CSS: Record<string, string> = {
-  claude: claudeThemeCss,
-  medium: mediumThemeCss,
-  wechat: wechatThemeCss,
-  ink: inkThemeCss,
-  tech: techThemeCss,
-  rose: roseThemeCss,
-  official: officialThemeCss,
-  fortune: fortuneThemeCss,
-  terminal: terminalThemeCss,
-  news: newsThemeCss,
-};
-
-const THEME_LABELS: Record<string, string> = {
-  claude: "Claude 暖橙",
-  medium: "Medium 简白",
-  wechat: "微信编辑器",
-  ink: "水墨",
-  tech: "科技",
-  rose: "玫瑰",
-  official: "公众号官方",
-  fortune: "财经报刊",
-  terminal: "终端（深色代码）",
-  news: "新闻早报",
-};
-
-
-// --- i18n ------------------------------------------------------------------
-// Bilingual UI (zh/en). Preference comes from settings ("auto" follows the
-// Obsidian interface language). Command/menu names bake in at load, so a
-// language change asks for a reload to take full effect.
-type Lang = "zh" | "en";
-let LANG_PREF: "auto" | Lang = "auto";
-const STRINGS: Record<string, { zh: string; en: string }> = {
-  cmdPublish: { zh: "发布当前笔记", en: "Publish current note" },
-  cmdSchedule: { zh: "定时发布…", en: "Publish at scheduled time…" },
-  cmdPreview: { zh: "预览排版（自动：文章/图片消息）", en: "Preview (auto: article or image-post cards)" },
-  cmdPreviewBrowser: { zh: "在浏览器中预览排版 HTML", en: "Preview rendered HTML in browser" },
-  cmdCopy: { zh: "复制排版富文本（粘贴到公众号编辑器）", en: "Copy rendered rich text (paste into WeChat editor)" },
-  cmdHistory: { zh: "打开发布历史与待发任务", en: "Open publish history & scheduled jobs" },
-  cmdSwitch: { zh: "切换公众号账号", en: "Switch WeChat account" },
-  ribbon: { zh: "Publy: 发布当前笔记", en: "Publy: publish current note" },
-  ribbonPreview: { zh: "Publy: 预览当前笔记", en: "Publy: preview current note" },
-  menuPublish: { zh: "Publy: 发布到公众号草稿箱", en: "Publy: Publish to WeChat drafts" },
-  menuPreview: { zh: "Publy: 预览排版", en: "Publy: Preview typeset" },
-  menuCopy: { zh: "Publy: 复制排版富文本", en: "Publy: Copy rich text" },
-  viewPreview: { zh: "Publy 预览", en: "Publy Preview" },
-  viewHistory: { zh: "Publy 发布历史", en: "Publy History" },
-  btnRefresh: { zh: "↻ 刷新", en: "↻ Refresh" },
-  btnCopy: { zh: "复制 rich text", en: "Copy rich text" },
-  btnPublish: { zh: "发布 → 公众号草稿箱", en: "Publish → WeChat drafts" },
-  pillDraft: { zh: "草稿预览", en: "Draft preview" },
-  previewHint: { zh: "打开一篇笔记，这里会实时预览它的公众号排版。", en: "Open a note — its WeChat-ready typeset shows up here, live." },
-  noTitle: { zh: "(无标题)", en: "(untitled)" },
-  setLang: { zh: "界面语言", en: "Language" },
-  setAutoPreview: { zh: "打开笔记时自动预览", en: "Auto-preview on note open" },
-  setAutoPreviewDesc: { zh: "每个笔记打开时自动渲染公众号排版预览（高频预览零交互）；预览面板已开时切换笔记自动跟随；重度用户也可在 设置→快捷键 里为「预览当前笔记」绑热键", en: "Render the WeChat preview automatically as each note opens; with the panel open, switching notes follows along; heavy users can also bind a hotkey to 'Preview current note' in Settings → Hotkeys" },
-  setLangDesc: { zh: "自动跟随 Obsidian 界面语言；命令名需重载插件后更新", en: "Auto follows the Obsidian UI language; command names update after reload" },
-  langAuto: { zh: "自动", en: "Auto" },
-  langReload: { zh: "Publy: 界面语言已保存——命令名等将在重载插件后完全生效", en: "Publy: language saved — command names update fully after reload" },
-  intro: {
-    zh: "本地预览和复制富文本无需服务或账号。若要保存到公众号草稿箱，请先配置自己的 Publy 服务端、API key 和公众号账号，再测试连接；当前不提供可购买的托管服务。",
-    en: "Local preview and rich-text copy need no server or account. To save to WeChat drafts, configure your own Publy server, API key and WeChat account, then test the connection. Paid hosting is not currently available.",
-  },
-  guideLink: { zh: "使用手册", en: "Guide" },
-  setServer: { zh: "Server 地址", en: "Server URL" },
-  setServerDesc: { zh: "Publy 服务地址，带协议，例如 https://publy-api.example.com", en: "Publy server URL incl. protocol, e.g. https://publy-api.example.com" },
-  setKey: { zh: "API key", en: "API key" },
-  setKeyDesc: { zh: "只保存在本机 vault 配置里", en: "Stored only in this vault's plugin data" },
-  setAccount: { zh: "公众号账号名", en: "WeChat account" },
-  setAccountDesc: { zh: "服务端绑定的账号名；配置好后自动列出 key 名下的账号", en: "Account bound on the server; auto-lists your accounts once configured" },
-  setAccountFallback: { zh: "my-account（配置服务后可下拉选择）", en: "my-account (configure the server to get a dropdown)" },
-  setMedia: { zh: "媒体目录", en: "Media folder" },
-  setMediaDesc: { zh: "本地图片查找目录；留空 = 自动跟随 vault 附件设置", en: "Where local images live; empty = follow the vault attachment setting" },
-  setMediaPlaceholder: { zh: "自动（vault 附件目录）", en: "Auto (vault attachment folder)" },
-  setTheme: { zh: "主题", en: "Theme" },
-  setThemeDesc: { zh: "文章排版主题；通过 CLI 安装的主题可在重新打开设置后选择。terminal 使用深色代码高亮。", en: "Article theme; themes installed by the CLI appear after reopening settings. Terminal uses dark code highlighting." },
-  themeLoadError: { zh: "已选主题不存在或已损坏，请重新安装主题或切换内置主题。", en: "The selected theme is missing or invalid. Reinstall it or select a built-in theme." },
-  themeListError: { zh: "无法读取已安装主题，请用命令行检查主题目录。", en: "Installed themes could not be read. Check the theme directory using the CLI." },
-  setConn: { zh: "连接", en: "Connection" },
-  setConnDesc: { zh: "检查服务可达性、API key 与套餐配额", en: "Check reachability, API key and plan quota" },
-  btnTest: { zh: "测试连接", en: "Test connection" },
-  testing: { zh: "测试中…", en: "Testing…" },
-  badServerUrl: { zh: "❌ Server 地址格式不对（要带 https:// 或 http://）", en: "❌ Server URL looks wrong (include https:// or http://)" },
-  needKey: { zh: "❌ 先填 API key", en: "❌ Enter the API key first" },
-  keyInvalid: { zh: "❌ key 无效或被停用（服务返回 {code}）", en: "❌ Key invalid or disabled (server said {code})" },
-  connOk: { zh: "✅ 连接正常 — {usage}", en: "✅ Connected — {usage}" },
-  connOkNoAccount: { zh: " · 还没填公众号账号名，发布时会用服务端默认账号", en: " · no account set; the server default will be used" },
-  planAdmin: { zh: "管理员 key（无限额）", en: "admin key (no quota)" },
-  planUsage: { zh: "套餐 {plan} · 本月 {used}/{limit} 篇", en: "plan {plan} · {used}/{limit} posts this month" },
-  connFail: { zh: "❌ 连接失败：{msg} — 请检查 Server 地址与 API key", en: "❌ Connection failed: {msg} — check the Server URL and API key" },
-  noActiveNote: { zh: "Publy: 没有活动笔记", en: "Publy: no active note" },
-  errNoActiveNote: { zh: "没有活动笔记", en: "no active note" },
-  healthBad: { zh: "health 响应异常", en: "unexpected health response" },
-  coverExplicit: { zh: "封面：自选图片", en: "cover: your pick" },
-  coverPickTitle: { zh: "选择这篇的封面", en: "Pick a cover for this note" },
-  coverAutoTile: { zh: "自动标题卡", en: "Auto title card" },
-  btnConfirm: { zh: "确定", en: "OK" },
-  coverFirst: { zh: "封面：正文首图", en: "cover: first image" },
-  coverAuto: { zh: "封面：自动标题卡", en: "cover: auto title card" },
-  ensureConfigured: { zh: "Publy: 还差一步——在设置里填 Server 地址和 API key（可用「测试连接」验证）", en: "Publy: almost there — set the Server URL and API key in settings (Test connection verifies it)" },
-  inFlight: { zh: "Publy: 已有一篇在发布中——稍等，完成后会弹结果", en: "Publy: a publish is already running — the result will pop shortly" },
-  rendering: { zh: "Publy: 渲染中…", en: "Publy: rendering…" },
-  uploading: { zh: "Publy: 上传到公众号…", en: "Publy: uploading to WeChat…" },
-  renderFail: { zh: "Publy: 渲染失败 — {msg}", en: "Publy: render failed — {msg}" },
-  mediaNotReady: { zh: "素材未就绪，草稿未发送。请修复：", en: "Media not ready; draft NOT sent. Fix:" },
-  coverFormatBad: { zh: "封面必须是有效的 PNG/JPEG 图片：{path}", en: "Cover must be a valid PNG/JPEG image: {path}" },
-  publishFail: { zh: "Publy: 发布失败 — {msg}", en: "Publy: publish failed — {msg}" },
-  publishOk: { zh: "✅《{title}》已进公众号草稿箱（{sec} 秒）", en: "✅ [{title}] is in your WeChat drafts ({sec}s)" },
-  scheduledOk: { zh: "🕒《{title}》已排期 {when} — 在「发布历史」里可取消", en: "🕒 [{title}] scheduled for {when} — cancel it in History" },
-  deduped: { zh: "Publy: 10 分钟内已发过《{title}》——本次跳过（防重复）", en: "Publy: [{title}] was just published — skipped as duplicate" },
-  netFail: { zh: "Publy: 发布失败 — {msg}", en: "Publy: publish failed — {msg}" },
-  badServer: { zh: "Publy: Server 地址格式不对——需要带协议，例如 https://publy-api.example.com", en: "Publy: Server URL is malformed — include the protocol, e.g. https://publy-api.example.com" },
-  copyHasImages: { zh: "Publy: 笔记包含图片或公式附件，已取消复制以避免无效链接；请使用草稿交付功能", en: "Publy: copy cancelled — image or formula attachments need draft delivery, not unresolved clipboard links" },
-  copyMediaNotReady: { zh: "Publy: 图片或公式渲染未完成，已取消复制，剪贴板内容未修改", en: "Publy: copy cancelled — media or math could not be rendered; clipboard left unchanged" },
-  copyOk: { zh: "Publy: 已复制排版 rich text — 到公众号编辑器 Ctrl+V 粘贴", en: "Publy: rich text copied — paste into the WeChat editor with Ctrl+V" },
-  wasmDown: { zh: "Publy: 卡片渲染器不可用（wasm 初始化失败）——文章发布不受影响", en: "Publy: card renderer unavailable (wasm init failed) — article publishing is unaffected" },
-  previewCard: { zh: "预览卡片 {index}", en: "Preview card {index}" },
-  cardsRendering: { zh: "Publy: 正在渲染图片消息卡片…", en: "Publy: rendering image-post cards…" },
-  cardsFail: { zh: "Publy: 图片消息卡片渲染失败 — {msg}", en: "Publy: card rendering failed — {msg}" },
-  wasmInitFail: { zh: "Publy: 卡片渲染器初始化失败（文章功能不受影响）——详情见开发者控制台", en: "Publy: card renderer failed to init (articles unaffected) — see the developer console" },
-  histLoading: { zh: "加载中…", en: "Loading…" },
-  histLoadFail: { zh: "加载失败：{msg} — 检查「测试连接」里的地址与 key", en: "Failed to load: {msg} — check URL & key under Test connection" },
-  histNeedConfig: { zh: "配置 Server 和 API key 后，这里会显示发布历史与待发的定时任务。", en: "Once the Server URL and API key are set, publish history and scheduled jobs show up here." },
-  histTitle: { zh: "发布历史", en: "History" },
-  histJobs: { zh: "待发任务（{n}）", en: "Scheduled ({n})" },
-  histJobsEmpty: { zh: "没有待发的定时任务。右键笔记或命令面板可排期。", en: "Nothing scheduled. Right-click a note or use the command palette to schedule." },
-  histRecent: { zh: "最近记录", en: "Recent" },
-  histEmpty: { zh: "还没有发布记录。", en: "No publishes yet." },
-  btnCancel: { zh: "取消", en: "Cancel" },
-  cancelOk: { zh: "已取消待发任务", en: "Scheduled job cancelled" },
-  cancelFail: { zh: "取消失败：{msg}", en: "Cancel failed: {msg}" },
-  typeImagePost: { zh: "图片消息", en: "image post" },
-  typeArticle: { zh: "文章", en: "article" },
-  formatLabel: { zh: "本次发布形式", en: "Format for this draft" },
-  formatAuto: { zh: "跟随文档（{format}）", en: "Follow document ({format})" },
-  formatArticle: { zh: "文章", en: "Article" },
-  formatImage: { zh: "图片与配文", en: "Images and caption" },
-  formatCards: { zh: "文字卡片", en: "Text cards" },
-  acctFetchFail: { zh: "获取账号列表失败：{msg}", en: "Failed to list accounts: {msg}" },
-  acctNone: { zh: "这个 key 名下没有公众号账号——请先在自托管服务端绑定（publy account add）", en: "No WeChat accounts under this key — bind one on your self-hosted server (publy account add)" },
-  acctSwitched: { zh: "已切换到「{name}」", en: "Switched to [{name}]" },
-  acctModalTitle: { zh: "切换公众号账号", en: "Switch WeChat account" },
-  acctCurrent: { zh: "{name}（当前）", en: "{name} (current)" },
-  acctSwitchBtn: { zh: "切换", en: "Switch" },
-  schedTitle: { zh: "定时发布", en: "Schedule publish" },
-  schedDesc: { zh: "到点由 Publy 服务自动发布到公众号草稿箱；配额在执行时计。", en: "The Publy server publishes to your WeChat drafts at the chosen time; quota counts at execution." },
-  schedBtn: { zh: "排期", en: "Schedule" },
-  schedInvalid: { zh: "时间无效或已过去——重新选一个未来时间", en: "That time is invalid or in the past — pick a future time" },
-  browseLocal: { zh: "从本机选择图片…", en: "Pick an image from this computer…" },
-  coverLocal: { zh: "本机图片", en: "Local image" },
-  localCoverLost: { zh: "本机封面图已失效——请重新选择", en: "Local cover image lost — pick it again" },
-  tipRefresh: { zh: "重新渲染预览", en: "Re-render the preview" },
-  tipCopy: { zh: "复制排版 rich text", en: "Copy rendered rich text" },
-  tipWidthMobile: { zh: "手机宽（390px）——公众号读者大多在手机", en: "Mobile width (390px) — most WeChat readers are on phones" },
-  tipWidthDesktop: { zh: "桌面宽（700px）", en: "Desktop width (700px)" },
-  tipTheme: { zh: "文章主题（切换即时重渲染）", en: "Article theme (re-renders instantly)" },
-  pubRunning: { zh: "发布中…", en: "Publishing…" },
-  resultOk: { zh: "已进草稿箱", en: "In your WeChat drafts" },
-  resultScheduled: { zh: "已排期", en: "Scheduled" },
-  resultDeduped: { zh: "10 分钟内已发过，本次跳过（防重复）", en: "Just published — skipped as duplicate" },
-  resultFail: { zh: "发布失败", en: "Publish failed" },
-  // #7: outcome-unknown is distinct from explicit failure — a dropped network
-  // connection says nothing about whether the draft was created
-  resultUnknown: { zh: "结果未知 — 草稿可能已创建；请查询结果并检查公众号草稿箱，不要直接重发", en: "Outcome unknown — the draft may exist. Query and check WeChat drafts before submitting again" },
-  btnQueryResult: { zh: "查询结果", en: "Query result" },
-  queryConfirmed: { zh: "✅ 已确认《{title}》在「{account}」草稿箱（幂等命中，未重复创建）", en: "✅ Confirmed: [{title}] is in [{account}] drafts (idempotent hit, no duplicate)" },
-  queryUnknown: { zh: "服务端无法确认结果；请先检查公众号草稿箱，再决定是否新建草稿", en: "Server cannot confirm the outcome. Check your WeChat drafts before deciding whether to submit again" },
-  queryFail: { zh: "Publy: 查询失败 — {msg}", en: "Publy: query failed — {msg}" },
-  uploadingNamed: { zh: "Publy: 投递中 —《{title}》→「{account}」草稿箱", en: "Publy: delivering [{title}] → [{account}] drafts" },
-  needAccount: { zh: "先选定公众号账号——不向未指定的默认账号投递（可在设置或「切换公众号账号」里选）", en: "Pick a WeChat account first — never submit to an unnamed default (Settings or the switch-account command)" },
-  btnPublishNamed: { zh: "投递「{account}」草稿箱", en: "Deliver → [{account}] drafts" },
-  emptyOpenHint: { zh: "打开一篇笔记，这里会实时预览它的公众号排版", en: "Open a note — its WeChat-ready typeset shows up here, live" },
-};
-
-function t(key: string, vars?: Record<string, string | number>): string {
-  let lang: Lang = LANG_PREF === "auto"
-    ? (typeof window !== "undefined" &&
-       String((window as unknown as { moment?: { locale?: () => string } }).moment?.locale?.() ?? "en").toLowerCase().startsWith("zh") ? "zh" : "en")
-    : LANG_PREF;
-  let out = STRINGS[key]?.[lang] ?? STRINGS[key]?.zh ?? key;
-  if (vars) for (const [k, v] of Object.entries(vars)) out = out.split("{" + k + "}").join(String(v));
-  return out;
-}
-
-/** Only validated content-only bundles are offered to the plugin. */
-function availableArticleThemes(): Record<string, string> {
-  const choices: Record<string, string> = Object.assign(Object.create(null), THEME_LABELS);
-  try {
-    for (const theme of listInstalledThemes()) {
-      if (!Object.hasOwn(choices, theme.id) && !Object.hasOwn(BUILTIN_CARD_THEMES, theme.id)) {
-        choices[theme.id] = `${theme.name} · ${theme.version}`;
-      }
-    }
-  } catch { new Notice(t("themeListError")); }
-  return choices;
-}
-function articleThemeCss(id: string): string {
-  if (Object.hasOwn(THEME_CSS, id)) return THEME_CSS[id];
-  try { return readInstalledTheme(id).css; }
-  catch { throw new Error(t("themeLoadError")); }
-}
-
-const VIEW_TYPE_PUBLY_PREVIEW = "publy-preview";
-const PUBLY_HISTORY_VIEW = "publy-history";
-
-interface PublySettings {
-  server: string;
-  apiKey: string;
-  account: string;
-  mediaDir: string;
-  theme: string;
-  lang: "auto" | "zh" | "en";
-  /** open the preview panel automatically as each markdown note opens */
-  autoPreview: boolean;
-  /** preview panel width: 390px "mobile" (the WeChat norm) or 700px "desktop" */
-  previewWidth: "mobile" | "desktop";
-  /** file path -> last cover choice ("auto" or attachment name) */
-  lastCover: Record<string, string>;
-}
-
-const DEFAULT_SETTINGS: PublySettings = {
-  server: "",
-  apiKey: "",
-  account: "",
-  mediaDir: "",
-  theme: "claude",
-  lang: "auto",
-  autoPreview: false,
-  previewWidth: "desktop",
-  lastCover: {},
-};
-
-interface PublishResponse {
-  mediaId?: string;
-  code?: string;
-  message?: string;
-  scheduled?: boolean;
-  jobId?: string;
-  runAt?: string;
-  coverSource?: "cover" | "first-image" | "auto";
-  /** server echo of the submitted identity (#7): results name their own
-   *  destination and request instead of whatever preview is now visible */
-  account?: string;
-  title?: string;
-  requestId?: string;
-  deduped?: boolean;
-}
-
-/** GET /v1/publish-result/:key answer */
-interface PublishResultInfo {
-  status: "confirmed" | "unknown";
-  mediaId?: string;
-  account?: string;
-  title?: string;
-  requestId?: string;
-}
-
-interface HistoryEntry {
-  ts: string;
-  event: string;
-  account?: string;
-  title?: string;
-  type?: string;
-  mediaId?: string;
-  error?: string;
-}
-
-interface JobEntry {
-  id: string;
-  runAt: string;
-  status: string;
-  account?: string;
-  type?: string;
-  title?: string;
-  error?: string;
-}
 
 /** In-app preview leaf: article HTML or image-post card strip, with a small
  *  action toolbar (refresh / copy / publish) so the preview is a cockpit,
@@ -711,51 +427,6 @@ class PublyHistoryView extends ItemView {
   }
 }
 
-const IMAGE_EXT_TYPES: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
-
-function imageContentType(p: string): string {
-  return IMAGE_EXT_TYPES[path.extname(p).toLowerCase()] ?? "image/png";
-}
-
-async function fileToBase64(f: File): Promise<string> {
-  const buf = new Uint8Array(await f.arrayBuffer());
-  let bin = "";
-  for (let i = 0; i < buf.length; i += 0x8000) {
-    bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  }
-  return btoa(bin);
-}
-
-/** native file picker via <input type="file"> — the community-plugin-safe way
- *  (electron.remote is banned by Obsidian's review rules, and the HTML input
- *  works everywhere). Resolves with the chosen files; [] when cancelled. */
-function pickLocalImageFiles(): Promise<File[]> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/png,image/jpeg,image/webp,image/gif";
-    input.multiple = true;
-    input.style.display = "none";
-    let settled = false;
-    const done = (files: File[]) => {
-      if (settled) return;
-      settled = true;
-      input.remove();
-      resolve(files);
-    };
-    input.addEventListener("change", () => done(input.files ? Array.from(input.files) : []));
-    input.addEventListener("cancel", () => done([]));
-    document.body.appendChild(input);
-    input.click();
-  });
-}
-
 /** Simple list picker for switching accounts. */
 class AccountModal extends Modal {
   private names: string[];
@@ -807,12 +478,12 @@ class AccountModal extends Modal {
 class CoverPickerModal extends Modal {
   private plugin: PublyPlugin;
   private file: TFile;
-  private candidates: { name: string; path: string; contentType: string }[];
+  private candidates: { name: string; data: string; contentType: string }[];
   private onPick: (choice: string | null) => void;
   private chosen: string;
   private picked = false;
 
-  constructor(app: App, plugin: PublyPlugin, file: TFile, candidates: { name: string; path: string; contentType: string }[], current: string, onPick: (choice: string | null) => void) {
+  constructor(app: App, plugin: PublyPlugin, file: TFile, candidates: { name: string; data: string; contentType: string }[], current: string, onPick: (choice: string | null) => void) {
     super(app);
     this.plugin = plugin;
     this.file = file;
@@ -848,12 +519,9 @@ class CoverPickerModal extends Modal {
       return el;
     };
     for (const c of this.candidates.slice(0, 12)) {
-      let dataUri = "";
-      try {
-        dataUri = `data:${c.contentType};base64,${fs.readFileSync(c.path).toString("base64")}`;
-      } catch {
-        dataUri = "";
-      }
+      // Payload attachments already carry base64 data; no filesystem path is
+      // kept, so the tile cannot depend on a file that may have moved.
+      const dataUri = c.data ? `data:${c.contentType};base64,${c.data}` : "";
       makeTile(c.name, (box) => {
         if (dataUri) {
           const im = box.createEl("img");
@@ -976,7 +644,7 @@ class ScheduleModal extends Modal {
 }
 
 export default class PublyPlugin extends Plugin {
-  settings: PublySettings;
+  declare settings: PublySettings;
   private readonly formatChoices = new Map<string, PublicationFormat>();
   formatForNote(path: string): PublicationFormat | undefined { return this.formatChoices.get(path); }
   chooseFormat(path: string, value: PublicationFormat | "auto"): void {
@@ -1041,7 +709,7 @@ export default class PublyPlugin extends Plugin {
     }
 
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    LANG_PREF = this.settings.lang ?? "auto";
+    setLanguage(this.settings.lang ?? "auto");
 
     this.registerView(VIEW_TYPE_PUBLY_PREVIEW, (leaf: WorkspaceLeaf) => new PublyPreviewView(leaf, this));
     this.registerView(PUBLY_HISTORY_VIEW, (leaf: WorkspaceLeaf) => new PublyHistoryView(leaf, this));
@@ -1247,7 +915,9 @@ export default class PublyPlugin extends Plugin {
     const { workspace } = this.app;
     let leaf = workspace.getLeavesOfType(viewType)[0] as WorkspaceLeaf | undefined;
     if (!leaf) {
-      leaf = workspace.getRightLeaf(false);
+      const created = workspace.getRightLeaf(false);
+      if (!created) throw new Error("Cannot open a Publy view in the current workspace");
+      leaf = created;
       await leaf.setViewState({ type: viewType, active: true });
     }
     workspace.revealLeaf(leaf);
@@ -1475,7 +1145,7 @@ export default class PublyPlugin extends Plugin {
   private async previewInBrowser(render: () => Promise<string>): Promise<void> {
     try {
       const html = await render();
-      const { shell } = require("electron") as typeof import("electron").shell;
+      const { shell } = require("electron") as typeof import("electron");
       const out = os.tmpdir() + `/publy-preview-${Date.now()}.html`;
       fs.writeFileSync(out, html);
       shell.openPath(out);
@@ -1542,7 +1212,7 @@ export default class PublyPlugin extends Plugin {
     // one sticky progress toast for the whole run — transient toasts vanish
     // mid-publish and reads as "nothing happened", inviting double-clicks
     const progress = new Notice(t("rendering"), 0);
-    let html: string;
+    let html = "";
     let payloadAttachments: { name: string; data: string; contentType: string }[];
     let coverName: string | undefined;
     let explicitCover = false;
@@ -1839,7 +1509,7 @@ class PublySettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.lang ?? "auto")
         .onChange(async (v) => {
           this.plugin.settings.lang = v as "auto" | "zh" | "en";
-          LANG_PREF = this.plugin.settings.lang;
+          setLanguage(this.plugin.settings.lang);
           await this.plugin.saveSettings();
           new Notice(t("langReload"), 6000);
           this.display();

@@ -26,6 +26,19 @@ The latest **published** GitHub plugin release is [0.8.3](https://github.com/tur
 
 For source development: use Node.js 22+, pnpm 11, `pnpm install --frozen-lockfile`, and `pnpm -r build`. Built plugin files are in `packages/obsidian-plugin/dist/`; the simulated smoke script is `node scripts/verify-plugin.mjs` at the repository root. This smoke script is not actual Obsidian desktop acceptance.
 
+## Source module layout
+
+The plugin entry point is `src/main.ts` (views, modals, controller and settings tab). Pure helpers live in reviewable modules and are type-checked before every bundle:
+
+| Module | Owns |
+| --- | --- |
+| `src/types.ts` | settings shape/defaults, server response types, view IDs |
+| `src/i18n.ts` | bilingual strings and the applied language preference |
+| `src/image-input.ts` | image MIME helpers, base64 conversion, native file picker |
+| `src/article-themes.ts` | built-in theme CSS/labels and installed-bundle selection |
+
+`pnpm --filter @publy/obsidian-plugin build` runs `tsc --noEmit` against `tsconfig.json`/`env.d.ts` and then esbuild. The type check catches cross-module references that a bundler-only build would silently keep. Splitting views, modals, the account/identity state and the network gateway out of `main.ts` remains tracked in #15; this layout is a first, behavior-preserving step.
+
 ## Report an issue
 
 Open an [issue](https://github.com/turlamai/publy/issues) with plugin version, Obsidian version, OS, installation method, reproducible steps and redacted output. Never attach API keys, AppSecrets or private notes.
