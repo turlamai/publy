@@ -49,6 +49,8 @@ publy theme pack my.css --id my-style --theme-version 1.0.0 --name "我的主题
 
 迁移旧的本地主题时，请先备份它的 CSS 和许可证，再对副本运行 `theme pack`。不受支持的选择器或声明需要你明确调整；Publy 会拒绝，而不会悄悄降低校验要求。你本人信任的 CSS 文件仍可通过 `--custom-theme /path/to/theme.css` 临时用于一次渲染；这是旧的可信输入路径，不具备主题包的安全边界。不要运行旧包的安装脚本；主题包流程不会自动导入 npm 包。
 
+签名主题包是可选项。用 Ed25519 私钥运行 `theme pack --sign-key <pem>` 会生成 `publy-theme-v2` 包，其中携带对应公钥，以及对元数据和 CSS 哈希的分离签名。`theme add/update --trusted-key <base64>` 只安装由该公钥签名的包。只有在通过可信渠道从作者处拿到公钥时才应固定它：签名证明持有该密钥，不证明身份；未固定公钥时签名仅作参考。私钥只在本地进程中读取，不会上传。
+
 ## 我的笔记和草稿在哪里？
 
 Publy 不建立笔记库，也没有用来浏览或编辑笔记的后台。你仍然在

@@ -676,6 +676,9 @@ const THEME_ERRORS: Record<string, string> = {
   THEME_VERSION_UNCHANGED: "The installed theme already has that version.",
   THEME_EXISTS: "The output or installed theme already exists.",
   THEME_NOT_FOUND: "The source or installed theme was not found.",
+  THEME_SIGNATURE_INVALID: "The bundle signature is invalid or its metadata was modified.",
+  THEME_UNTRUSTED_SIGNER: "The bundle is not signed by the pinned public key.",
+  THEME_SIGNING_KEY_INVALID: "The signing key is not a valid Ed25519 key.",
 };
 function themeError(error: unknown, fallback: string): string {
   const err = error as NodeJS.ErrnoException;
@@ -684,8 +687,8 @@ function themeError(error: unknown, fallback: string): string {
   return typeof err?.message === "string" && Object.hasOwn(THEME_ERRORS, err.message) ? err.message : fallback;
 }
 
-async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; json?: boolean }): Promise<void> {
-  const { validateThemeBundle, BUILTIN_THEMES, BUILTIN_CARD_THEMES } = await import("@publy/core");
+async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; signKey?: string; json?: boolean }): Promise<void> {
+  const { validateThemeBundle, BUILTIN_THEMES, BUILTIN_CARD_THEMES, themeSignaturePayload } = await import("@publy/core");
   try {
     if ((BUILTIN_THEMES as readonly string[]).includes(opts.id) || Object.hasOwn(BUILTIN_CARD_THEMES, opts.id)) throw new Error("THEME_RESERVED_ID");
     const stat = fs.lstatSync(cssFile);
@@ -699,8 +702,22 @@ async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: s
       if (length > 128 * 1024) throw new Error("THEME_INVALID_SOURCE");
       css = new TextDecoder("utf-8", { fatal: true }).decode(data.subarray(0, length));
     } finally { fs.closeSync(fd); }
-    const bundle = { format: "publy-theme-v1", id: opts.id, version: opts.themeVersion, name: opts.name, license: opts.license,
+    const bundle: Record<string, unknown> = { format: opts.signKey ? "publy-theme-v2" : "publy-theme-v1",
+      id: opts.id, version: opts.themeVersion, name: opts.name, license: opts.license,
       css, cssSha256: crypto.createHash("sha256").update(css, "utf8").digest("hex") };
+    if (opts.signKey) {
+      // Signing is an author action. The private key never leaves this process,
+      // and the bundle carries only the public key plus the detached signature.
+      const keyStat = fs.lstatSync(opts.signKey);
+      if (!keyStat.isFile() || keyStat.isSymbolicLink() || keyStat.size > 8 * 1024) throw new Error("THEME_SIGNING_KEY_INVALID");
+      let privateKey: crypto.KeyObject;
+      try { privateKey = crypto.createPrivateKey(fs.readFileSync(opts.signKey, "utf8")); }
+      catch { throw new Error("THEME_SIGNING_KEY_INVALID"); }
+      if (privateKey.asymmetricKeyType !== "ed25519") throw new Error("THEME_SIGNING_KEY_INVALID");
+      const publicKey = crypto.createPublicKey(privateKey).export({ type: "spki", format: "der" }).toString("base64");
+      const signature = crypto.sign(null, themeSignaturePayload(bundle as Parameters<typeof themeSignaturePayload>[0]), privateKey).toString("base64");
+      bundle.signature = { alg: "ed25519", publicKey, signature };
+    }
     const raw = JSON.stringify(bundle, null, 2) + "\n"; validateThemeBundle(raw);
     fs.writeFileSync(opts.output, raw, { flag: "wx", mode: 0o600 });
     const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: "THEME_PACK_OK", id: opts.id,
@@ -714,11 +731,13 @@ async function cmdThemePack(cssFile: string, opts: { id: string; themeVersion: s
   }
 }
 
-async function cmdThemeBundle(action: "add" | "update" | "remove", source: string, opts: { json?: boolean; sha256?: string }): Promise<void> {
-  const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, installThemeBundle, removeInstalledTheme } = await import("@publy/core");
+async function cmdThemeBundle(action: "add" | "update" | "remove", source: string, opts: { json?: boolean; sha256?: string; trustedKey?: string }): Promise<void> {
+  const { BUILTIN_THEMES, BUILTIN_CARD_THEMES, installThemeBundle, removeInstalledTheme, decodeThemePublicKey } = await import("@publy/core");
   let networkUsed = false;
   let downloading = false;
   try {
+    // Reject a malformed pin before any download or local read.
+    if (opts.trustedKey !== undefined) decodeThemePublicKey(opts.trustedKey);
     if (action === "remove") { removeInstalledTheme(source); }
     else {
       let bytes: Uint8Array;
@@ -747,7 +766,7 @@ async function cmdThemeBundle(action: "add" | "update" | "remove", source: strin
       }
       if (opts.sha256 && (!/^[a-f0-9]{64}$/i.test(opts.sha256) || crypto.createHash("sha256").update(bytes).digest("hex") !== opts.sha256.toLowerCase())) throw new Error("THEME_HASH_MISMATCH");
       const raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-      const bundle = installThemeBundle(raw, action, [...BUILTIN_THEMES, ...Object.keys(BUILTIN_CARD_THEMES)]);
+      const bundle = installThemeBundle(raw, action, [...BUILTIN_THEMES, ...Object.keys(BUILTIN_CARD_THEMES)], { trustedKey: opts.trustedKey });
       source = bundle.id;
     }
     const result = { schemaVersion: 1, kind: "theme-bundle", ok: true, code: `THEME_${action.toUpperCase()}_OK`, id: source, networkUsed, submitted: false };
@@ -1219,9 +1238,9 @@ const AGENT_USAGE: Record<string, string> = {
   "account add": "publy account add <name> --json [--app-id <id>]",
   "config set": "publy config set <key> <value> --json",
   "theme ls": "publy theme ls --json",
-  "theme pack": "publy theme pack <css-file> --id <id> --theme-version <version> --name <name> --license <license> --output <file> --json",
-  "theme add": "publy theme add <file-or-https-url> [--sha256 <hash>] --json",
-  "theme update": "publy theme update <file-or-https-url> [--sha256 <hash>] --json",
+  "theme pack": "publy theme pack <css-file> --id <id> --theme-version <version> --name <name> --license <license> --output <file> [--sign-key <pem>] --json",
+  "theme add": "publy theme add <file-or-https-url> [--sha256 <hash>] [--trusted-key <base64>] --json",
+  "theme update": "publy theme update <file-or-https-url> [--sha256 <hash>] [--trusted-key <base64>] --json",
   "theme remove": "publy theme remove <id> --json",
   "theme preview": "publy theme preview <name> --json",
   tunnel: "publy tunnel --json",
@@ -1605,11 +1624,14 @@ export function createProgram(): Command {
     });
 
   themeCmd.command("pack").argument("<css-file>").requiredOption("--id <id>").requiredOption("--theme-version <version>")
-    .requiredOption("--name <name>").requiredOption("--license <license>").requiredOption("--output <file>").option("--json")
-    .action((file: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; json?: boolean }) => cmdThemePack(file, opts));
+    .requiredOption("--name <name>").requiredOption("--license <license>").requiredOption("--output <file>")
+    .option("--sign-key <pem>", "Ed25519 private key (PKCS#8 PEM); emits a signed v2 bundle")
+    .option("--json")
+    .action((file: string, opts: { id: string; themeVersion: string; name: string; license: string; output: string; signKey?: string; json?: boolean }) => cmdThemePack(file, opts));
   for (const action of ["add", "update"] as const) {
     themeCmd.command(action).argument("<file-or-https-url>").option("--sha256 <hash>", "required for HTTPS; SHA-256 of the bundle file")
-      .option("--json").action((source: string, opts: { json?: boolean; sha256?: string }) => cmdThemeBundle(action, source, opts));
+      .option("--trusted-key <base64>", "require a v2 bundle signed by this Ed25519 public key (SPKI DER, base64)")
+      .option("--json").action((source: string, opts: { json?: boolean; sha256?: string; trustedKey?: string }) => cmdThemeBundle(action, source, opts));
   }
   themeCmd.command("remove").argument("<id>").option("--json").action((id: string, opts: { json?: boolean }) => cmdThemeBundle("remove", id, opts));
 

@@ -256,16 +256,16 @@ caption: ...           # 帖子配文（≤1000 字；# 标签写在 caption 末
 
 ### 5.1 主题包
 
-- 文章主题 = npm 包 `publy-theme-*`：`theme.css`（`#publy` scope）+ `manifest.json`（适用范围 article|card）+ `sample.md` + `preview.png`（CI 渲染）
+- 文章主题 = 内容型主题包（JSON：`publy-theme-v1`，或带 Ed25519 签名的 `publy-theme-v2`）：版本、名称、许可证、`#publy` scope 的受限 CSS 与 CSS SHA-256；不含可执行 hook，不通过 npm 安装
+- 签名只证明持有某密钥：`--trusted-key` 固定公钥后才会拒绝其他签名者；摘要本身不证明作者身份
 - 卡片主题：`CardTheme` 风格配置模块（colors、fonts、watermark），引擎按四种版式原型消费配置；内置参考实现 naive / claude。卡片主题不做 HTML 模板——satori 的 flex 语义下配置化比模板更可靠
 - 语义化版本；本地 CSS 文件可用 `--custom-theme` 直接兜底，不强绑 npm
 
 ### 5.2 注册表
 
-- GitHub 仓库 `publy-themes`：`index.json` 精选清单（名称、npm 包、截图、作者）
-- 提交 = PR；CI 自动渲染 sample 生成预览图进 gallery 页
-- `publy theme search / add / preview` 读注册表；`add` 实际安装走 npm
-- 解决 gist 注册的痛点：版本化、一条命令安装、装前可预览、贡献有常规入口
+- GitHub 仓库 `publy-themes` 仍只有描述性 `index.json`（内置主题预览与说明）；CLI 目前不读取该索引，也不从画廊安装
+- 外部主题通过本地文件或带 `--sha256` 的 HTTPS 主题包安装；`--trusted-key` 可固定签名公钥
+- 精选画廊/自动发现/更新策略仍待设计：需要签名密钥分发与索引格式的决定，当前不对外宣称可用
 
 ### 5.3 商业化（二期）
 
