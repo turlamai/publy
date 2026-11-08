@@ -14,7 +14,7 @@ Editor-independent Markdown-to-WeChat draft publishing: local rendering and pref
 
 Compliance: Publy only uses official WeChat MP APIs. No account simulation, no browser automation.
 
-Status: local rendering and delivery components exist; public hosted onboarding and commercial operation are not open. **Obsidian community-directory publication has not been verified**; the source plugin version and latest published GitHub Release differ. See [directory release readiness](docs/obsidian-submission.md) and [official-install blocker](https://github.com/turlamai/publy/issues/12).
+Status: local rendering and delivery components exist; public hosted onboarding and commercial operation are not open. **Obsidian community-directory publication has not been verified**; the 0.8.7 GitHub Release is published, but a Community Directory listing and the directory-install acceptance do not exist yet. See [directory release readiness](docs/obsidian-submission.md) and [official-install blocker](https://github.com/turlamai/publy/issues/12).
 
 **Use any Markdown file:** [Typora quick start](docs/typora.md) · [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). Obsidian is optional; Publy does not require a particular editor. Typora and Obsidian still require real clean-machine acceptance.
 
