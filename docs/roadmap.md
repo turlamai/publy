@@ -55,7 +55,7 @@ local integration work, not a merge, release, deployed service or sales claim.
   CI and native evidence. `main:/docs` triggers a public Pages deployment;
   resolve that release boundary with the owner before merge or publication.
 
-## Actual release state / 当前真实发行状态 — 2026-10-30
+## Actual release state / 当前真实发行状态 — 2026-11-08
 
 **Developer code ≠ tested release ≠ public availability.** The monorepo now
 retains TypeScript/pnpm only as an internal build tool; the old CLI package is
@@ -65,11 +65,11 @@ install audited OS archives from GitHub Releases, not run npm/pnpm/raco.
 See [distribution policy](distribution.md) and
 [Racket migration experiment #18](https://github.com/turlamai/publy/issues/18).
 
-**Obsidian:** source plugin is 0.8.7 while the latest public Release is 0.8.3.
-The official Community Directory install/download, with only three files, is
-not yet verified for cards/fonts/WASM (#12). Community listing/review
-remains unresolved (#14), and in-app desktop tests remain to be proved (#15).
-A side-loaded ZIP is not proof of directory compatibility.
+**Obsidian:** source and the latest public Release are both 0.8.7 (published
+2026-11-08 from `c0a3573`; three files, ZIP and SHA-256 checksums attached).
+The official Community Directory listing and its three-file install/download
+are still unverified for cards/fonts/WASM (#12); listing/review remains
+unresolved (#14). A side-loaded ZIP is not proof of directory compatibility.
 
 **Commercial:** Public hosted checkout is disabled by default; manual-only
 legacy tests are not live sales. Paid state must come from Commerce / Permit

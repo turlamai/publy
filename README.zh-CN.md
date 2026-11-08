@@ -13,7 +13,7 @@
 
 合规：只走微信公众号官方 API，不做账号模拟，不做浏览器自动化。
 
-状态：本地渲染与投递组件已存在；公开托管开通与商业运营尚未开放。
+状态：本地渲染与投递组件已存在；公开托管开通与商业运营尚未开放。**Obsidian 社区目录上架尚未验证**：0.8.7 GitHub Release 已发布，但目录上架与目录安装验收尚未完成。
 
 **使用任意 Markdown 文件：** [Typora 使用指南](docs/typora.zh-CN.md) · [跨编辑器使用与商业级验收](docs/editor-workflows.zh-CN.md) · [English](docs/editor-workflows.md)。Obsidian 是可选入口，Publy 不依赖特定编辑器；还需真实干净电脑验收。
 
