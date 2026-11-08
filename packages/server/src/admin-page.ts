@@ -755,7 +755,7 @@ function renderUsers() {
     b.onclick = function () {
       var target = usersCache.find(function (u) { return u.id === b.dataset.rot; });
       confirmBox('为「' + target.contact + '」换发新 key？旧 key 立即失效（已配置的客户端需更新）。', async function () {
-        var r = await api('/v1/admin/users/' + b.dataset.rot + '/rotate-key', { method: 'POST' });
+        var r = await api('/v1/admin/users/' + b.dataset.rot + '/rotate-key', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
         var d = await r.json();
         if (d.ok) {
           copyText(d.apiKey, '新 key 已生成并复制');
@@ -870,7 +870,7 @@ async function loadAccounts() {
         var original = button.textContent;
         button.textContent = '测试中…';
         try {
-          var response = await api('/v1/admin/accounts/' + encodeURIComponent(account.name) + '/verify', { method: 'POST' });
+          var response = await api('/v1/admin/accounts/' + encodeURIComponent(account.name) + '/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
           var result = await response.json();
           if (result.ok) toast('「' + account.name + '」微信连通正常' + (result.ip ? ' · 出口 IP ' + result.ip : ''), 'ok');
           else toast('「' + account.name + '」验证失败：' + (result.message || result.errcode || '未知错误'), 'err');
@@ -1116,7 +1116,7 @@ async function wsConnect() {
       }
       approvedWsOrigins.add(target.origin);
     }
-    var response = await api('/v1/ws-ticket', { method: 'POST' });
+    var response = await api('/v1/ws-ticket', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     if (!response.ok) throw new Error('无法获取短期凭证（HTTP ' + response.status + '）');
     var data = await response.json();
     if (!KEY || KEY !== keyAtStart || generation !== wsGeneration) return;
