@@ -1383,10 +1383,10 @@ const ADMIN_CSS = `
       flex-direction: row; align-items: center; padding: 8px 12px; gap: 6px; overflow-x: auto; }
     .sidebar-brand, .sidebar-foot, .nav-label { display: none; }
     .nav { flex-direction: row; gap: 2px; overflow-x: auto; flex: 1; }
-    .nav-item { width: auto; padding: 9px; gap: 0; }
+    .nav-item { width: auto; padding: 9px; gap: 0; position: relative; }
     .nav-item span:not(.nav-badge) { display: none; }
-    .nav-badge { position: absolute; margin: -14px 0 0 14px; }
-    .topbar { padding: 14px 16px; }
+    .nav-badge { position: absolute; top: 2px; right: 2px; margin: 0; }
+    .topbar { position: static; padding: 14px 16px; }
     .content { padding: 18px 16px 60px; }
     .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .search { width: 100%; }
