@@ -1154,6 +1154,19 @@ export function buildApp(config: ServerConfig) {
 
   // account inventory for the console: names + appIds + resolved owner
   // contact; secrets never leave the server
+  // verify one configured account from THIS server without exposing secrets:
+  // the operator learns immediately whether the AppID/secret and IP whitelist
+  // still work, instead of discovering it on the next real draft.
+  app.post<{ Params: { name: string } }>("/v1/admin/accounts/:name/verify", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const name = (req.params as { name: string }).name;
+    const cred = resolveAccount(name, { admin: true });
+    if (!cred) return reply.code(404).send({ code: "NOT_FOUND", message: "no such account" });
+    const result = await checkWechatCredential(cred.appId, cred.appSecret);
+    audit({ event: "verify-account", account: cred.name, ok: result.ok, errcode: result.errcode });
+    return { account: cred.name, ...result };
+  });
+
   app.get("/v1/admin/accounts", async (req, reply) => {
     if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
     const configNames = new Set((config.accounts ?? []).map((a) => a.name));
@@ -1169,6 +1182,109 @@ export function buildApp(config: ServerConfig) {
         })),
     ];
     return { accounts: all };
+  });
+
+  // --- operator system + metrics -------------------------------------------
+  //
+  // The console needs durable facts, not invented numbers: version/uptime,
+  // memory, data volume, job states and daily event buckets derived from the
+  // append-only audit log. Everything is admin-only and read-only.
+
+  function serverVersion(): string {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { version?: string };
+      return pkg.version ?? "unknown";
+    } catch { return "unknown"; }
+  }
+
+  function directoryUsage(dir: string): { bytes: number; files: number } {
+    let bytes = 0, files = 0;
+    const walk = (current: string): void => {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.isFile()) {
+          try { bytes += fs.statSync(full).size; files += 1; } catch { /* skip unreadable */ }
+        }
+      }
+    };
+    walk(dir);
+    return { bytes, files };
+  }
+
+  function shanghaiDate(iso: unknown): string | null {
+    if (typeof iso !== "string") return null;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" });
+  }
+
+  app.get("/v1/admin/system", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const usage = directoryUsage(dataDir);
+    const historyStat = (() => { try { return fs.statSync(historyFile); } catch { return null; } })();
+    let historyLines = 0;
+    try { historyLines = fs.readFileSync(historyFile, "utf-8").split("\n").filter(Boolean).length; } catch { /* empty */ }
+    const jobCounts = { pending: 0, running: 0, done: 0, failed: 0, cancelled: 0, interrupted: 0 } as Record<string, number>;
+    for (const job of Object.values(jobs)) jobCounts[job.status] = (jobCounts[job.status] ?? 0) + 1;
+    const memory = process.memoryUsage();
+    return {
+      version: serverVersion(),
+      node: process.version,
+      platform: `${process.platform}/${process.arch}`,
+      uptimeSec: Math.round(process.uptime()),
+      startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+      now: new Date().toISOString(),
+      memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed },
+      dataDir: { path: dataDir, bytes: usage.bytes, files: usage.files },
+      history: { bytes: historyStat?.size ?? 0, lines: historyLines },
+      jobs: jobCounts,
+      claims: { pending: store.listImmediateClaims("pending", 500).length },
+      counts: {
+        users: store.listUsers().length,
+        accounts: (config.accounts ?? []).length + store.listAccounts().length,
+        orders: store.listOrders().length,
+      },
+    };
+  });
+
+  app.get<{ Querystring: { days?: string } }>("/v1/admin/metrics", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const requested = Number.parseInt((req.query as { days?: string }).days ?? "14", 10);
+    const days = Math.min(Math.max(Number.isFinite(requested) ? requested : 14, 7), 30);
+    const counts: Record<string, { published: number; failed: number; scheduled: number; unknown: number; other: number }> = {};
+    for (let offset = days - 1; offset >= 0; offset -= 1) {
+      const date = new Date(Date.now() - offset * 86_400_000);
+      const key = date.toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" });
+      counts[key] = { published: 0, failed: 0, scheduled: 0, unknown: 0, other: 0 };
+    }
+    const totals = { published: 0, failed: 0, scheduled: 0, unknown: 0, other: 0 };
+    let events = 0;
+    try {
+      const lines = fs.readFileSync(historyFile, "utf-8").split("\n").filter(Boolean).slice(-20000);
+      for (const line of lines) {
+        let entry: { ts?: unknown; event?: unknown };
+        try { entry = JSON.parse(line); } catch { continue; }
+        const bucket = counts[shanghaiDate(entry.ts) ?? ""];
+        if (!bucket) continue;
+        events += 1;
+        const event = String(entry.event ?? "");
+        if (event === "published" || event === "scheduled-published") { bucket.published += 1; totals.published += 1; }
+        else if (event === "failed" || event === "scheduled-failed") { bucket.failed += 1; totals.failed += 1; }
+        else if (event === "scheduled") { bucket.scheduled += 1; totals.scheduled += 1; }
+        else if (event === "outcome-unknown" || event === "scheduled-outcome-unknown") { bucket.unknown += 1; totals.unknown += 1; }
+        else { bucket.other += 1; totals.other += 1; }
+      }
+    } catch { /* no history yet */ }
+    return {
+      days,
+      timeZone: "Asia/Shanghai",
+      events,
+      totals,
+      series: Object.entries(counts).map(([date, value]) => ({ date, ...value })),
+    };
   });
 
   // --- operator reconciliation of unresolved immediate requests -------------
