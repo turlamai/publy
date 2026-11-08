@@ -8,146 +8,250 @@ import { shell } from "./pages.js";
 
 export function adminPage(): string {
   const body = `
-<div id="topbar">
-  <div class="tb-inner">
-    <div class="brand">Publy <span>Admin</span></div>
-    <div class="tb-right">
-      <span class="badge badge-green" id="conn-badge" style="display:none">实时已连接</span>
-      <button class="btn btn-ghost btn-sm" id="logout">退出</button>
+<div id="login-card" class="login-view">
+  <div class="login-panel">
+    <div class="brand-large">
+      <span class="brand-mark">P</span>
+      <div><strong>Publy</strong><small>Operator Console</small></div>
     </div>
+    <h1>登录运营控制台</h1>
+    <p class="muted">使用 <code>server.json</code> 中的 admin key 登录。密钥只保存在当前标签页的 sessionStorage，不会写入服务器。</p>
+    <label for="key">Admin key</label>
+    <div class="login-row">
+      <input id="key" type="password" autocomplete="current-password" placeholder="粘贴 admin key">
+      <button class="btn" id="login-btn">进入</button>
+    </div>
+    <div class="form-error" id="login-error" role="alert"></div>
+    <div class="login-foot">仅限自托管运营者 · 开发内测版 · 公开托管与收款尚未开放</div>
   </div>
 </div>
-<div class="wrap">
 
-<div class="card" id="login-card">
-  <h3>操作员登录</h3>
-  <label>Admin key（server.json 的 apiKey）</label>
-  <div style="display:flex;gap:8px">
-    <input id="key" type="password" style="flex:1" placeholder="粘贴后回车">
-    <button class="btn" id="login-btn">进入</button>
+<div id="app" class="app" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark">P</span>
+      <div><strong>Publy</strong><small>运营控制台</small></div>
+    </div>
+    <nav class="nav" id="tabs" aria-label="主导航">
+      <div class="nav-label">总览</div>
+      <button class="tab nav-item active" data-tab="overview">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></svg>
+        <span>概览</span>
+      </button>
+      <button class="tab nav-item" data-tab="jobs">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2Z"/></svg>
+        <span>草稿任务</span><span class="nav-badge" id="nav-jobs-badge"></span>
+      </button>
+      <button class="tab nav-item" data-tab="claims">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/></svg>
+        <span>待核对</span><span class="nav-badge" id="nav-claims-badge"></span>
+      </button>
+      <div class="nav-label">客户</div>
+      <button class="tab nav-item" data-tab="users">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3Zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3Zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5c0-2.3-4.7-3.5-7-3.5Zm8 0c-.3 0-.6 0-1 .1 1.2.9 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5Z"/></svg>
+        <span>用户</span>
+      </button>
+      <button class="tab nav-item" data-tab="orders">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12a2 2 0 0 1 2 2v18l-4-2-4 2-4-2-4 2V4a2 2 0 0 1 2-2Zm2 6h8v2H8V8Zm0 4h8v2H8v-2Z"/></svg>
+        <span>订单</span>
+      </button>
+      <div class="nav-label">配置与运维</div>
+      <button class="tab nav-item" data-tab="accounts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15 15 0 0 0-1.2-5.1A8 8 0 0 1 18.9 11ZM12 4.2c.8 1 1.6 3 1.9 6.8h-3.8c.3-3.8 1.1-5.8 1.9-6.8ZM5.1 13h3c.2 2.2.6 4 1.2 5.1A8 8 0 0 1 5.1 13Zm3-2h-3a8 8 0 0 1 4.2-5.1A15 15 0 0 0 8.1 11Zm3.9 8.8c-.8-1-1.6-3-1.9-6.8h3.8c-.3 3.8-1.1 5.8-1.9 6.8Zm1.8-1.7c.6-1.1 1-2.9 1.2-5.1h3a8 8 0 0 1-4.2 5.1Z"/></svg>
+        <span>公众号账号</span>
+      </button>
+      <button class="tab nav-item" data-tab="feed">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h3v-3H4v3Zm0-6h3v-3H4v3Zm0-6h3V5H4v3Zm6 12h10v-3H10v3Zm0-6h10v-3H10v3Zm0-9v3h10V5H10Z"/></svg>
+        <span>实时动态</span>
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="server-line"><span class="dot" id="server-dot"></span><span id="server-pill">连接中…</span></div>
+      <div class="server-version" id="server-version">Publy —</div>
+      <button class="btn btn-ghost btn-sm sidebar-logout" id="logout">退出登录</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="page-heading">
+        <h1 id="page-title">概览</h1>
+        <p id="page-sub">服务状态与今日动态</p>
+      </div>
+      <div class="top-actions">
+        <span class="badge badge-green" id="conn-badge" style="display:none">实时已连接</span>
+        <button class="btn btn-ghost btn-sm" id="refresh-btn">刷新</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <section id="tab-overview" class="panel">
+        <div id="overview-status" class="status-line" role="status" aria-live="polite"></div>
+        <div class="kpi-grid" id="stat-grid"></div>
+        <div class="dash-grid">
+          <div class="card chart-card">
+            <div class="card-head">
+              <div><h3>投递趋势</h3><p class="card-sub">最近 14 天 · Asia/Shanghai</p></div>
+              <div class="legend">
+                <span><i class="legend-dot ok"></i>草稿确认</span>
+                <span><i class="legend-dot err"></i>失败</span>
+                <span><i class="legend-dot warn"></i>结果未知</span>
+              </div>
+            </div>
+            <div id="chart" class="chart" role="img" aria-label="最近 14 天投递趋势图"></div>
+          </div>
+          <div class="card system-card">
+            <div class="card-head"><h3>服务状态</h3><span class="badge badge-green" id="system-state">运行中</span></div>
+            <dl class="kv" id="system-panel"></dl>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <div class="card">
+            <div class="card-head"><h3>最近动态</h3><button class="btn btn-ghost btn-sm" onclick="switchTab('feed')">查看全部</button></div>
+            <div id="ov-activity" class="activity-list"><div class="empty">暂无事件</div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>快捷操作</h3></div>
+            <div class="quick-grid">
+              <button class="quick" onclick="switchTab('jobs')"><b>草稿任务</b><span>查看待投递与历史结果</span></button>
+              <button class="quick" onclick="switchTab('claims')"><b>核对未知结果</b><span>读取草稿箱并确认</span></button>
+              <button class="quick" onclick="switchTab('users')"><b>开通 / 延期</b><span>管理本地用户与配额</span></button>
+              <button class="quick" onclick="switchTab('accounts')"><b>公众号账号</b><span>查看绑定与来源</span></button>
+            </div>
+            <p class="hint">笔记仍在原文件夹或 Obsidian 中管理；草稿请到微信后台查看。此处仅管理自托管服务，公开托管与收款尚未开放。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-jobs" class="panel" style="display:none">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>草稿任务</h3><p class="card-sub">服务端排程任务，时间为本机时区</p></div>
+            <button class="btn btn-ghost btn-sm" id="jobs-refresh">刷新</button>
+          </div>
+          <div class="toolbar">
+            <input id="jobs-search" class="search" placeholder="搜索标题、公众号或任务编号">
+            <select id="jobs-filter" aria-label="按状态筛选">
+              <option value="">全部状态</option>
+              <option value="pending">等待投递</option>
+              <option value="running">投递中</option>
+              <option value="done">草稿已确认</option>
+              <option value="failed">失败</option>
+              <option value="cancelled">已取消</option>
+              <option value="interrupted">结果未知</option>
+            </select>
+            <span id="jobs-status" class="status-line" role="status" style="margin:0"></span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th><th class="right">操作</th></tr></thead>
+            <tbody id="j-rows"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>最近投递记录</h3><p class="card-sub">最近 100 条服务事件；以微信回执为准</p></div>
+          </div>
+          <div class="toolbar">
+            <input id="history-search" class="search" placeholder="搜索标题或公众号">
+            <select id="history-filter" aria-label="按结果筛选">
+              <option value="">全部结果</option>
+              <option value="published">草稿已确认</option>
+              <option value="failed">失败</option>
+              <option value="unknown">结果未知</option>
+              <option value="scheduled">已排程</option>
+              <option value="cancelled">已取消</option>
+              <option value="deduped">重复已处理</option>
+            </select>
+            <span id="history-status" class="status-line" role="status" style="margin:0"></span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>时间</th><th>标题</th><th>公众号</th><th>结果</th></tr></thead>
+            <tbody id="h-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="tab-claims" class="panel" style="display:none">
+        <div class="banner">
+          <strong>只读核对，不重发。</strong> 这些请求提交时丢失了回执，草稿可能已经创建。核对会实时读取对应公众号的草稿箱；只有确认后才释放或标记请求身份，客户端才能安全重试。
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>待核对的即时发布</h3><p class="card-sub" id="claims-summary">—</p></div>
+            <button class="btn btn-ghost btn-sm" id="claims-refresh">刷新</button>
+          </div>
+          <div id="claims-status" class="status-line" role="status" aria-live="polite"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>发生时间</th><th>用户</th><th>公众号</th><th>标题</th><th>请求编号</th><th class="right">操作</th></tr></thead>
+            <tbody id="c-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="tab-users" class="panel" style="display:none">
+        <div class="summary-row" id="user-summary"></div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>用户</h3><p class="card-sub">本地用户、key 与旧版套餐字段</p></div>
+            <div class="toolbar-right">
+              <input id="u-search" class="search" placeholder="搜索联系方式…">
+              <button class="btn btn-sm" id="mk-btn">开通 / 延期</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>联系方式</th><th>套餐</th><th>本月用量</th><th>到期</th><th>状态</th><th>API key</th><th class="right">操作</th></tr></thead>
+            <tbody id="u-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="tab-orders" class="panel" style="display:none">
+        <div class="summary-row" id="order-summary"></div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>历史 / 测试订单</h3><p class="card-sub">本地记录，不代表真实收款或当前权益</p></div>
+            <select id="o-filter" aria-label="按订单状态筛选">
+              <option value="pending">待确认</option>
+              <option value="paid">已支付</option>
+              <option value="">全部</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>编号</th><th>联系方式</th><th>套餐</th><th>金额</th><th>渠道</th><th>时间</th><th class="right">操作</th></tr></thead>
+            <tbody id="o-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="tab-accounts" class="panel" style="display:none">
+        <div class="card">
+          <div class="card-head">
+            <div><h3>公众号账号</h3><p class="card-sub">凭据只保存在服务器，不在此展示</p></div>
+            <button class="btn btn-sm" id="acc-btn">新增账号</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>账号名</th><th>AppID</th><th>归属</th><th>来源</th><th class="right">操作</th></tr></thead>
+            <tbody id="a-rows"></tbody>
+          </table></div>
+          <p class="hint">数据库账号的 AppSecret 是否加密取决于服务器 secretKey；server.json 中的账号凭据按配置文件原样保存。请保护配置与备份。</p>
+        </div>
+      </section>
+
+      <section id="tab-feed" class="panel" style="display:none">
+        <div class="card">
+          <div class="card-head">
+            <div class="feed-title"><h3>实时动态</h3><span class="dot" id="ws-dot"></span><span id="ws-state" class="muted">未连接</span></div>
+            <div class="toolbar-right">
+              <input id="ws-url" class="search" title="publy-ws 网关地址（改过端口就改这里，存 localStorage）" placeholder="wss://…/events">
+              <button class="btn btn-sm btn-ghost" id="ws-reconnect">重连</button>
+            </div>
+          </div>
+          <div id="feed" class="feed"><div class="empty">连接网关后，发布 / 支付 / 绑定事件会实时出现在这里。</div></div>
+          <p class="hint">网关 = publy-ws 进程（默认端口 = API 端口 + 1）。未开启网关时这里保持安静，不影响草稿投递。</p>
+        </div>
+      </section>
+    </main>
   </div>
-  <div class="hint">仅限自托管运营者。请通过 HTTPS 或可信私有网络访问；密钥保存在本标签页的会话存储中。公开托管和收款尚未开放。</div>
-</div>
-
-<div id="app" style="display:none">
-  <div class="workspace-heading"><div><div class="workspace-eyebrow">PUBLY / SELF-HOSTED</div><h1>运营工作台</h1><p>管理公众号账号、草稿任务与服务状态。</p></div><span class="workspace-status">自托管 · 开发预览</span></div>
-  <nav class="tabs" id="tabs">
-    <button data-tab="overview" class="tab active">概览</button>
-    <button data-tab="jobs" class="tab">草稿任务</button>
-    <button data-tab="claims" class="tab">待核对</button>
-    <button data-tab="users" class="tab">用户</button>
-    <button data-tab="orders" class="tab">订单</button>
-    <button data-tab="accounts" class="tab">账号</button>
-    <button data-tab="feed" class="tab">动态</button>
-  </nav>
-
-  <section id="tab-overview" class="panel">
-    <div id="overview-status" class="hint" role="status" aria-live="polite"></div>
-    <div class="stat-grid" id="stat-grid"></div>
-    <div class="card">
-      <h3>服务管理</h3>
-      <p class="hint">笔记仍在原来的文件夹或 Obsidian 笔记库中管理；公众号草稿请在微信后台查看。此处是自托管服务的开发期管理工具，订单功能仅用于历史数据及隔离测试。</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('jobs')">查看草稿任务</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('claims')">核对未知结果</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('users')">开通 / 延期用户</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('orders')">查看历史订单</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('accounts')">绑定公众号</button>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('feed')">实时动态</button>
-      </div>
-      <div class="hint">概览数据在切回本页时自动刷新。</div>
-    </div>
-  </section>
-
-  <section id="tab-jobs" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>草稿任务</h3>
-        <button class="btn btn-ghost btn-sm" id="jobs-refresh">刷新</button>
-      </div>
-      <p class="hint">这里只显示服务端排程任务，时间按本机时区显示。已完成表示草稿已创建，不表示公开发布。结果未知时先检查微信公众号草稿箱，再决定后续操作。</p>
-      <div id="jobs-status" class="hint" role="status" aria-live="polite"></div>
-      <table><thead><tr><th>标题</th><th>公众号</th><th>计划时间</th><th>状态</th><th>任务编号</th><th>操作</th></tr></thead>
-      <tbody id="j-rows"></tbody></table>
-      <h3 style="margin-top:28px">最近投递记录</h3>
-      <p class="hint">显示最近 100 条服务事件中的投递记录，可能受日志保留影响；请以公众号草稿箱和实际回执为准。</p>
-      <div id="history-status" class="hint" role="status" aria-live="polite"></div>
-      <table><thead><tr><th>时间</th><th>标题</th><th>公众号</th><th>结果</th></tr></thead>
-      <tbody id="h-rows"></tbody></table>
-    </div>
-  </section>
-
-  <section id="tab-claims" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>待核对的即时发布</h3>
-        <button class="btn btn-ghost btn-sm" id="claims-refresh">刷新</button>
-      </div>
-      <p class="hint">这些请求在提交时丢失了回执，草稿可能已经创建。核对会实时读取对应公众号的草稿箱；确认后，该请求编号才会被标记为已创建或释放，客户端才能安全地查询或重试。不要在没有核对的情况下重发草稿。</p>
-      <div id="claims-status" class="hint" role="status" aria-live="polite"></div>
-      <table><thead><tr><th>发生时间</th><th>用户</th><th>公众号</th><th>标题</th><th>请求编号</th><th>操作</th></tr></thead>
-      <tbody id="c-rows"></tbody></table>
-    </div>
-  </section>
-
-  <section id="tab-users" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>用户</h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="u-search" placeholder="搜索联系方式…" style="width:220px">
-          <button class="btn btn-sm" id="mk-btn">开通 / 延期</button>
-        </div>
-      </div>
-      <table><thead><tr>
-        <th>联系方式</th><th>套餐</th><th>本月用量</th><th>到期</th><th>状态</th><th>API key</th><th style="text-align:right">操作</th>
-      </tr></thead><tbody id="u-rows"></tbody></table>
-    </div>
-  </section>
-
-  <section id="tab-orders" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>历史 / 测试订单</h3>
-        <select id="o-filter" style="width:auto">
-          <option value="pending">待确认</option>
-          <option value="paid">已支付</option>
-          <option value="">全部</option>
-        </select>
-      </div>
-      <table><thead><tr>
-        <th>编号</th><th>联系方式</th><th>套餐</th><th>金额</th><th>渠道</th><th>时间</th><th style="text-align:right">操作</th>
-      </tr></thead><tbody id="o-rows"></tbody></table>
-    </div>
-  </section>
-
-  <section id="tab-accounts" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>公众号账号</h3>
-        <button class="btn btn-sm" id="acc-btn">新增账号</button>
-      </div>
-      <table><thead><tr>
-        <th>账号名</th><th>AppID</th><th>归属</th><th>来源</th>
-      </tr></thead><tbody id="a-rows"></tbody></table>
-      <div class="hint">数据库账号的 AppSecret 是否加密取决于服务器密钥配置；server.json 中的账号凭据按配置文件原样保存。请保护配置和备份。</div>
-    </div>
-  </section>
-
-  <section id="tab-feed" class="panel" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <h3>实时动态 <span class="dot" id="ws-dot"></span><span id="ws-state" class="hint" style="margin:0">未连接</span></h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="ws-url" style="width:280px" title="publy-ws 网关地址（改过端口就改这里，存 localStorage）">
-          <button class="btn btn-sm btn-ghost" id="ws-reconnect">重连</button>
-        </div>
-      </div>
-      <div id="feed" class="feed"><div class="empty">连接网关后，所有发布 / 支付 / 绑定事件实时出现在这里。</div></div>
-      <div class="hint">网关 = publy-ws 进程（默认端口 = API 端口 + 1）。没开网关时这里只是安静的列表。</div>
-    </div>
-  </section>
-</div>
 </div>
 
 <div id="modal-mask" style="display:none">
@@ -221,7 +325,8 @@ function logout() {
   approvedWsOrigins.clear();
   document.getElementById('key').value = '';
   document.getElementById('app').style.display = 'none';
-  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('login-card').style.display = 'flex';
+  document.getElementById('login-error').textContent = '';
 }
 function gv(id) { return document.getElementById(id).value.trim(); }
 
@@ -231,28 +336,41 @@ document.getElementById('key').addEventListener('keydown', function (e) { if (e.
 document.getElementById('logout').onclick = logout;
 async function login() {
   KEY = gv('key');
-  if (!KEY) return toast('请输入 key', 'err');
+  var error = document.getElementById('login-error');
+  error.textContent = '';
+  if (!KEY) { error.textContent = '请输入 admin key。'; return; }
   try {
     var r = await fetch('/v1/admin/overview', { headers: H() });
-    if (!r.ok) return toast(r.status === 401 ? 'key 不对' : '无法登录（HTTP ' + r.status + '）', 'err');
+    if (!r.ok) { error.textContent = r.status === 401 ? 'admin key 不正确。' : '无法登录（HTTP ' + r.status + '）。'; return; }
     sessionStorage.setItem('publy_admin_key', KEY);
     enter();
-  } catch (e) { toast('网络错误：' + e.message, 'err'); }
+  } catch (e) { error.textContent = '网络错误：' + e.message; }
 }
 function enter() {
   document.getElementById('login-card').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  loadOverview();
+  document.getElementById('app').style.display = 'flex';
+  switchTab('overview');
 }
 
 /* ---------- tabs ---------- */
-var loaded = {};
+var TAB_META = {
+  overview: ['概览', '服务状态与今日动态'],
+  jobs: ['草稿任务', '排程任务与最近投递记录'],
+  claims: ['待核对', '回执丢失、需要人工读取草稿箱的请求'],
+  users: ['用户', '本地用户、key 与配额'],
+  orders: ['订单', '历史与测试订单记录'],
+  accounts: ['公众号账号', '已绑定的公众号与来源'],
+  feed: ['实时动态', '通过 publy-ws 网关接收的实时事件']
+};
 function switchTab(name) {
+  if (!TAB_META[name]) return;
   document.querySelectorAll('.tab').forEach(function (t) {
     t.classList.toggle('active', t.dataset.tab === name);
   });
   document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
   document.getElementById('tab-' + name).style.display = 'block';
+  document.getElementById('page-title').textContent = TAB_META[name][0];
+  document.getElementById('page-sub').textContent = TAB_META[name][1];
   if (name === 'overview') loadOverview();
   if (name === 'jobs') refreshDrafts();
   if (name === 'claims') loadClaims();
@@ -264,34 +382,191 @@ function switchTab(name) {
 document.querySelectorAll('.tab').forEach(function (t) {
   t.onclick = function () { switchTab(t.dataset.tab); };
 });
+document.getElementById('refresh-btn').onclick = function () {
+  var active = document.querySelector('.tab.active');
+  switchTab(active && active.dataset.tab ? active.dataset.tab : 'overview');
+};
+
+/* ---------- formatting ---------- */
+function fmtBytes(bytes) {
+  if (!bytes && bytes !== 0) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+function fmtDuration(seconds) {
+  if (seconds == null || Number.isNaN(Number(seconds))) return '—';
+  var s = Math.max(0, Math.floor(Number(seconds)));
+  var d = Math.floor(s / 86400); s -= d * 86400;
+  var h = Math.floor(s / 3600); s -= h * 3600;
+  var m = Math.floor(s / 60);
+  if (d) return d + ' 天 ' + h + ' 小时';
+  if (h) return h + ' 小时 ' + m + ' 分';
+  return m + ' 分';
+}
+function fmtDateTime(value) {
+  var d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+function setBadge(id, count) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = count > 99 ? '99+' : String(count);
+  el.classList.toggle('show', count > 0);
+}
 
 /* ---------- overview ---------- */
+var KPI_ICONS = {
+  users: '<path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13Zm8 0c-.3 0-.6 0-1 .1 1.2.9 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5Z"/>',
+  drafts: '<path d="M6 2h9l5 5v15H6V2Zm8 1.5V8h4.5L14 3.5ZM8 12h8v2H8v-2Zm0 4h8v2H8v-2Z"/>',
+  events: '<path d="M13 2 3 14h7v8l10-12h-7l0-8Z"/>',
+  claims: '<path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/>',
+  jobs: '<path d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2Z"/>',
+  accounts: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 4.2c.8 1 1.6 3 1.9 6.8h-3.8c.3-3.8 1.1-5.8 1.9-6.8ZM5.1 13h3c.2 2.2.6 4 1.2 5.1A8 8 0 0 1 5.1 13Zm3-2h-3a8 8 0 0 1 4.2-5.1A15 15 0 0 0 8.1 11Zm3.9 8.8c-.8-1-1.6-3-1.9-6.8h3.8c-.3 3.8-1.1 5.8-1.9 6.8Zm1.8-1.7c.6-1.1 1-2.9 1.2-5.1h3a8 8 0 0 1-4.2 5.1Z"/>'
+};
+function kpiCard(label, value, meta, icon) {
+  return '<div class="kpi"><div class="kpi-label">' + esc(label) + '</div>'
+    + '<div class="kpi-value">' + esc(value) + '</div>'
+    + '<div class="kpi-meta">' + esc(meta) + '</div>'
+    + '<div class="kpi-icon"><svg viewBox="0 0 24 24" aria-hidden="true">' + (KPI_ICONS[icon] || '') + '</svg></div></div>';
+}
 async function loadOverview() {
   var status = document.getElementById('overview-status');
   var g = document.getElementById('stat-grid');
   status.textContent = '正在读取服务概览…';
   g.innerHTML = '';
   try {
-  var response = await api('/v1/admin/overview');
-  if (!response.ok) throw new Error('overview unavailable');
-  var d = await response.json();
-  var cards = [
-    ['用户', d.users.total, d.users.pro + ' 条旧版套餐记录' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : '')],
-    ['本月草稿', d.publishes.monthTotal, '全部用户合计'],
-    ['历史待确认订单', d.orders.pending, d.orders.paid + ' 笔历史已支付标记'],
-    ['公众号账号', d.accounts.total, '请保护凭据与备份'],
-    ['待核对发布', (d.claims || {}).pending || 0, '回执丢失，需要人工核对'],
-    ['今日事件', d.eventsToday, '审计流 24h 窗口']
-  ];
-  g.innerHTML = cards.map(function (c) {
-    return '<div class="stat"><div class="stat-n">' + esc(c[1]) + '</div>'
-      + '<div class="stat-t">' + esc(c[0]) + '</div><div class="stat-s">' + esc(c[2]) + '</div></div>';
+    var overviewResponse = await api('/v1/admin/overview');
+    if (!overviewResponse.ok) throw new Error('overview unavailable');
+    var d = await overviewResponse.json();
+    var extras = await Promise.all([
+      api('/v1/admin/system').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      api('/v1/admin/metrics?days=14').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      api('/v1/history?limit=8').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    ]);
+    var system = extras[0], metrics = extras[1], history = extras[2];
+    var pendingJobs = system && system.jobs ? (system.jobs.pending || 0) + (system.jobs.running || 0) + (system.jobs.interrupted || 0) : 0;
+    g.innerHTML = [
+      kpiCard('用户', d.users.total, (d.users.pro || 0) + ' 个付费记录' + (d.users.disabled ? ' · ' + d.users.disabled + ' 停用' : ''), 'users'),
+      kpiCard('本月草稿', d.publishes.monthTotal, '全部用户合计', 'drafts'),
+      kpiCard('今日事件', d.eventsToday, '审计流 24h 窗口', 'events'),
+      kpiCard('待核对', (d.claims || {}).pending || 0, '回执丢失，需要人工核对', 'claims'),
+      kpiCard('待投递任务', pendingJobs, '等待 / 投递中 / 未决', 'jobs'),
+      kpiCard('公众号账号', d.accounts.total, '请保护凭据与备份', 'accounts')
+    ].join('');
+    setBadge('nav-claims-badge', (d.claims || {}).pending || 0);
+    setBadge('nav-jobs-badge', pendingJobs);
+    renderSystem(system);
+    renderChart(metrics);
+    renderActivity(history);
+    status.textContent = '';
+  } catch (error) {
+    status.textContent = '无法读取服务概览，请检查连接后刷新。';
+    g.innerHTML = '';
+  }
+}
+function renderSystem(system) {
+  var el = document.getElementById('system-panel');
+  var state = document.getElementById('system-state');
+  var version = document.getElementById('server-version');
+  var pill = document.getElementById('server-pill');
+  var dot = document.getElementById('server-dot');
+  if (!system) {
+    el.innerHTML = '<dt>状态</dt><dd>不可用</dd>';
+    state.textContent = '不可用';
+    state.className = 'badge badge-red';
+    return;
+  }
+  state.textContent = '运行中';
+  state.className = 'badge badge-green';
+  if (version) version.textContent = 'Publy ' + (system.version || '—') + ' · ' + (system.platform || '');
+  if (pill) pill.textContent = '在线 ' + fmtDuration(system.uptimeSec);
+  if (dot) dot.className = 'dot on';
+  el.innerHTML = [
+    ['版本', system.version || '—'],
+    ['运行时长', fmtDuration(system.uptimeSec)],
+    ['Node', system.node || '—'],
+    ['内存 RSS', fmtBytes(system.memory && system.memory.rssBytes)],
+    ['数据目录', fmtBytes(system.dataDir && system.dataDir.bytes)],
+    ['审计事件', (system.history && system.history.lines) || 0],
+    ['任务队列', (system.jobs && (system.jobs.pending || 0)) + ' 等待 · ' + (system.jobs && (system.jobs.running || 0)) + ' 投递中'],
+    ['待核对', (system.claims && system.claims.pending) || 0]
+  ].map(function (row) { return '<dt>' + esc(row[0]) + '</dt><dd>' + esc(row[1]) + '</dd>'; }).join('');
+}
+function renderChart(metrics) {
+  var el = document.getElementById('chart');
+  if (!metrics || !Array.isArray(metrics.series) || !metrics.series.length) {
+    el.innerHTML = '<div class="chart-empty">暂无趋势数据</div>';
+    return;
+  }
+  var series = metrics.series;
+  var max = 1;
+  series.forEach(function (day) { max = Math.max(max, (day.published || 0) + (day.failed || 0) + (day.unknown || 0)); });
+  var W = 620, H = 230, padL = 34, padR = 10, padT = 12, padB = 28;
+  var plotW = W - padL - padR, plotH = H - padT - padB;
+  var step = plotW / series.length;
+  var bars = [];
+  var labels = [];
+  var grid = '';
+  for (var i = 0; i <= 3; i++) {
+    var value = Math.round(max * i / 3);
+    var y = padT + plotH - (plotH * i / 3);
+    grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#e6eee3"/>'
+      + '<text x="' + (padL - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#8a9a8f">' + value + '</text>';
+  }
+  series.forEach(function (day, index) {
+    var x = padL + index * step + step * 0.22;
+    var width = step * 0.56;
+    var total = (day.published || 0) + (day.failed || 0) + (day.unknown || 0);
+    var y = padT + plotH;
+    var segs = [
+      ['published', '#176842'], ['failed', '#b23b3b'], ['unknown', '#b7791f']
+    ];
+    var tip = day.date + '：确认 ' + (day.published || 0) + ' · 失败 ' + (day.failed || 0) + ' · 未知 ' + (day.unknown || 0);
+    bars.push('<g><title>' + esc(tip) + '</title>');
+    segs.forEach(function (seg) {
+      var value = day[seg[0]] || 0;
+      if (!value) return;
+      var h = plotH * value / max;
+      y -= h;
+      bars.push('<rect x="' + x + '" y="' + y + '" width="' + width + '" height="' + h + '" rx="2" fill="' + seg[1] + '"/>');
+    });
+    if (!total) bars.push('<rect x="' + x + '" y="' + (padT + plotH - 2) + '" width="' + width + '" height="2" rx="1" fill="#e6eee3"/>');
+    bars.push('</g>');
+    if (index % 2 === 0 || index === series.length - 1) {
+      labels.push('<text x="' + (x + width / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9" fill="#8a9a8f">'
+        + esc(day.date.slice(5)) + '</text>');
+    }
+  });
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="最近 ' + series.length + ' 天投递趋势">'
+    + grid + bars.join('') + labels.join('') + '</svg>';
+}
+function renderActivity(history) {
+  var el = document.getElementById('ov-activity');
+  var items = history && Array.isArray(history.history) ? history.history.slice().sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); }).slice(0, 8) : [];
+  if (!items.length) { el.innerHTML = '<div class="empty">暂无事件</div>'; return; }
+  var labels = { published: '草稿确认', failed: '失败', scheduled: '已排程', cancelled: '已取消', deduped: '重复已处理',
+    'outcome-unknown': '结果未知', 'claim-reconciled': '人工核对', 'purchase-paid': '支付', 'purchase-completed': '订单完成' };
+  var kinds = { published: 'badge-green', failed: 'badge-red', 'outcome-unknown': 'badge-amber', scheduled: 'badge-blue' };
+  el.innerHTML = items.map(function (entry) {
+    var label = Object.prototype.hasOwnProperty.call(labels, entry.event) ? labels[entry.event] : entry.event;
+    var kind = kinds[entry.event] || 'badge-gray';
+    var detail = [entry.title, entry.account, entry.contact].filter(Boolean).join(' · ');
+    var when = entry.ts ? new Date(entry.ts) : null;
+    return '<div class="activity-item"><span class="badge ' + kind + '">' + esc(label) + '</span>'
+      + '<span class="activity-main">' + esc(detail || '—') + '</span>'
+      + '<span class="activity-time">' + esc(when && !Number.isNaN(when.getTime()) ? relTime(when.getTime()) : '') + '</span></div>';
   }).join('');
-  status.textContent = '';
-  } catch (error) { status.textContent = '无法读取服务概览，请检查连接后刷新。'; }
 }
 
 /* ---------- scheduled drafts ---------- */
+var jobsCache = [];
+var historyCache = [];
+var JOB_LABELS = { pending: ['等待投递', 'badge-blue'], running: ['投递中', 'badge-amber'],
+  done: ['草稿已确认', 'badge-green'], failed: ['失败', 'badge-red'], cancelled: ['已取消', 'badge-gray'],
+  interrupted: ['结果未知，请检查草稿箱', 'badge-amber'] };
 async function loadJobs() {
   var status = document.getElementById('jobs-status'), rows = document.getElementById('j-rows');
   status.textContent = '正在读取任务…';
@@ -301,29 +576,43 @@ async function loadJobs() {
     if (!response.ok) throw new Error('HTTP ' + response.status);
     var data = await response.json();
     if (!Array.isArray(data.jobs)) throw new Error('任务数据格式错误');
-    var labels = { pending: '等待投递', running: '投递中', done: '草稿已确认',
-      failed: '失败，请核对', cancelled: '已取消', interrupted: '结果未知，请检查草稿箱' };
-    if (!data.jobs.length) {
-      rows.innerHTML = '<tr><td colspan="6" class="empty">暂无排程任务</td></tr>';
-    } else {
-      rows.innerHTML = data.jobs.map(function (job, index) {
-        var when = new Date(job.runAt);
-        var label = Object.prototype.hasOwnProperty.call(labels, job.status) ? labels[job.status] : '状态未知，请检查';
-        var action = job.status === 'pending' && typeof job.id === 'string'
-          ? '<button class="btn btn-ghost btn-sm" data-cancel-job="' + index + '">取消任务</button>' : '—';
-        return '<tr><td>' + esc(job.title) + '</td><td>' + esc(job.account) + '</td><td>'
-          + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
-          + esc(label) + '</td><td class="key">' + esc(job.id) + '</td><td>' + action + '</td></tr>';
-      }).join('');
-      rows.querySelectorAll('[data-cancel-job]').forEach(function (button) {
-        var job = data.jobs[Number(button.dataset.cancelJob)];
-        button.onclick = function () { confirmCancelJob(job); };
-      });
-    }
-    status.textContent = '共 ' + data.jobs.length + ' 个任务';
+    jobsCache = data.jobs;
+    var pending = jobsCache.filter(function (job) { return job.status === 'pending' || job.status === 'running' || job.status === 'interrupted'; }).length;
+    setBadge('nav-jobs-badge', pending);
+    renderJobs();
+    status.textContent = '共 ' + jobsCache.length + ' 个任务';
   } catch (error) {
+    jobsCache = [];
     status.textContent = '无法读取任务，请检查服务连接和权限后刷新。';
   }
+}
+function renderJobs() {
+  var rows = document.getElementById('j-rows');
+  if (!rows) return;
+  var filter = document.getElementById('jobs-filter') ? document.getElementById('jobs-filter').value : '';
+  var query = document.getElementById('jobs-search') ? document.getElementById('jobs-search').value.trim().toLowerCase() : '';
+  var list = jobsCache.filter(function (job) {
+    if (filter && job.status !== filter) return false;
+    if (!query) return true;
+    return [job.title, job.account, job.id].filter(Boolean).join(' ').toLowerCase().indexOf(query) >= 0;
+  });
+  if (!list.length) {
+    rows.innerHTML = '<tr><td colspan="6" class="empty">' + (jobsCache.length ? '没有匹配的任务' : '暂无排程任务') + '</td></tr>';
+    return;
+  }
+  rows.innerHTML = list.map(function (job, index) {
+    var when = new Date(job.runAt);
+    var meta = JOB_LABELS[job.status] || ['状态未知', 'badge-gray'];
+    var action = job.status === 'pending' && typeof job.id === 'string'
+      ? '<button class="btn btn-ghost btn-sm" data-cancel-job="' + index + '">取消任务</button>' : '<span class="dim">—</span>';
+    return '<tr><td><b>' + esc(job.title) + '</b></td><td>' + esc(job.account) + '</td><td>'
+      + esc(fmtDateTime(job.runAt)) + '</td><td><span class="badge ' + meta[1] + '">'
+      + esc(meta[0]) + '</span></td><td class="key">' + esc(job.id) + '</td><td class="td-actions">' + action + '</td></tr>';
+  }).join('');
+  rows.querySelectorAll('[data-cancel-job]').forEach(function (button) {
+    var job = list[Number(button.dataset.cancelJob)];
+    button.onclick = function () { confirmCancelJob(job); };
+  });
 }
 function confirmCancelJob(job) {
   confirmBox('取消「' + (job.title || '未命名任务') + '」的排程？已开始投递的任务无法在此取消。', async function () {
@@ -339,6 +628,11 @@ function confirmCancelJob(job) {
     refreshDrafts();
   });
 }
+var HISTORY_LABELS = { published: ['草稿已确认', 'badge-green'], 'scheduled-published': ['排程草稿已确认', 'badge-green'],
+  failed: ['失败', 'badge-red'], 'scheduled-failed': ['排程失败', 'badge-red'],
+  'outcome-unknown': ['结果未知，请检查草稿箱', 'badge-amber'], 'scheduled-outcome-unknown': ['结果未知，请检查草稿箱', 'badge-amber'],
+  deduped: ['重复请求已处理', 'badge-gray'], 'scheduled-deduped': ['排程草稿已确认', 'badge-green'],
+  scheduled: ['已排程', 'badge-blue'], cancelled: ['已取消', 'badge-gray'], 'claim-reconciled': ['人工核对', 'badge-blue'] };
 async function loadDraftHistory() {
   var status = document.getElementById('history-status'), rows = document.getElementById('h-rows');
   status.textContent = '正在读取记录…';
@@ -348,29 +642,60 @@ async function loadDraftHistory() {
     if (!response.ok) throw new Error('HTTP ' + response.status);
     var data = await response.json();
     if (!Array.isArray(data.history)) throw new Error('记录格式错误');
-    var labels = { published: '草稿已确认', 'scheduled-published': '排程草稿已确认',
-      failed: '失败，请核对', 'scheduled-failed': '排程失败，请核对',
-      'outcome-unknown': '结果未知，请检查草稿箱', 'scheduled-outcome-unknown': '结果未知，请检查草稿箱',
-      deduped: '重复请求已处理，请核对任务', 'scheduled-deduped': '排程草稿已确认', scheduled: '已排程', cancelled: '已取消' };
-    var records = data.history.filter(function (entry) { return entry && Object.prototype.hasOwnProperty.call(labels, entry.event); }).reverse();
-    if (!records.length) rows.innerHTML = '<tr><td colspan="4" class="empty">最近没有可显示的投递记录</td></tr>';
-    else rows.innerHTML = records.map(function (entry) {
-      var when = new Date(entry.ts);
-      return '<tr><td>' + esc(Number.isNaN(when.getTime()) ? '—' : when.toLocaleString()) + '</td><td>'
-        + esc(entry.title) + '</td><td>' + esc(entry.account) + '</td><td>' + esc(labels[entry.event]) + '</td></tr>';
-    }).join('');
-    status.textContent = '显示 ' + records.length + ' 条记录';
-  } catch (error) { status.textContent = '无法读取记录，请检查服务连接和权限后刷新。'; }
+    historyCache = data.history.filter(function (entry) { return entry && Object.prototype.hasOwnProperty.call(HISTORY_LABELS, entry.event); }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
+    renderHistory();
+    status.textContent = '显示 ' + historyCache.length + ' 条记录';
+  } catch (error) {
+    historyCache = [];
+    status.textContent = '无法读取记录，请检查服务连接和权限后刷新。';
+  }
+}
+function renderHistory() {
+  var rows = document.getElementById('h-rows');
+  if (!rows) return;
+  var filter = document.getElementById('history-filter') ? document.getElementById('history-filter').value : '';
+  var query = document.getElementById('history-search') ? document.getElementById('history-search').value.trim().toLowerCase() : '';
+  var list = historyCache.filter(function (entry) {
+    if (filter) {
+      if (filter === 'unknown') { if (entry.event.indexOf('outcome-unknown') < 0) return false; }
+      else if (entry.event !== filter && entry.event !== 'scheduled-' + filter) return false;
+    }
+    if (!query) return true;
+    return [entry.title, entry.account].filter(Boolean).join(' ').toLowerCase().indexOf(query) >= 0;
+  });
+  if (!list.length) rows.innerHTML = '<tr><td colspan="4" class="empty">最近没有可显示的投递记录</td></tr>';
+  else rows.innerHTML = list.map(function (entry) {
+    var when = new Date(entry.ts);
+    var meta = HISTORY_LABELS[entry.event] || [entry.event, 'badge-gray'];
+    return '<tr><td>' + esc(fmtDateTime(entry.ts)) + '</td><td><b>'
+      + esc(entry.title) + '</b></td><td>' + esc(entry.account) + '</td><td><span class="badge ' + meta[1] + '">'
+      + esc(meta[0]) + '</span></td></tr>';
+  }).join('');
 }
 function refreshDrafts() { void loadJobs(); void loadDraftHistory(); }
+document.getElementById('jobs-filter').onchange = renderJobs;
+document.getElementById('jobs-search').addEventListener('input', renderJobs);
+document.getElementById('history-filter').onchange = renderHistory;
+document.getElementById('history-search').addEventListener('input', renderHistory);
+
 document.getElementById('jobs-refresh').onclick = refreshDrafts;
 
 /* ---------- users ---------- */
 var usersCache = [];
 async function loadUsers() {
-  var d = await (await api('/v1/admin/users')).json();
-  usersCache = d.users;
-  renderUsers();
+  try {
+    var d = await (await api('/v1/admin/users')).json();
+    usersCache = Array.isArray(d.users) ? d.users : [];
+    var active = usersCache.filter(function (u) { return !u.disabled; }).length;
+    var paid = usersCache.filter(function (u) { return u.plan !== 'free'; }).length;
+    var summary = document.getElementById('user-summary');
+    if (summary) summary.innerHTML = [
+      ['总用户', usersCache.length], ['正常', active], ['已停用', usersCache.length - active], ['付费记录', paid]
+    ].map(function (c) { return '<span class="summary-chip">' + esc(c[0]) + ' <b>' + esc(c[1]) + '</b></span>'; }).join('');
+    renderUsers();
+  } catch (error) {
+    toast('无法读取用户列表，请检查连接后刷新。', 'err');
+  }
 }
 function renderUsers() {
   var q = gv('u-search').toLowerCase();
@@ -378,8 +703,9 @@ function renderUsers() {
   var list = usersCache.filter(function (u) { return !q || u.contact.toLowerCase().indexOf(q) >= 0; });
   if (!list.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">' + (q ? '没有匹配的用户' : '还没有用户') + '</td></tr>'; return; }
   tb.innerHTML = list.map(function (u) {
+    var expired = u.expiresAt && u.expiresAt < Date.now();
     var exp = u.expiresAt
-      ? new Date(u.expiresAt).toLocaleDateString() + ' <span class="dim">(剩 ' + daysLeft(u.expiresAt) + ' 天)</span>'
+      ? new Date(u.expiresAt).toLocaleDateString() + ' <span class="dim">(' + (expired ? '已过期' : '剩 ' + daysLeft(u.expiresAt) + ' 天') + ')</span>'
       : '—';
     var pct = Math.min(100, Math.round(u.used / Math.max(u.limit, 1) * 100));
     var bar = '<div class="bar"><div class="bar-in' + (pct >= 90 ? ' hot' : '') + '" style="width:' + pct + '%"></div></div>'
@@ -489,35 +815,76 @@ document.getElementById('mk-btn').onclick = function () { openExtend(null); };
 
 /* ---------- orders ---------- */
 async function loadOrders() {
-  var st = document.getElementById('o-filter').value;
-  var d = await (await api('/v1/admin/orders' + (st ? '?status=' + st : ''))).json();
+  try {
+    var st = document.getElementById('o-filter').value;
+    var d = await (await api('/v1/admin/orders' + (st ? '?status=' + st : ''))).json();
+    var orders = Array.isArray(d.orders) ? d.orders : [];
+    var pending = orders.filter(function (o) { return o.status === 'pending'; }).length;
+    var paid = orders.filter(function (o) { return o.status === 'paid'; });
+    var summary = document.getElementById('order-summary');
+    if (summary) summary.innerHTML = [
+      ['当前筛选', orders.length], ['待确认', pending], ['已支付标记', paid.length],
+      ['金额合计', '¥' + (paid.reduce(function (a, o) { return a + o.amountFen; }, 0) / 100).toFixed(0)]
+    ].map(function (c) { return '<span class="summary-chip">' + esc(c[0]) + ' <b>' + esc(c[1]) + '</b></span>'; }).join('');
+    renderOrders(orders);
+  } catch (error) {
+    toast('无法读取订单，请检查连接后刷新。', 'err');
+  }
+}
+function renderOrders(orders) {
   var tb = document.getElementById('o-rows');
-  if (!(d.orders ?? []).length) { tb.innerHTML = '<tr><td colspan="7" class="empty">没有订单</td></tr>'; return; }
-  tb.innerHTML = d.orders.map(function (o) {
-    return '<tr><td class="key">' + esc(o.id.slice(0, 8)) + '</td>'
+  if (!orders.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">没有订单</td></tr>'; return; }
+  tb.innerHTML = orders.map(function (o) {
+    return '<tr><td class="key" title="' + esc(o.id) + '">' + esc(o.id.slice(0, 8)) + '</td>'
       + '<td>' + esc(o.contact) + '</td>'
       + '<td>' + esc(o.plan) + ' × ' + o.months + ' 月</td>'
       + '<td>¥' + (o.amountFen / 100).toFixed(0) + '</td>'
       + '<td>' + esc(o.provider || '—') + '</td>'
       + '<td>' + relTime(o.createdAt) + '</td>'
       + '<td class="td-actions">'
-      + '<span class="badge badge-gray">' + esc(o.status === 'paid' ? '已支付（历史）' : '待确认（历史/测试）') + '</span>'
+      + '<span class="badge ' + (o.status === 'paid' ? 'badge-green' : 'badge-amber') + '">'
+      + esc(o.status === 'paid' ? '已支付（历史）' : '待确认（历史/测试）') + '</span>'
       + '</td></tr>';
   }).join('');
-
 }
 document.getElementById('o-filter').onchange = loadOrders;
 
 /* ---------- accounts ---------- */
 async function loadAccounts() {
-  var d = await (await api('/v1/admin/accounts')).json();
-  var tb = document.getElementById('a-rows');
-  if (!(d.accounts ?? []).length) { tb.innerHTML = '<tr><td colspan="4" class="empty">还没有账号</td></tr>'; return; }
-  tb.innerHTML = d.accounts.map(function (a) {
-    return '<tr><td><b>' + esc(a.name) + '</b></td><td class="key">' + esc(a.appId) + '</td>'
-      + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">管理员</span>') + '</td>'
-      + '<td>' + esc(a.source === 'config' ? 'server.json' : '数据库') + '</td></tr>';
-  }).join('');
+  try {
+    var d = await (await api('/v1/admin/accounts')).json();
+    var tb = document.getElementById('a-rows');
+    var accounts = Array.isArray(d.accounts) ? d.accounts : [];
+    if (!accounts.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">还没有账号</td></tr>'; return; }
+    tb.innerHTML = accounts.map(function (a, index) {
+      return '<tr><td><b>' + esc(a.name) + '</b></td><td class="key">' + esc(a.appId) + '</td>'
+        + '<td>' + (a.owner ? esc(a.owner) : '<span class="badge badge-gray">管理员</span>') + '</td>'
+        + '<td><span class="badge ' + (a.source === 'config' ? 'badge-blue' : 'badge-green') + '">'
+        + esc(a.source === 'config' ? 'server.json' : '数据库') + '</span></td>'
+        + '<td class="td-actions"><button class="btn btn-ghost btn-sm" data-verify="' + index + '">测试连接</button></td></tr>';
+    }).join('');
+    tb.querySelectorAll('[data-verify]').forEach(function (button) {
+      var account = accounts[Number(button.dataset.verify)];
+      button.onclick = async function () {
+        button.disabled = true;
+        var original = button.textContent;
+        button.textContent = '测试中…';
+        try {
+          var response = await api('/v1/admin/accounts/' + encodeURIComponent(account.name) + '/verify', { method: 'POST' });
+          var result = await response.json();
+          if (result.ok) toast('「' + account.name + '」微信连通正常' + (result.ip ? ' · 出口 IP ' + result.ip : ''), 'ok');
+          else toast('「' + account.name + '」验证失败：' + (result.message || result.errcode || '未知错误'), 'err');
+        } catch (error) {
+          toast('测试连接失败：' + error.message, 'err');
+        } finally {
+          button.disabled = false;
+          button.textContent = original;
+        }
+      };
+    });
+  } catch (error) {
+    toast('无法读取公众号账号，请检查连接后刷新。', 'err');
+  }
 }
 document.getElementById('acc-btn').onclick = function () {
   openModal('<h3>新增公众号账号</h3>'
@@ -556,27 +923,31 @@ document.getElementById('acc-btn').onclick = function () {
 var claimsCache = [];
 async function loadClaims() {
   var status = document.getElementById('claims-status'), rows = document.getElementById('c-rows');
+  var summary = document.getElementById('claims-summary');
   status.textContent = '正在读取待核对请求…';
   rows.innerHTML = '';
+  if (summary) summary.textContent = '正在读取…';
   try {
     var response = await api('/v1/admin/claims');
     if (!response.ok) throw new Error('HTTP ' + response.status);
     var data = await response.json();
     if (!Array.isArray(data.claims)) throw new Error('待核对数据格式错误');
     claimsCache = data.claims;
+    setBadge('nav-claims-badge', claimsCache.length);
+    if (summary) summary.textContent = '核对会实时读取公众号草稿箱，只读，不修改微信内容。';
     if (!claimsCache.length) {
       rows.innerHTML = '<tr><td colspan="6" class="empty">当前没有待核对的发布</td></tr>';
-      status.textContent = '';
+      status.textContent = '共 ' + claimsCache.length + ' 条待核对';
       return;
     }
     rows.innerHTML = claimsCache.map(function (claim, index) {
       var when = claim.createdAt ? new Date(claim.createdAt) : null;
-      return '<tr><td>' + esc(when && !Number.isNaN(when.getTime()) ? when.toLocaleString() : '—') + '</td>'
+      return '<tr><td>' + esc(fmtDateTime(claim.createdAt)) + '</td>'
         + '<td>' + esc(claim.ownerContact || claim.owner) + '</td>'
         + '<td>' + esc(claim.account || '—') + '</td>'
         + '<td>' + esc(claim.title || '—') + '</td>'
         + '<td class="key">' + esc(claim.key) + '</td>'
-        + '<td><button class="btn btn-ghost btn-sm" data-inspect="' + index + '">核对草稿箱</button></td></tr>';
+        + '<td class="td-actions"><button class="btn btn-ghost btn-sm" data-inspect="' + index + '">核对草稿箱</button></td></tr>';
     }).join('');
     rows.querySelectorAll('[data-inspect]').forEach(function (button) {
       var claim = claimsCache[Number(button.dataset.inspect)];
@@ -799,98 +1170,238 @@ if (KEY) {
 }
 
 const ADMIN_CSS = `
-  :root { --bg:#f6f8f3; --surface:#fff; --surface-2:#edf3ec; --border:#dce6db;
-    --border-light:#ccd9ce; --text:#172b20; --text-2:#51665a; --text-3:#6d8074;
-    --accent:#176842; --accent-hover:#0d5030; --accent-dim:#e4f2e7; --danger:#b63737;
-    --radius:14px; --radius-sm:8px; }
-  body { font-size:15px; }
-  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-    outline:3px solid #d99445; outline-offset:3px;
+  :root {
+    --bg: #f4f7f3;
+    --surface: #ffffff;
+    --surface-2: #eef3ec;
+    --border: #dde6da;
+    --border-light: #cbd8c9;
+    --text: #16271e;
+    --text-2: #50655a;
+    --text-3: #7a8b80;
+    --accent: #176842;
+    --accent-hover: #0d5030;
+    --accent-dim: #e3f2e8;
+    --danger: #b23b3b;
+    --warn: #b7791f;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --sidebar: #0e1511;
+    --sidebar-2: #16211b;
+    --sidebar-text: #c7d4cc;
+    --sidebar-muted: #7e9187;
   }
-  #login-card { max-width:520px; margin:72px auto; padding:32px; }
-  #login-card h3 { font-size:22px; }
-  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(248,250,246,.94);
-    backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
-  .tb-inner { max-width: 1180px; margin: 0 auto; padding: 16px 24px;
-    display: flex; align-items: center; justify-content: space-between; }
-  .brand { font-size: 17px; font-weight: 700; }
-  .brand span { color: var(--accent); }
-  .tb-right { display: flex; gap: 10px; align-items: center; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 36px 24px 72px; }
-  .workspace-heading { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:28px; }
-  .workspace-eyebrow { color:var(--accent); font-size:11px; letter-spacing:.13em; font-weight:700; }
-  .workspace-heading h1 { font-size:28px; letter-spacing:-.03em; margin:4px 0; }
-  .workspace-heading p { color:var(--text-2); font-size:14px; }
-  .workspace-status { color:var(--accent); background:var(--accent-dim); border-radius:999px; padding:6px 12px; font-size:12px; white-space:nowrap; }
-  .btn-sm { padding: 7px 14px; font-size: 13px; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-  .tab { background: transparent; border: 0; color: var(--text-2); font-size: 14px;
-    padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .panel .card { margin-bottom: 16px; overflow-x: auto; box-shadow:0 8px 24px #1a38250a; }
-  .panel .hint { font-size:13px; }
-  .tabs { overflow-x: auto; }
-  .tab { white-space: nowrap; }
-  .card-head { display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-  .card-head h3 { border: 0; padding: 0; margin: 0; font-size: 15px; }
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px; margin-bottom: 16px; }
-  .stat { background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 22px; box-shadow:0 8px 24px #1a38250a; }
-  .stat-n { font-size: 30px; font-weight: 700; line-height: 1.2; }
-  .stat-t { font-size: 13px; color: var(--text-2); margin-top: 2px; }
-  .stat-s { font-size: 12px; color: var(--text-3); margin-top: 6px; }
-  .bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
-    margin-bottom: 4px; width: 120px; display: inline-block; vertical-align: middle; }
-  .bar-in { height: 100%; background: var(--accent); border-radius: 3px; }
-  .bar-in.hot { background: var(--danger); }
-  .dim { color: var(--text-3); font-size: 12px; }
+  body { font-size: 14px; background: var(--bg); color: var(--text); }
+  code, .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, .tab:focus-visible {
+    outline: 3px solid #d99445; outline-offset: 2px;
+  }
+  .muted { color: var(--text-3); font-size: 12px; }
+  .right { text-align: right; }
+  .btn { border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; }
+  .btn-sm { padding: 7px 12px; font-size: 12px; }
+  .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border-light); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+  .btn-danger-solid { background: var(--danger); }
+
+  /* ---- login ---- */
+  .login-view { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 32px 18px; background: radial-gradient(900px 520px at 20% 0%, #1d3b2b 0%, #0b120e 55%, #070b08 100%); }
+  .login-panel { width: 100%; max-width: 460px; background: #fff; border-radius: 18px;
+    padding: 34px 34px 26px; box-shadow: 0 30px 80px rgba(0,0,0,.35); }
+  .brand-large { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .brand-large strong { display: block; font-size: 17px; letter-spacing: -.02em; }
+  .brand-large small { display: block; color: var(--text-3); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .brand-mark { width: 38px; height: 38px; border-radius: 11px; background: var(--accent);
+    color: #fff; display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px; box-shadow: 0 6px 16px rgba(23,104,66,.25); }
+  .login-panel h1 { font-size: 24px; letter-spacing: -.03em; margin-bottom: 6px; }
+  .login-panel .muted { line-height: 1.7; margin-bottom: 22px; }
+  .login-row { display: flex; gap: 8px; }
+  .login-row input { flex: 1; }
+  .login-row .btn { white-space: nowrap; }
+  .login-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border);
+    color: var(--text-3); font-size: 11px; line-height: 1.7; }
+  .form-error { color: var(--danger); font-size: 12px; min-height: 18px; margin-top: 8px; }
+
+  /* ---- shell ---- */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 244px; flex: 0 0 244px; background: var(--sidebar); color: var(--sidebar-text);
+    display: flex; flex-direction: column; padding: 18px 14px; position: sticky; top: 0; height: 100vh; }
+  .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+  .sidebar-brand strong { display: block; color: #fff; font-size: 15px; letter-spacing: -.01em; }
+  .sidebar-brand small { display: block; color: var(--sidebar-muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .nav { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; }
+  .nav-label { color: var(--sidebar-muted); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; padding: 16px 10px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; cursor: pointer;
+    background: transparent; color: var(--sidebar-text); border-radius: 9px; padding: 9px 10px;
+    font-size: 13px; text-align: left; transition: background .15s, color .15s; }
+  .nav-item svg { width: 17px; height: 17px; fill: currentColor; opacity: .75; flex: 0 0 17px; }
+  .nav-item span { flex: 1; }
+  .nav-item:hover { background: var(--sidebar-2); color: #fff; }
+  .nav-item.active { background: rgba(7,193,96,.14); color: #fff; box-shadow: inset 2px 0 0 #07C160; }
+  .nav-item.active svg { opacity: 1; color: #07C160; }
+  .nav-badge { flex: 0 0 auto !important; min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px;
+    background: #d97706; color: #fff; font-size: 10px; font-weight: 700; display: none;
+    align-items: center; justify-content: center; }
+  .nav-badge.show { display: inline-flex; }
+  .sidebar-foot { border-top: 1px solid rgba(255,255,255,.08); padding: 14px 8px 2px; margin-top: 10px; }
+  .server-line { display: flex; align-items: center; gap: 7px; color: var(--sidebar-muted); font-size: 11px; }
+  .server-version { color: var(--sidebar-muted); font-size: 10px; margin: 6px 0 10px; letter-spacing: .04em; }
+  .sidebar-logout { width: 100%; color: var(--sidebar-text); border-color: rgba(255,255,255,.14); }
+  .sidebar-logout:hover { background: var(--sidebar-2); color: #fff; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .dot.on { background: #07C160; box-shadow: 0 0 0 3px rgba(7,193,96,.16); }
+  .dot.wait { background: #eab308; }
+  .dot.err { background: #ef4444; }
+
+  .main { flex: 1; min-width: 0; }
+  .topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: space-between; gap: 18px; padding: 18px 30px; background: rgba(244,247,243,.92);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  .page-heading h1 { font-size: 22px; letter-spacing: -.03em; line-height: 1.25; }
+  .page-heading p { color: var(--text-3); font-size: 12px; margin-top: 2px; }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .content { padding: 26px 30px 70px; max-width: 1320px; margin: 0 auto; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(20,45,30,.04); }
+  .card h3 { font-size: 14px; font-weight: 650; color: var(--text); border: 0; padding: 0; margin: 0; }
+  .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+    margin-bottom: 16px; }
+  .card-sub { color: var(--text-3); font-size: 11px; margin-top: 3px; }
+  .status-line { color: var(--text-3); font-size: 12px; margin: 10px 0; min-height: 16px; }
+  .hint { color: var(--text-3); font-size: 12px; line-height: 1.8; margin-top: 12px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: 0 1px 2px rgba(20,45,30,.04); position: relative; overflow: hidden; }
+  .kpi-label { color: var(--text-3); font-size: 11px; letter-spacing: .03em; }
+  .kpi-value { font-size: 27px; font-weight: 700; letter-spacing: -.03em; line-height: 1.2; margin: 4px 0 2px; }
+  .kpi-meta { color: var(--text-3); font-size: 11px; }
+  .kpi-icon { position: absolute; right: 14px; top: 14px; width: 30px; height: 30px; border-radius: 9px;
+    background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .kpi-icon svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .dash-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); gap: 16px; }
+  .chart { width: 100%; min-height: 230px; }
+  .chart svg { width: 100%; height: 230px; display: block; }
+  .chart-empty { color: var(--text-3); font-size: 12px; padding: 60px 0; text-align: center; }
+  .legend { display: flex; gap: 14px; color: var(--text-3); font-size: 11px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .legend-dot.ok { background: #176842; }
+  .legend-dot.err { background: #b23b3b; }
+  .legend-dot.warn { background: #b7791f; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; font-size: 12px; }
+  .kv dt { color: var(--text-3); }
+  .kv dd { text-align: right; font-weight: 600; word-break: break-all; }
+  .activity-list { display: flex; flex-direction: column; }
+  .activity-item { display: flex; align-items: center; gap: 10px; padding: 9px 0;
+    border-bottom: 1px solid var(--surface-2); font-size: 12px; }
+  .activity-item:last-child { border-bottom: 0; }
+  .activity-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .activity-time { color: var(--text-3); font-size: 11px; white-space: nowrap; }
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .quick { text-align: left; background: var(--surface-2); border: 1px solid transparent;
+    border-radius: 10px; padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+  .quick:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .quick b { font-size: 12px; color: var(--text); }
+  .quick span { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .search { width: 280px; max-width: 100%; padding: 8px 12px; font-size: 12px; }
+  select { width: auto; padding: 8px 12px; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-light); border-radius: 8px; font-size: 12px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 10px 12px; color: var(--text-3); font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px; border-bottom: 1px solid var(--surface-2); vertical-align: middle; }
+  tbody tr:hover td { background: #f8fbf7; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--text-3); padding: 30px; text-align: center; font-size: 12px; }
+  .key { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11px; cursor: pointer; color: var(--text-2); }
+  span.key:hover { color: var(--accent); }
   .td-actions { text-align: right; white-space: nowrap; }
   .td-actions .btn { margin-left: 4px; }
-  .key { font-family: monospace; font-size: 12px; cursor: pointer; }
-  span.key:hover { color: var(--accent); }
-  .empty { color: var(--text-3); padding: 24px; text-align: center; }
-  .modal-mask-fix {}
-  #modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50;
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 650; letter-spacing: .01em; white-space: nowrap; }
+  .badge-green { background: var(--accent-dim); color: var(--accent); }
+  .badge-gray { background: var(--surface-2); color: var(--text-3); }
+  .badge-red { background: #fbeaea; color: var(--danger); }
+  .badge-amber { background: #fdf3e2; color: var(--warn); }
+  .badge-blue { background: #e8f0fb; color: #2b5f9e; }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden;
+    margin-bottom: 4px; width: 110px; display: inline-block; vertical-align: middle; }
+  .bar-in { height: 100%; background: var(--accent); border-radius: 3px; }
+  .bar-in.hot { background: var(--danger); }
+  .summary-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .summary-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 12px; font-size: 11px; color: var(--text-2); }
+  .summary-chip b { color: var(--text); }
+  .banner { background: #fff8e8; border: 1px solid #efd9a8; color: #7a5a12;
+    border-radius: 12px; padding: 12px 16px; font-size: 12px; line-height: 1.8; margin-bottom: 14px; }
+
+  #modal-mask { position: fixed; inset: 0; background: rgba(8,18,12,.55); z-index: 50;
     display: flex; align-items: center; justify-content: center; padding: 20px; }
-  #modal { background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 24px; width: 100%; max-width: 460px;
-    max-height: 85vh; overflow: auto; }
-  #modal h3 { font-size: 15px; margin-bottom: 6px; }
-  .btn-danger-solid { background: var(--danger); color: #fff; border: 0; }
-  .btn-danger-solid:hover { background: #ef5350; }
-  #toasts { position: fixed; bottom: 20px; right: 20px; z-index: 99;
-    display: flex; flex-direction: column; gap: 8px; }
-  .toast { background: var(--surface-2); border: 1px solid var(--border);
-    border-left: 3px solid var(--accent); color: var(--text);
-    padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px;
-    opacity: 0; transform: translateY(8px); transition: all .3s; }
+  #modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px; width: 100%; max-width: 480px; max-height: 86vh; overflow: auto;
+    box-shadow: 0 30px 80px rgba(0,0,0,.25); }
+  #modal h3 { font-size: 16px; margin-bottom: 4px; }
+  #modal label { display: block; font-size: 11px; font-weight: 600; color: var(--text-2); margin: 14px 0 5px; }
+  #modal input, #modal select, #modal textarea { width: 100%; padding: 9px 11px; font-size: 13px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border-light); border-radius: 8px; }
+  .msg { margin-top: 12px; font-size: 12px; color: var(--text-2); }
+  #toasts { position: fixed; bottom: 20px; right: 20px; z-index: 99; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: #12201a; color: #eaf3ee; border-left: 3px solid #07C160;
+    padding: 11px 16px; border-radius: 8px; font-size: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    opacity: 0; transform: translateY(8px); transition: all .25s; }
   .toast.show { opacity: 1; transform: none; }
-  .toast.err { border-left-color: var(--danger); }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--text-3); margin-right: 6px; }
-  .dot.on { background: var(--accent); }
-  .dot.wait { background: #eab308; }
-  .dot.err { background: var(--danger); }
+  .toast.err { border-left-color: #ef4444; }
   .feed { max-height: 60vh; overflow: auto; }
-  .ev { display: flex; gap: 10px; align-items: baseline; padding: 9px 4px;
-    border-bottom: 1px solid var(--surface-2); font-size: 13px; }
+  .feed-title { display: flex; align-items: center; gap: 8px; }
+  .ev { display: flex; gap: 10px; align-items: center; padding: 9px 2px;
+    border-bottom: 1px solid var(--surface-2); font-size: 12px; }
+  .ev:last-child { border-bottom: 0; }
   .ev-b { flex: 0 0 auto; }
   .ev-b.ok { background: var(--accent-dim); color: var(--accent); }
-  .ev-b.err { background: rgba(248,113,113,.12); color: var(--danger); }
-  .ev-b.gold { background: rgba(234,179,8,.12); color: #eab308; }
+  .ev-b.err { background: #fbeaea; color: var(--danger); }
+  .ev-b.gold { background: #fdf3e2; color: var(--warn); }
   .ev-b.dim { background: var(--surface-2); color: var(--text-3); }
-  .ev-main { flex: 1; word-break: break-all; }
-  @media (max-width:640px) {
-    .wrap { padding:24px 18px 56px; }
-    .workspace-heading { align-items:flex-start; flex-direction:column; gap:12px; }
-    .workspace-heading h1 { font-size:24px; }
-    .card-head { flex-wrap:wrap; gap:12px; }
-    #u-search, #ws-url { max-width:100%; }
-    table { min-width:620px; }
+  .ev-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dim { color: var(--text-3); font-size: 11px; }
+
+  @media (max-width: 1080px) {
+    .dash-grid { grid-template-columns: 1fr; }
   }
-  select { width: auto; padding: 8px 12px; background: var(--bg); color: var(--text);
-    border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 13px; }
+  @media (max-width: 860px) {
+    .app { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; flex: none; position: sticky; top: 0; z-index: 20;
+      flex-direction: row; align-items: center; padding: 8px 12px; gap: 6px; overflow-x: auto; }
+    .sidebar-brand, .sidebar-foot, .nav-label { display: none; }
+    .nav { flex-direction: row; gap: 2px; overflow-x: auto; flex: 1; }
+    .nav-item { width: auto; padding: 9px; gap: 0; position: relative; }
+    .nav-item span:not(.nav-badge) { display: none; }
+    .nav-badge { position: absolute; top: 2px; right: 2px; margin: 0; }
+    .topbar { position: static; padding: 14px 16px; }
+    .content { padding: 18px 16px 60px; }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .search { width: 100%; }
+    .toolbar, .toolbar-right { width: 100%; }
+    .quick-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpi { padding: 13px 14px; }
+    .kpi-value { font-size: 22px; }
+    .page-heading h1 { font-size: 18px; }
+    .top-actions .badge { display: none; }
+    .legend { font-size: 10px; gap: 10px; }
+  }
+  @media (max-width: 380px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
 `;
