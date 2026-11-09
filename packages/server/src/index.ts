@@ -361,6 +361,9 @@ export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
   const legacyCheckoutEnabled = config.payments?.enableLegacyCheckout === true;
+  // Money must not be taken unless the same deployment can verify and activate
+  // the Permit entitlement. Both halves are required for the public flow.
+  const hostedPurchaseEnabled = Boolean(config.hostedCheckout && config.hostedAdmission);
   if (legacyCheckoutEnabled && config.payments?.provider !== "manual") {
     throw new Error("legacy checkout is restricted to manual synthetic testing; online providers require Commerce/Permit");
   }
@@ -666,7 +669,7 @@ export function buildApp(config: ServerConfig) {
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
   app.get("/hosted", async (_req, reply) => {
     reply.header("cache-control", "no-store");
-    return reply.type("text/html").send(hostedPurchasePage(Boolean(config.hostedCheckout), config.publicUrl));
+    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl));
   });
   app.get("/hosted/return", async (req, reply) => {
     reply.header("cache-control", "no-store");
@@ -794,8 +797,7 @@ export function buildApp(config: ServerConfig) {
   // grants paid rights. Duplicate contacts fail closed instead of leaking a key.
   const signupAttempts = new Map<string, number[]>();
   app.post<{ Body: unknown }>("/v1/signup", async (req, reply) => {
-    const hosted = config.hostedCheckout;
-    if (!hosted) return reply.code(503).send({ code: "SIGNUP_NOT_AVAILABLE", message: "hosted purchase is not configured" });
+    if (!hostedPurchaseEnabled) return reply.code(503).send({ code: "SIGNUP_NOT_AVAILABLE", message: "hosted purchase and admission are not both configured" });
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).sort().join(",") !== "contact") {
@@ -825,7 +827,7 @@ export function buildApp(config: ServerConfig) {
   const sandboxCheckoutAttempts = new Map<string, number[]>();
   app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
     const sandbox = config.sandboxCheckout;
-    if (!sandbox && !config.hostedCheckout) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
+    if (!sandbox && !hostedPurchaseEnabled) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
     const caller = (req as unknown as { caller: Caller }).caller;
     if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
     const body = req.body;

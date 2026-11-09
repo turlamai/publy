@@ -5,6 +5,10 @@ turn this on for customers until the Commerce hosted-entitlement admission and
 Publy quota/admission slice is complete. A configured checkout can create a
 real Alipay order; it does not by itself grant hosted rights.
 
+The public `/hosted`, `/v1/signup` and `/v1/hosted/checkout` flow requires
+**both** `hostedCheckout` and `hostedAdmission`. A deployment with only the
+checkout half stays closed, so it cannot take money it cannot activate.
+
 ## Flow
 
 1. `GET /hosted` — public purchase page. Without `hostedCheckout` it shows

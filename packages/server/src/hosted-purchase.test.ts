@@ -68,12 +68,17 @@ test("public signup is gated on checkout and refuses duplicate contacts", async 
     await app.close();
 
     const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const admissionScript = path.join(dir, "admission.js"), trust = path.join(dir, "trust.json");
+    fs.writeFileSync(trust, "{}");
+    fs.writeFileSync(admissionScript, "process.stdin.resume();process.stdin.on('end',()=>process.exit(7))");
     app = buildApp({ ...config, hostedCheckout: {
       endpoint: "http://127.0.0.1:9/v1/hosted/alipay-checkout", serviceId: "service", secret: Buffer.alloc(32, 9),
       issuer: "fixture", appId: "fixture-app", merchantPublicKeyPem: publicKey.export({ type: "spki", format: "pem" }).toString(),
       notifyUrl: "https://example.test/notify", returnUrl: "https://example.test/return", environment: "sandbox",
       fetcher: signedCommerceFetcher(privateKey, []),
-    } });
+    }, hostedAdmission: { endpoint: "http://127.0.0.1:9/v1/hosted/proof", serviceId: "s", secret: Buffer.alloc(32, 3),
+      issuer: "fixture", offerId: "publy-personal-monthly", racketExecutable: process.execPath,
+      verifierScript: admissionScript, trustStore: trust, enroll: false } });
     await app.ready();
     const signup = await app.inject({ method: "POST", url: "/v1/signup", payload: { contact: "buyer@example.test" } });
     assert.equal(signup.statusCode, 200);
