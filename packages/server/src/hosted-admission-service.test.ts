@@ -24,6 +24,8 @@ test("hosted admission requires enrolled, current proof and a matching Permit de
     fs.writeFileSync(trust, "{}");
     fs.writeFileSync(script, `let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{const x=JSON.parse(s);
       if(x.plan!=='personal'||x.account!=='account-a')process.exit(2);
+      if(x.entitlement_id&&typeof x.minimum_revision!=='number')process.exit(2);
+      if(/\.\d{3}Z$/.test(x.at))process.exit(2);
       process.stdout.write(JSON.stringify({status:'admitted',authorizes_use:true,entitlement_id:'ent-1',revision:3,
         payload_sha256:'a'.repeat(64),use_expires_at:'2026-12-01T00:00:00Z'}));});`);
     const requests: Array<Record<string, unknown>> = [];

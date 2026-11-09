@@ -35,8 +35,10 @@ export async function verifyHostedAdmission(input: {
       (input.minimumRevision !== undefined && (!Number.isSafeInteger(input.minimumRevision) || input.minimumRevision < 0))) return denied();
   let body: string;
   try {
-    body = JSON.stringify({ credential: input.credential, account: input.account, plan: input.plan, at: input.at,
-      entitlement_id: input.entitlementId ?? null, minimum_revision: input.minimumRevision ?? null });
+    const payload: Record<string, unknown> = { credential: input.credential, account: input.account, plan: input.plan, at: input.at };
+    if (input.entitlementId !== undefined) payload.entitlement_id = input.entitlementId;
+    if (input.minimumRevision !== undefined) payload.minimum_revision = input.minimumRevision;
+    body = JSON.stringify(payload);
   } catch { return denied(); }
   if (Buffer.byteLength(body, "utf8") > 1024 * 1024) return denied();
 
@@ -44,7 +46,7 @@ export async function verifyHostedAdmission(input: {
     let child: ReturnType<typeof spawn>;
     try {
       const env: NodeJS.ProcessEnv = {};
-      for (const key of ["PATH", "PLTCOLLECTS", "PLTUSERHOME", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"]) {
+      for (const key of ["PATH", "HOME", "USERPROFILE", "PLTCOLLECTS", "PLTUSERHOME", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"]) {
         if (process.env[key] !== undefined) env[key] = process.env[key];
       }
       child = spawn(input.racketExecutable, [input.verifierScript, input.trustStore], { stdio: ["pipe", "pipe", "ignore"], shell: false, env });

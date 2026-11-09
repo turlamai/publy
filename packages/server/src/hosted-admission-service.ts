@@ -46,9 +46,11 @@ export async function checkHostedAdmission(input: {
       secret: input.secret, scope, minimumRevision: previous?.revision ?? null,
       expectedEntitlementId: previous?.entitlementId ?? null, fetcher: input.fetcher });
     if (observation.status !== "verified-proof") return deny(`proof-${observation.status}`);
-    const at = new Date(input.now ?? Date.now()).toISOString();
+    // Permit policy expects second-resolution RFC3339; a millisecond
+    // suffix is rejected as an invalid timestamp, not treated as the same instant.
+    const at = new Date(input.now ?? Date.now()).toISOString().replace(/\.\d{3}Z$/, "Z");
     const verified = await verifyHostedAdmission({ credential: observation.credential, account: input.subject,
-      plan: input.plan, at, entitlementId: observation.entitlementId,
+      plan: input.plan, at, entitlementId: previous?.entitlementId,
       minimumRevision: previous?.revision, racketExecutable: input.racketExecutable,
       verifierScript: input.verifierScript, trustStore: input.trustStore });
     if (!verified.allowed || !verified.entitlementId || verified.revision === undefined || !verified.payloadSha256 ||
