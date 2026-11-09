@@ -1231,6 +1231,43 @@ export function buildApp(config: ServerConfig) {
     return ((req as unknown as { caller: Caller }).caller as Caller).admin;
   }
 
+  // Operator recovery for a paid order whose browser return was lost or whose
+  // server restarted. It re-checks current proof + Permit before activating.
+  app.post<{ Body: unknown }>("/v1/admin/hosted/reconcile", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const admission = config.hostedAdmission;
+    if (!admission) return reply.code(503).send({ code: "HOSTED_ADMISSION_NOT_CONFIGURED" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).sort().join(",") !== "userId") {
+      return reply.code(400).send({ code: "BAD_REQUEST" });
+    }
+    const userId = (body as Record<string, unknown>).userId;
+    if (typeof userId !== "string" || !userId) return reply.code(400).send({ code: "BAD_REQUEST" });
+    const user = store.findUserById(userId);
+    if (!user || user.disabledAt) return reply.code(404).send({ code: "USER_NOT_FOUND" });
+    const offerId = store.latestHostedOffer(user.id) ?? admission.offerId;
+    if (!isHostedOfferId(offerId)) return reply.code(400).send({ code: "HOSTED_OFFER_UNKNOWN" });
+    const offer = HOSTED_OFFERS[offerId];
+    const subject = store.resolveHostedSubject(user.id);
+    if (!subject) return reply.code(409).send({ code: "HOSTED_IDENTITY_MISSING" });
+    const decision = await checkHostedAdmission({ endpoint: admission.endpoint, serviceId: admission.serviceId,
+      secret: admission.secret, issuer: admission.issuer, offerId, subject, plan: offer.plan,
+      racketExecutable: admission.racketExecutable, verifierScript: admission.verifierScript,
+      trustStore: admission.trustStore, fence: store.hostedFence(), enroll: admission.enroll,
+      fetcher: admission.fetcher });
+    if (!decision.allowed) return reply.code(409).send({ code: "HOSTED_ADMISSION_REQUIRED",
+      message: `Hosted entitlement is not current (${decision.reason ?? "denied"}).` });
+    const paidThrough = Date.parse(decision.useExpiresAt ?? "");
+    if (!Number.isSafeInteger(paidThrough) || paidThrough <= Date.now()) {
+      return reply.code(409).send({ code: "HOSTED_ENTITLEMENT_EXPIRED" });
+    }
+    store.setPlanUntil(user.id, offer.plan, paidThrough);
+    store.recordHostedPurchase(user.id, offerId, "operator-reconcile");
+    audit({ event: "hosted-reconciled", userId: user.id, plan: offer.plan, entitlementId: decision.entitlementId, revision: decision.revision });
+    return { ok: true, plan: offer.plan, paidThrough: new Date(paidThrough).toISOString(),
+      entitlementId: decision.entitlementId, revision: decision.revision };
+  });
+
   app.get("/v1/admin/users", async (req, reply) => {
     if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
     return {
