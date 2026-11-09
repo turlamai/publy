@@ -20,7 +20,9 @@ import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, Wech
 import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
 import { requestHostedCheckout } from "./commerce-checkout-request.js";
-import { purchasePage } from "./pages.js";
+import { purchasePage, hostedPurchasePage, hostedResultPage } from "./pages.js";
+import { HOSTED_OFFERS, isHostedOfferId } from "./hosted-offers.js";
+import { checkHostedAdmission } from "./hosted-admission-service.js";
 import { adminPage } from "./admin-page.js";
 
 export interface ServerAccount {
@@ -52,6 +54,21 @@ export interface ServerConfig {
     endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
     appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
     fetcher?: typeof fetch;
+  };
+  /** Production/sandbox Commerce checkout. Read from server.json only when
+   *  secretFile exists; the secret is never returned or logged. */
+  hostedCheckout?: {
+    endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
+    appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
+    environment: "sandbox" | "production";
+    fetcher?: typeof fetch;
+  };
+  /** Current-state Commerce proof + independent Permit admission. Optional;
+   *  when set, paid non-admin users must pass it before any draft is sent. */
+  hostedAdmission?: {
+    endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
+    offerId: string; racketExecutable: string; verifierScript: string; trustStore: string;
+    enroll: boolean; fetcher?: typeof fetch;
   };
   payments?: {
     /** Old checkout is off by default. This opt-in permits only isolated tests. */
@@ -138,7 +155,80 @@ export function loadServerConfig(configPath?: string): ServerConfig {
     publicIp: raw.publicIp,
     secretKey: raw.secretKey,
     payments: raw.payments,
+    hostedCheckout: loadHostedCheckout(raw.hostedCheckout, file),
+    hostedAdmission: loadHostedAdmission(raw.hostedAdmission, file),
   };
+}
+
+function loadHostedCheckout(raw: unknown, configFile: string): ServerConfig["hostedCheckout"] {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`server config ${configFile} hostedCheckout must be an object`);
+  }
+  const value = raw as Record<string, unknown>;
+  const text = (key: string): string => {
+    const v = value[key];
+    if (typeof v !== "string" || !v.trim()) throw new Error(`hostedCheckout.${key} must be a non-empty string`);
+    return v;
+  };
+  const endpoint = new URL(text("endpoint"));
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(endpoint.hostname);
+  if ((endpoint.protocol !== "https:" && !(loopback && endpoint.protocol === "http:")) ||
+      endpoint.pathname !== "/v1/hosted/alipay-checkout" || endpoint.search || endpoint.username || endpoint.password) {
+    throw new Error("hostedCheckout.endpoint must be an absolute /v1/hosted/alipay-checkout URL (https unless loopback)");
+  }
+  for (const key of ["notifyUrl", "returnUrl"]) {
+    const url = new URL(text(key));
+    if (url.protocol !== "https:") throw new Error(`hostedCheckout.${key} must be https`);
+  }
+  const environment = text("environment");
+  if (environment !== "sandbox" && environment !== "production") {
+    throw new Error("hostedCheckout.environment must be sandbox or production");
+  }
+  const secretFile = text("secretFile");
+  if (!path.isAbsolute(secretFile)) throw new Error("hostedCheckout.secretFile must be an absolute path");
+  let secret: Buffer;
+  try { secret = fs.readFileSync(secretFile); } catch { throw new Error("hostedCheckout.secretFile is not readable"); }
+  if (secret.length < 32 || secret.length > 128) throw new Error("hostedCheckout secret must be 32-128 raw bytes");
+  return {
+    endpoint: endpoint.toString(), serviceId: text("serviceId"), secret, issuer: text("issuer"),
+    appId: text("appId"), merchantPublicKeyPem: text("merchantPublicKeyPem"),
+    notifyUrl: text("notifyUrl"), returnUrl: text("returnUrl"), environment,
+  };
+}
+
+function loadHostedAdmission(raw: unknown, configFile: string): ServerConfig["hostedAdmission"] {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`server config ${configFile} hostedAdmission must be an object`);
+  }
+  const value = raw as Record<string, unknown>;
+  const text = (key: string): string => {
+    const v = value[key];
+    if (typeof v !== "string" || !v.trim()) throw new Error(`hostedAdmission.${key} must be a non-empty string`);
+    return v;
+  };
+  const endpoint = new URL(text("endpoint"));
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(endpoint.hostname);
+  if ((endpoint.protocol !== "https:" && !(loopback && endpoint.protocol === "http:")) ||
+      endpoint.pathname !== "/v1/hosted/proof" || endpoint.search || endpoint.username || endpoint.password) {
+    throw new Error("hostedAdmission.endpoint must be an absolute /v1/hosted/proof URL (https unless loopback)");
+  }
+  const secretFile = text("secretFile");
+  if (!path.isAbsolute(secretFile)) throw new Error("hostedAdmission.secretFile must be an absolute path");
+  let secret: Buffer;
+  try { secret = fs.readFileSync(secretFile); } catch { throw new Error("hostedAdmission.secretFile is not readable"); }
+  if (secret.length < 32 || secret.length > 128) throw new Error("hostedAdmission secret must be 32-128 raw bytes");
+  const enroll = value.enroll;
+  if (typeof enroll !== "boolean") throw new Error("hostedAdmission.enroll must be a boolean");
+  for (const key of ["racketExecutable", "verifierScript", "trustStore"]) {
+    const p = text(key);
+    if (!path.isAbsolute(p)) throw new Error(`hostedAdmission.${key} must be an absolute path`);
+    if (!fs.existsSync(p)) throw new Error(`hostedAdmission.${key} does not exist`);
+  }
+  return { endpoint: endpoint.toString(), serviceId: text("serviceId"), secret, issuer: text("issuer"),
+    offerId: text("offerId"), racketExecutable: text("racketExecutable"), verifierScript: text("verifierScript"),
+    trustStore: text("trustStore"), enroll };
 }
 
 /** best-effort egress IP detection for the onboarding guide (domestic first) */
@@ -271,6 +361,9 @@ export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
   const legacyCheckoutEnabled = config.payments?.enableLegacyCheckout === true;
+  // Money must not be taken unless the same deployment can verify and activate
+  // the Permit entitlement. Both halves are required for the public flow.
+  const hostedPurchaseEnabled = Boolean(config.hostedCheckout && config.hostedAdmission);
   if (legacyCheckoutEnabled && config.payments?.provider !== "manual") {
     throw new Error("legacy checkout is restricted to manual synthetic testing; online providers require Commerce/Permit");
   }
@@ -408,6 +501,9 @@ export function buildApp(config: ServerConfig) {
           return;
         }
       }
+      // Admission is checked again at execution: a scheduled job may outlive
+      // the entitlement snapshot that admitted it at enqueue time.
+      await requireHostedAdmission(caller);
       // Recovering a confirmed draft does not consume a new quota unit.
       if (!caller.admin) {
         const limit = planLimit(caller.user);
@@ -488,6 +584,29 @@ export function buildApp(config: ServerConfig) {
 
   // --- auth ------------------------------------------------------------------
 
+  // Browser return sessions. A return page is display-only; it may trigger a
+  // server-side current-proof check, but never grants rights from URL params.
+  const hostedSessions = new Map<string, { userId: string; offerId?: string; expiresAt: number }>();
+  const HOSTED_SESSION_TTL_MS = 3600_000;
+  function issueHostedSession(reply: FastifyReply, userId: string): string {
+    const token = crypto.randomBytes(32).toString("base64url");
+    hostedSessions.set(token, { userId, expiresAt: Date.now() + HOSTED_SESSION_TTL_MS });
+    for (const [key, value] of hostedSessions) if (value.expiresAt <= Date.now()) hostedSessions.delete(key);
+    const secure = (config.publicUrl ?? "").startsWith("https:") ? "; Secure" : "";
+    reply.header("set-cookie", `publy_hosted_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600${secure}`);
+    return token;
+  }
+  function readHostedSession(req: { headers: Record<string, string | string[] | undefined> }): { userId: string; offerId?: string; token: string } | null {
+    const raw = req.headers.cookie;
+    if (typeof raw !== "string") return null;
+    const match = raw.split(";").map((part) => part.trim()).find((part) => part.startsWith("publy_hosted_session="));
+    if (!match) return null;
+    const token = match.slice("publy_hosted_session=".length);
+    const session = hostedSessions.get(token);
+    if (!session || session.expiresAt <= Date.now()) { hostedSessions.delete(token); return null; }
+    return { userId: session.userId, offerId: session.offerId, token };
+  }
+
   function auth(callerKey: string | undefined): Caller | null {
     if (!callerKey) return null;
     if (config.apiKey && callerKey === config.apiKey) return { admin: true };
@@ -496,10 +615,28 @@ export function buildApp(config: ServerConfig) {
     return { admin: false, user };
   }
 
+  /** Paid hosted users must pass current-state proof + Permit admission.
+   * Free users stay on the local free allowance; admins are the operator. */
+  async function requireHostedAdmission(caller: Caller): Promise<void> {
+    const admission = config.hostedAdmission;
+    if (!admission || caller.admin || caller.user.plan === "free") return;
+    const plan = caller.user.plan as "personal" | "studio";
+    const subject = store.resolveHostedSubject(caller.user.id);
+    if (!subject) throw new PublishError("HOSTED_IDENTITY_MISSING", "Paid hosted use requires an enrolled hosted identity.");
+    const offerId = store.latestHostedOffer(caller.user.id) ?? admission.offerId;
+    const decision = await checkHostedAdmission({ endpoint: admission.endpoint, serviceId: admission.serviceId,
+      secret: admission.secret, issuer: admission.issuer, offerId, subject, plan,
+      racketExecutable: admission.racketExecutable, verifierScript: admission.verifierScript,
+      trustStore: admission.trustStore, fence: store.hostedFence(), enroll: admission.enroll,
+      fetcher: admission.fetcher });
+    if (!decision.allowed) throw new PublishError("HOSTED_ADMISSION_REQUIRED", `Hosted entitlement is not current (${decision.reason ?? "denied"}).`);
+  }
+
   app.addHook("onRequest", async (req, reply) => {
     // the /admin page SHELL is public (it's just html); its data endpoints
     // (/v1/admin/*) still require the admin key
-    if (req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
+    if (req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
+        req.url === "/v1/signup" || req.url.startsWith("/hosted") || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
     const caller = auth(req.headers["x-api-key"] as string | undefined);
     if (!caller) {
       await reply.code(401).send({ code: "UNAUTHORIZED", message: "Invalid API key" });
@@ -530,6 +667,36 @@ export function buildApp(config: ServerConfig) {
     ? reply.type("text/html").send(purchasePage(config.publicIp ?? "（探测中，稍后刷新可见）"))
     : reply.type("text/html").send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Publy</title><body><main><h1>Publy</h1><p>Local preview, CLI and self-hosted publishing are available. Public hosted subscriptions are not open.</p><a href="https://github.com/turlamai/publy">Source and documentation</a></main></body></html>'));
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
+  app.get("/hosted", async (_req, reply) => {
+    reply.header("cache-control", "no-store");
+    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl));
+  });
+  app.get("/hosted/return", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    const page = (title: string, message: string, ok = false) => reply.type("text/html").send(hostedResultPage(title, message, ok));
+    const session = readHostedSession(req as unknown as { headers: Record<string, string | string[] | undefined> });
+    if (!session) return page("无法确认购买会话", "请使用购买时的同一浏览器打开此页；支付结果以 Commerce/支付宝回调为准。");
+    const user = store.findUserById(session.userId);
+    if (!user || user.disabledAt) return page("账号不可用", "该账号已停用，请联系运营者。");
+    if (!session.offerId) return page("尚未创建订单", "没有找到这次购买的套餐，请重新从购买页发起。");
+    const offer = isHostedOfferId(session.offerId) ? HOSTED_OFFERS[session.offerId] : null;
+    if (!offer) return page("套餐无效", "该订单的套餐无法识别，请联系运营者。");
+    const admission = config.hostedAdmission;
+    if (!admission) return page("权益服务未配置", "支付已完成时也不会开通服务；请联系运营者配置 Commerce/Permit 后再试。");
+    const subject = store.resolveHostedSubject(user.id);
+    if (!subject) return page("账号未绑定托管身份", "请联系运营者重新建立 hosted identity。");
+    const decision = await checkHostedAdmission({ endpoint: admission.endpoint, serviceId: admission.serviceId,
+      secret: admission.secret, issuer: admission.issuer, offerId: session.offerId, subject, plan: offer.plan,
+      racketExecutable: admission.racketExecutable, verifierScript: admission.verifierScript,
+      trustStore: admission.trustStore, fence: store.hostedFence(), enroll: admission.enroll, fetcher: admission.fetcher });
+    if (!decision.allowed) return page("还在确认支付", "Commerce 尚未给出与这笔订单匹配的当前权益。请稍后刷新；若已扣款但仍无权益，请联系运营者。");
+    const paidThrough = Date.parse(decision.useExpiresAt ?? "");
+    if (!Number.isSafeInteger(paidThrough) || paidThrough <= Date.now()) return page("权益已过期", "当前 Permit 权益已不在有效期内，请联系运营者。");
+    store.setPlanUntil(user.id, offer.plan, paidThrough);
+    store.recordHostedPurchase(user.id, session.offerId, "activation");
+    audit({ event: "hosted-activated", userId: user.id, plan: offer.plan, entitlementId: decision.entitlementId, revision: decision.revision });
+    return page("已开通", `已按 Permit 权益开通 ${offer.label}，有效期至 ${new Date(paidThrough).toISOString().slice(0, 10)}。`, true);
+  });
 
   // The disabled path must never initialize a configured external gateway.
   const payments = createProvider(legacyCheckoutEnabled ? config.payments : { provider: "manual" }, store, (order) => {
@@ -625,28 +792,59 @@ export function buildApp(config: ServerConfig) {
     return { plan: caller.user.plan, used: store.getUsage(caller.user), limit, expiresAt: caller.user.expiresAt || undefined };
   });
 
+  // Public, rate-limited account creation for the hosted purchase flow. It
+  // only exists when a Commerce checkout is configured; a free key alone never
+  // grants paid rights. Duplicate contacts fail closed instead of leaking a key.
+  const signupAttempts = new Map<string, number[]>();
+  app.post<{ Body: unknown }>("/v1/signup", async (req, reply) => {
+    if (!hostedPurchaseEnabled) return reply.code(503).send({ code: "SIGNUP_NOT_AVAILABLE", message: "hosted purchase and admission are not both configured" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).sort().join(",") !== "contact") {
+      return reply.code(400).send({ code: "BAD_SIGNUP_REQUEST" });
+    }
+    const contact = (body as Record<string, unknown>).contact;
+    if (typeof contact !== "string" || !/^\S{3,120}$/.test(contact)) {
+      return reply.code(400).send({ code: "BAD_CONTACT" });
+    }
+    const now = Date.now();
+    const ip = req.ip || "unknown";
+    const attempts = (signupAttempts.get(ip) ?? []).filter((t) => now - t < 3600_000);
+    if (attempts.length >= 5) return reply.code(429).send({ code: "RATE_LIMITED" });
+    attempts.push(now);
+    signupAttempts.set(ip, attempts);
+    if (store.findUserByContact(contact)) return reply.code(409).send({ code: "CONTACT_TAKEN" });
+    const user = store.createUser(contact, "free", 1);
+    const subject = store.enrollHostedSubject(user.id);
+    issueHostedSession(reply, user.id);
+    audit({ event: "hosted-signup", userId: user.id });
+    reply.header("cache-control", "no-store");
+    return { userId: user.id, apiKey: user.apiKey, subject };
+  });
+
   // Sandbox-only integration seam: no configuration file can enable this
   // route. It prepares a signed order, never confirms payment or grants rights.
   const sandboxCheckoutAttempts = new Map<string, number[]>();
   app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
     const sandbox = config.sandboxCheckout;
-    if (!sandbox) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
+    if (!sandbox && !hostedPurchaseEnabled) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
     const caller = (req as unknown as { caller: Caller }).caller;
     if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).sort().join(",") !== "offer,requestId") return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
     const value = body as Record<string, unknown>;
-    const offers: Record<string, number> = Object.freeze({
-      "publy-personal-monthly": 2900, "publy-personal-annual": 29000,
-      "publy-studio-monthly": 7900, "publy-studio-annual": 79000,
-    });
-    if (typeof value.offer !== "string" || !Object.hasOwn(offers, value.offer) ||
+    if (!isHostedOfferId(value.offer) ||
         typeof value.requestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.requestId)) {
       return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
     }
     const subject = store.resolveHostedSubject(caller.user.id);
     if (!subject) return reply.code(403).send({ code: "HOSTED_IDENTITY_NOT_ENROLLED" });
+    const session = readHostedSession(req as unknown as { headers: Record<string, string | string[] | undefined> });
+    if (session?.userId === caller.user.id) {
+      const stored = hostedSessions.get(session.token);
+      if (stored) stored.offerId = value.offer;
+    } else issueHostedSession(reply, caller.user.id);
     const now = Date.now();
     const attempts = (sandboxCheckoutAttempts.get(caller.user.id) ?? []).filter((t) => now - t < 3600_000);
     if (attempts.length >= 20) return reply.code(429).send({ code: "RATE_LIMITED" });
@@ -654,9 +852,12 @@ export function buildApp(config: ServerConfig) {
     sandboxCheckoutAttempts.set(caller.user.id, attempts);
     // Namespacing prevents one user's request ID from colliding with another's.
     const requestId = crypto.createHash("sha256").update(subject).update("\0").update(value.requestId).digest("hex");
+    store.recordHostedPurchase(caller.user.id, value.offer, requestId);
+    const checkout = (config.hostedCheckout ?? sandbox)!;
     const result = await requestHostedCheckout({
-      ...sandbox, environment: "sandbox", requestId, amountFen: offers[value.offer],
-      scope: { issuer: sandbox.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
+      ...checkout, environment: config.hostedCheckout ? config.hostedCheckout.environment : "sandbox",
+      requestId, amountFen: HOSTED_OFFERS[value.offer].fen,
+      scope: { issuer: checkout.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
     });
     reply.header("cache-control", "no-store");
     return result.status === "ready" ? result : reply.code(503).send({ code: "CHECKOUT_OUTCOME_UNKNOWN" });
@@ -787,6 +988,13 @@ export function buildApp(config: ServerConfig) {
       }
     }
 
+    try {
+      await requireHostedAdmission(caller);
+    } catch (error) {
+      if (error instanceof PublishError) return reply.code(403).send({ code: error.code, message: error.message });
+      throw error;
+    }
+
     if (body.publishAt) {
       const runAt = new Date(body.publishAt).getTime();
       if (Number.isNaN(runAt) || runAt < Date.now() - 60_000) {
@@ -865,7 +1073,8 @@ export function buildApp(config: ServerConfig) {
       audit({ event: "failed", account: body.account, type: body.type, title: body.title, error: (err as Error).message });
       notifyWebhook(body.account, "failed", { title: body.title, error: (err as Error).message });
       if (err instanceof PublishError) {
-        return reply.code(400).send({ code: err.code, message: err.message });
+        const status = err.code === "HOSTED_ADMISSION_REQUIRED" || err.code === "HOSTED_IDENTITY_MISSING" ? 403 : 400;
+        return reply.code(status).send({ code: err.code, message: err.message });
       }
       if (err instanceof WechatError) {
         return reply.code(502).send({ code: `WECHAT_${err.errcode}`, message: err.message });
@@ -1021,6 +1230,43 @@ export function buildApp(config: ServerConfig) {
   function requireAdmin(req: unknown): boolean {
     return ((req as unknown as { caller: Caller }).caller as Caller).admin;
   }
+
+  // Operator recovery for a paid order whose browser return was lost or whose
+  // server restarted. It re-checks current proof + Permit before activating.
+  app.post<{ Body: unknown }>("/v1/admin/hosted/reconcile", async (req, reply) => {
+    if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });
+    const admission = config.hostedAdmission;
+    if (!admission) return reply.code(503).send({ code: "HOSTED_ADMISSION_NOT_CONFIGURED" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).sort().join(",") !== "userId") {
+      return reply.code(400).send({ code: "BAD_REQUEST" });
+    }
+    const userId = (body as Record<string, unknown>).userId;
+    if (typeof userId !== "string" || !userId) return reply.code(400).send({ code: "BAD_REQUEST" });
+    const user = store.findUserById(userId);
+    if (!user || user.disabledAt) return reply.code(404).send({ code: "USER_NOT_FOUND" });
+    const offerId = store.latestHostedOffer(user.id) ?? admission.offerId;
+    if (!isHostedOfferId(offerId)) return reply.code(400).send({ code: "HOSTED_OFFER_UNKNOWN" });
+    const offer = HOSTED_OFFERS[offerId];
+    const subject = store.resolveHostedSubject(user.id);
+    if (!subject) return reply.code(409).send({ code: "HOSTED_IDENTITY_MISSING" });
+    const decision = await checkHostedAdmission({ endpoint: admission.endpoint, serviceId: admission.serviceId,
+      secret: admission.secret, issuer: admission.issuer, offerId, subject, plan: offer.plan,
+      racketExecutable: admission.racketExecutable, verifierScript: admission.verifierScript,
+      trustStore: admission.trustStore, fence: store.hostedFence(), enroll: admission.enroll,
+      fetcher: admission.fetcher });
+    if (!decision.allowed) return reply.code(409).send({ code: "HOSTED_ADMISSION_REQUIRED",
+      message: `Hosted entitlement is not current (${decision.reason ?? "denied"}).` });
+    const paidThrough = Date.parse(decision.useExpiresAt ?? "");
+    if (!Number.isSafeInteger(paidThrough) || paidThrough <= Date.now()) {
+      return reply.code(409).send({ code: "HOSTED_ENTITLEMENT_EXPIRED" });
+    }
+    store.setPlanUntil(user.id, offer.plan, paidThrough);
+    store.recordHostedPurchase(user.id, offerId, "operator-reconcile");
+    audit({ event: "hosted-reconciled", userId: user.id, plan: offer.plan, entitlementId: decision.entitlementId, revision: decision.revision });
+    return { ok: true, plan: offer.plan, paidThrough: new Date(paidThrough).toISOString(),
+      entitlementId: decision.entitlementId, revision: decision.revision };
+  });
 
   app.get("/v1/admin/users", async (req, reply) => {
     if (!requireAdmin(req)) return reply.code(403).send({ code: "FORBIDDEN", message: "admin only" });

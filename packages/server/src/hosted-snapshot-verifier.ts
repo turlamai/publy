@@ -47,7 +47,7 @@ export async function verifyHostedSnapshot(input: HostedSnapshotVerifierInput): 
       // The verifier needs runtime and temporary-directory settings, not the
       // parent service's payment, account or signing environment variables.
       const env: NodeJS.ProcessEnv = {};
-      for (const key of ["PATH", "PLTCOLLECTS", "PLTUSERHOME", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"]) {
+      for (const key of ["PATH", "HOME", "USERPROFILE", "PLTCOLLECTS", "PLTUSERHOME", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"]) {
         if (process.env[key] !== undefined) env[key] = process.env[key];
       }
       child = spawn(input.racketExecutable, [input.verifierScript, input.trustStore], { stdio: ["pipe", "pipe", "ignore"], shell: false, env });

@@ -1,4 +1,5 @@
 // Storefront (purchase) + admin console pages.
+import { HOSTED_OFFERS, formatFen, type HostedOfferId } from "./hosted-offers.js";
 //
 // Design system: matches the publy.jrtx.site family — dark bg, green accent,
 // generous spacing, clean typography. The shared <style> is embedded in both
@@ -273,4 +274,117 @@ async function bindAccount() {
 }
 </script>`.replace(/\$\{contact\}/g, "${contact}");
   return shell("Publy · 购买", body);
+}
+
+/** Hosted purchase page. It is intentionally usable only when a Commerce
+ * checkout is configured; the disabled state is explicit, never a fake pay
+ * button. Payment confirmation still happens through Commerce/Permit. */
+export function hostedPurchasePage(available: boolean, publicUrl?: string): string {
+  const offers = (Object.entries(HOSTED_OFFERS) as Array<[HostedOfferId, (typeof HOSTED_OFFERS)[HostedOfferId]]>)
+    .map(([id, offer], index) => `
+      <label class="plan">
+        <input type="radio" name="offer" value="${id}" ${index === 0 ? "checked" : ""}>
+        <span class="plan-name">${offer.label}</span>
+        <span class="plan-price">${formatFen(offer.fen)}</span>
+        <span class="plan-meta">${offer.plan === "studio" ? "多账号与更高额度" : "个人写作与排程"} · 一次性支付</span>
+      </label>`).join("");
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publy 托管投递 · 开通</title>
+<style>
+:root{--ink:#16271e;--muted:#5d6d64;--line:#dce5d9;--green:#176842;--tint:#eef5ec;--amber:#8a5a12}
+*{box-sizing:border-box}body{margin:0;background:#f7f8f4;color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:500 34px/1.2 Georgia,serif;margin:8px 0 10px}
+.lead{color:var(--muted);max-width:600px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
+.notice{border:1px solid #ecd6a6;background:#fdf3e2;color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
+.notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
+.plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
+#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:#a3341f}
+.small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
+@media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
+</style></head><body><div class="wrap">
+<a href="https://publy.jrtx.site/">← Publy</a>
+<h1>托管投递，按需开通。</h1>
+<p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
+${available ? `<div class="notice ok">支付通道已配置。付款成功后，服务权益由 Commerce/Permit 确认；支付返回页本身不代表已开通。</div>` :
+  `<div class="notice">支付通道正在接入，暂不可购买。当前可以先使用免费的自托管路径：<a href="https://publy.jrtx.site/start.html">开始使用</a>。</div>`}
+${available ? `<form class="card" id="buy" >
+  <div class="plans">${offers}</div>
+  <label class="field">联系方式（邮箱或手机号，用于开户与对账）
+    <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com" required>
+  </label>
+  <button type="submit" id="pay">去支付宝付款</button>
+  <div id="msg" role="status" aria-live="polite"></div>
+</form>` : ""}
+<div class="card">
+  <strong>付款前请确认</strong>
+  <ul class="small">
+    <li>Publy 只创建草稿，最终发布仍由你在微信后台完成。</li>
+    <li>托管需要你的公众号 AppID 与 AppSecret，以及把本服务出口 IP 加入微信白名单。</li>
+    <li>额度按账号、按自然月计算；退款与到期规则以服务条款为准。</li>
+    <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
+  </ul>
+</div>
+<p class="foot">运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/terms.md">服务条款</a></p>
+</div>
+<script>
+var KEY = 'publy_hosted_api_key';
+var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
+function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
+function post(url, body, apiKey) {
+  return fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, apiKey ? { 'x-api-key': apiKey } : {}), body: JSON.stringify(body) });
+}
+if (form) form.addEventListener('submit', async function (event) {
+  event.preventDefault();
+  button.disabled = true;
+  say('正在创建订单…');
+  try {
+    var contact = document.getElementById('contact').value.trim();
+    var apiKey = sessionStorage.getItem(KEY);
+    if (!apiKey) {
+      var signup = await post('/v1/signup', { contact: contact });
+      var account = await signup.json();
+      if (signup.status === 409) throw new Error('该联系方式已开户；如已购买，请联系运营者找回 key。');
+      if (!signup.ok) throw new Error(account.message || account.code || '开户失败');
+      apiKey = account.apiKey;
+      sessionStorage.setItem(KEY, apiKey);
+    }
+    var offer = form.querySelector('input[name=offer]:checked').value;
+    // Reuse one request id across transport/unknown-outcome retries; a new id
+    // could create a second order for the same purchase intent.
+    var requestKey = 'publy_hosted_request:' + offer;
+    var requestId = sessionStorage.getItem(requestKey);
+    if (!requestId) {
+      requestId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)).replace(/-/g, '');
+      sessionStorage.setItem(requestKey, requestId);
+    }
+    var response = await post('/v1/hosted/checkout', { offer: offer, requestId: requestId }, apiKey);
+    var result = await response.json();
+    if (response.status !== 200 || result.status !== 'ready') throw new Error(result.message || result.code || '支付通道暂不可用');
+    var pay = document.createElement('form');
+    pay.method = 'POST'; pay.action = result.gateway;
+    Object.keys(result.fields).forEach(function (name) {
+      var input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = result.fields[name]; pay.appendChild(input);
+    });
+    document.body.appendChild(pay); pay.submit();
+  } catch (error) {
+    button.disabled = false;
+    say(error.message, true);
+  }
+});
+</script></body></html>`;
+}
+
+/** Small result page for the hosted return. It never includes credentials or
+ * payment parameters; the server has already re-checked Commerce/Permit. */
+export function hostedResultPage(title: string, message: string, ok: boolean): string {
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} · Publy</title><style>body{margin:0;background:#f7f8f4;color:#16271e;font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:500 30px/1.2 Georgia,serif;margin:0 0 10px}p{color:#5d6d64}
+.card{background:#fff;border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:#cfe3cd;background:#eef5ec}
+a{color:#176842}</style></head><body><main><h1>${title}</h1><div class="card ${ok ? "ok" : ""}"><p>${message}</p></div>
+<p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">购买页</a></p></main></body></html>`;
 }
