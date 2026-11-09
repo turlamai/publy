@@ -19,7 +19,16 @@
 
 ## 开始使用
 
-CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。 目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
+CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。
+
+| 路径 | 时间 | 需要准备 |
+| --- | --- | --- |
+| [Obsidian 插件](https://publy.jrtx.site/start.html?lang=zh) | 约 5 分钟 | Obsidian 桌面版 1.5+；仅草稿投递时需要服务器 |
+| [Typora / 任意编辑器 + CLI](https://publy.jrtx.site/start.html?lang=zh) | 约 10 分钟 | Node 22+ 与 pnpm（源码构建，暂无签名安装包） |
+| [自托管服务器](https://publy.jrtx.site/start.html?lang=zh) | 约 20 分钟 | Linux、Node 22/24、一个公众号 |
+| [托管服务](https://publy.jrtx.site/hosted.html?lang=zh) | — | 私有内测；暂不出售，没有结账入口 |
+
+[API 指南](https://publy.jrtx.site/api.html?lang=zh)覆盖鉴权、创建草稿、未知结果对账与排程任务。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
 
 [安装、首次使用、隐私与备份恢复](docs/USER-GUIDE.zh-CN.md) · [English](docs/USER-GUIDE.md)
 

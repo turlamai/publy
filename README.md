@@ -20,7 +20,16 @@ Status: local rendering and delivery components exist; public hosted onboarding 
 
 ## Start here
 
-CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale. Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions.
+CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.
+
+| Path | Time | You need |
+| --- | --- | --- |
+| [Obsidian plugin](https://publy.jrtx.site/start.html) | ~5 min | Obsidian desktop 1.5+; a server only for draft delivery |
+| [Typora / any editor + CLI](https://publy.jrtx.site/start.html) | ~10 min | Node 22+ and pnpm (source build; no signed installer yet) |
+| [Self-host the server](https://publy.jrtx.site/start.html) | ~20 min | Linux, Node 22/24, a WeChat Official Account |
+| [Hosted service](https://publy.jrtx.site/hosted.html) | — | Private pilot; not for sale, no checkout |
+
+The [API guide](https://publy.jrtx.site/api.html) covers authentication, draft creation, unknown-result reconciliation and scheduled jobs. A server needs a stable outbound IP and the account’s actual official API permissions.
 
 [Installation, first use, privacy, backup and recovery](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 

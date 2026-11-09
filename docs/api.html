@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publy HTTP API · API 指南</title>
+<meta name="description" content="Publy Protocol v1: authenticated draft creation, result reconciliation, jobs and quota.">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header><nav class="wrap nav" aria-label="Main">
+  <a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a>
+  <div class="nav-right">
+    <div class="navlinks">
+      <a href="index.html"><span data-lang="en">Product</span><span data-lang="zh">产品</span></a>
+      <a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a>
+      <a href="api.html" aria-current="page">API</a>
+      <a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a>
+      <a href="https://github.com/turlamai/publy">GitHub</a>
+    </div>
+    <div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
+  </div>
+</nav></header>
+
+<main>
+<section class="wrap hero">
+  <div>
+    <div class="kicker">PROTOCOL V1 · 协议 v1</div>
+    <h1><span data-lang="en">The HTTP API behind the draft.</span><span data-lang="zh">草稿背后的 HTTP API。</span></h1>
+    <p class="lead"><span data-lang="en">A small authenticated API for creating WeChat drafts, querying uncertain results, and managing scheduled jobs. It creates drafts only; it never mass-sends or publishes publicly.</span><span data-lang="zh">一组经过鉴权的小型 API：创建公众号草稿、查询未知结果、管理排程任务。它只创建草稿，不群发、不公开发布。</span></p>
+    <div class="buttons"><a class="btn primary" href="start.html"><span data-lang="en">Get a server first</span><span data-lang="zh">先准备服务器</span> →</a><a class="btn" href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Full protocol notes</span><span data-lang="zh">完整协议说明</span></a></div>
+  </div>
+  <aside class="note">
+    <strong><span data-lang="en">Base URL</span><span data-lang="zh">Base URL</span></strong><br>
+    <code>https://your-publy-server</code><br>
+    <span data-lang="en">Self-hosted. The hosted API is not open; there is no public key issuance or checkout yet.</span>
+    <span data-lang="zh">自托管地址。托管 API 尚未开放，目前没有公开发 key 或结账入口。</span>
+  </aside>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Authentication</span><span data-lang="zh">鉴权</span></div><h2><span data-lang="en">One header.</span><span data-lang="zh">一个请求头。</span></h2></div><p><span data-lang="en">Every data endpoint requires <code>x-api-key</code>. The admin key manages users/accounts; user keys can only publish to accounts they own and consume their own quota.</span><span data-lang="zh">所有数据接口都需要 <code>x-api-key</code>。admin key 管理用户/账号；用户 key 只能投递自己名下的公众号，并消耗自己的配额。</span></p></div>
+  <div class="card">
+    <pre><code>curl https://your-publy-server/health
+
+curl -H "x-api-key: publy_…" \
+  https://your-publy-server/v1/accounts
+
+curl -H "x-api-key: publy_…" \
+  https://your-publy-server/v1/quota</code></pre>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Endpoints</span><span data-lang="zh">接口</span></div><h2><span data-lang="en">Draft, query, schedule.</span><span data-lang="zh">投递、查询、排程。</span></h2></div></div>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th><span data-lang="en">Purpose</span><span data-lang="zh">用途</span></th><th><span data-lang="en">Key</span><span data-lang="zh">可用 key</span></th></tr></thead>
+      <tbody>
+        <tr><td><code>POST</code></td><td><code>/v1/publish</code></td><td><span data-lang="en">Create a WeChat draft (article or image post)</span><span data-lang="zh">创建公众号草稿（文章或图片消息）</span></td><td>user / admin</td></tr>
+        <tr><td><code>GET</code></td><td><code>/v1/publish-result/:key</code></td><td><span data-lang="en">Reconcile a lost response: <code>confirmed</code> or <code>unknown</code></span><span data-lang="zh">对账丢失的回执：<code>confirmed</code> 或 <code>unknown</code></span></td><td>user / admin</td></tr>
+        <tr><td><code>GET</code></td><td><code>/v1/accounts</code></td><td><span data-lang="en">Account names available to this key</span><span data-lang="zh">该 key 可用的公众号名称</span></td><td>user / admin</td></tr>
+        <tr><td><code>GET</code></td><td><code>/v1/quota</code></td><td><span data-lang="en">Current quota state</span><span data-lang="zh">当前配额状态</span></td><td>user / admin</td></tr>
+        <tr><td><code>GET</code></td><td><code>/v1/jobs</code></td><td><span data-lang="en">Scheduled jobs</span><span data-lang="zh">排程任务</span></td><td>user / admin</td></tr>
+        <tr><td><code>DELETE</code></td><td><code>/v1/jobs/:id</code></td><td><span data-lang="en">Cancel a pending job</span><span data-lang="zh">取消等待中的任务</span></td><td>user / admin</td></tr>
+        <tr><td><code>POST</code></td><td><code>/v1/jobs/:id/retry</code></td><td><span data-lang="en">Reconcile or retry a proven-safe job (never blind resend)</span><span data-lang="zh">对账或重试可证明安全的任务（绝不盲目重发）</span></td><td>user / admin</td></tr>
+        <tr><td><code>GET</code></td><td><code>/v1/history</code></td><td><span data-lang="en">Recent delivery events visible to this key</span><span data-lang="zh">该 key 可见的最近投递事件</span></td><td>user / admin</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Create a draft</span><span data-lang="zh">创建草稿</span></div><h2><span data-lang="en">POST /v1/publish</span><span data-lang="zh">POST /v1/publish</span></h2></div><p><span data-lang="en">The CLI and plugin render Markdown to the HTML payload. If you integrate directly, send the rendered article HTML and attachments yourself. Always send a stable <code>idempotencyKey</code> for retry safety.</span><span data-lang="zh">CLI 和插件会先把 Markdown 渲染成 HTML。若直接集成，需要自己发送渲染后的 HTML 与附件；务必带上稳定的 <code>idempotencyKey</code> 以保证重试安全。</span></p></div>
+  <div class="card">
+    <pre><code>POST /v1/publish
+x-api-key: publy_…
+content-type: application/json
+
+{
+  "account": "My Account",
+  "type": "article",
+  "title": "A draft title",
+  "html": "&lt;div id=\"publy\"&gt;…&lt;/div&gt;",
+  "images": [
+    { "name": "cover.png", "contentType": "image/png", "data": "&lt;base64&gt;" }
+  ],
+  "cover": "cover.png",
+  "idempotencyKey": "report-2026-11-09"
+}</code></pre>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:12px">
+      <span data-lang="en">Success returns <code>{ mediaId, deduped, account, title, requestId }</code>. A scheduled request returns <code>{ jobId, runAt, scheduled: true }</code>. A lost response returns HTTP 409 <code>DRAFT_OUTCOME_UNKNOWN</code>; do not resend — query <code>/v1/publish-result/:key</code> and check the WeChat draft box.</span>
+      <span data-lang="zh">成功返回 <code>{ mediaId, deduped, account, title, requestId }</code>；定时请求返回 <code>{ jobId, runAt, scheduled: true }</code>。回执丢失时返回 HTTP 409 <code>DRAFT_OUTCOME_UNKNOWN</code>：不要重发，先查 <code>/v1/publish-result/:key</code> 并核对微信草稿箱。</span>
+    </p>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Outcomes</span><span data-lang="zh">结果语义</span></div><h2><span data-lang="en">Never guess from a timeout.</span><span data-lang="zh">不要用超时猜测结果。</span></h2></div></div>
+  <div class="grid">
+    <div class="card"><h3><span data-lang="en">confirmed</span><span data-lang="zh">confirmed</span></h3><p><span data-lang="en">WeChat acknowledged the draft. The result names the account, title and request ID that were actually submitted.</span><span data-lang="zh">微信已确认创建草稿；结果会带上实际提交的公众号、标题与 request ID。</span></p></div>
+    <div class="card"><h3><span data-lang="en">unknown</span><span data-lang="zh">unknown</span></h3><p><span data-lang="en">The request may have landed. Keep the same request ID, inspect the WeChat draft box, then query and decide. A retry with the same key dedupes if it already exists.</span><span data-lang="zh">请求可能已落地。保留同一个 request ID，检查微信草稿箱后再查询并决定；同 key 重试若已存在会自动去重。</span></p></div>
+    <div class="card"><h3><span data-lang="en">rejected / failed</span><span data-lang="zh">rejected / failed</span></h3><p><span data-lang="en">The server or WeChat explicitly refused. Read the code/message; do not treat this as an unknown outcome.</span><span data-lang="zh">服务端或微信明确拒绝。查看 code/message；这不属于结果未知。</span></p></div>
+    <div class="card"><h3><span data-lang="en">scheduled</span><span data-lang="zh">scheduled</span></h3><p><span data-lang="en">A server-side job was accepted. Jobs found running after a restart are marked interrupted and never auto-resent.</span><span data-lang="zh">服务端已接受排程任务。重启时仍在运行的任务会标记为 interrupted，绝不自动重发。</span></p></div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Errors</span><span data-lang="zh">错误码</span></div><h2><span data-lang="en">Stable codes.</span><span data-lang="zh">稳定的错误码。</span></h2></div></div>
+  <div class="card" style="overflow-x:auto">
+    <table><thead><tr><th>Code</th><th>HTTP</th><th><span data-lang="en">Meaning</span><span data-lang="zh">含义</span></th></tr></thead><tbody>
+      <tr><td><code>UNAUTHORIZED</code></td><td>401</td><td><span data-lang="en">Missing or invalid API key</span><span data-lang="zh">缺少或无效的 API key</span></td></tr>
+      <tr><td><code>ACCOUNT_NOT_OWNED</code></td><td>403</td><td><span data-lang="en">User key cannot publish to that account</span><span data-lang="zh">用户 key 无权投递该公众号</span></td></tr>
+      <tr><td><code>BAD_REQUEST</code></td><td>400</td><td><span data-lang="en">Invalid input or unsupported field</span><span data-lang="zh">输入无效或字段不支持</span></td></tr>
+      <tr><td><code>QUOTA_EXCEEDED</code></td><td>429</td><td><span data-lang="en">Monthly allowance exhausted; no send attempted</span><span data-lang="zh">本月配额用尽，未发送</span></td></tr>
+      <tr><td><code>IDEMPOTENCY_CONFLICT</code></td><td>409</td><td><span data-lang="en">This key already identifies different content</span><span data-lang="zh">该 key 已绑定不同内容</span></td></tr>
+      <tr><td><code>DRAFT_OUTCOME_UNKNOWN</code></td><td>409</td><td><span data-lang="en">Unknown result; inspect drafts before another submission</span><span data-lang="zh">结果未知；再次提交前先核对草稿</span></td></tr>
+      <tr><td><code>WECHAT_*</code></td><td>502</td><td><span data-lang="en">Explicit WeChat API rejection; message carries the errcode</span><span data-lang="zh">微信 API 明确拒绝，message 中带 errcode</span></td></tr>
+    </tbody></table>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin-top:14px"><span data-lang="en">Exit codes for the CLI and the full JSON contract are documented in the <a href="https://github.com/turlamai/publy/blob/main/docs/agent-cli.md">Agent CLI guide</a>. Hosted billing and public key registration are not open.</span><span data-lang="zh">CLI 退出码与完整 JSON 契约见 <a href="https://github.com/turlamai/publy/blob/main/docs/agent-cli.md">Agent CLI 指南</a>。托管计费与公开 key 注册尚未开放。</span></p>
+</section>
+</main>
+
+<footer><div class="wrap inner">
+  <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Draft delivery, not public posting.</span><span data-lang="zh">只投递草稿，不做公开发布。</span></div></div>
+  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Protocol</span><span data-lang="zh">协议</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
+</div></footer>
+<script>
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  if (params.get('lang') === 'zh') { root.lang = 'zh-CN'; document.querySelectorAll('[data-switch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.switch === 'zh'))); }
+  document.querySelectorAll('[data-switch]').forEach(button => button.addEventListener('click', () => {
+    const zh = button.dataset.switch === 'zh';
+    root.lang = zh ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-switch]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    history.replaceState(null, '', zh ? '?lang=zh' : location.pathname);
+  }));
+</script>
+</body>
+</html>

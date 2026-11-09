@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start with Publy · 开始使用</title>
+<meta name="description" content="Install Publy for Obsidian, use the CLI from any Markdown editor, or self-host the draft delivery service.">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header><nav class="wrap nav" aria-label="Main">
+  <a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a>
+  <div class="nav-right">
+    <div class="navlinks">
+      <a href="index.html"><span data-lang="en">Product</span><span data-lang="zh">产品</span></a>
+      <a href="start.html" aria-current="page"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a>
+      <a href="api.html"><span data-lang="en">API</span><span data-lang="zh">API</span></a>
+      <a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a>
+      <a href="https://github.com/turlamai/publy">GitHub</a>
+    </div>
+    <div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
+  </div>
+</nav></header>
+
+<main>
+<section class="wrap hero">
+  <div>
+    <div class="kicker"><span data-lang="en">Start with what you already have</span><span data-lang="zh">从你已有的写作方式开始</span></div>
+    <h1><span data-lang="en">Your Markdown,<br>all the way to a draft.</span><span data-lang="zh">从 Markdown 开始，<br>一直到公众号草稿。</span></h1>
+    <p class="lead"><span data-lang="en">Pick one of four paths. Local preview, rich-text copy and the Obsidian plugin are free. Draft delivery needs a server you control — self-host it with the steps below.</span><span data-lang="zh">四条路径任选其一。本地预览、复制富文本和 Obsidian 插件免费；草稿投递需要一台你自己掌控的服务器，按下面的步骤自托管即可。</span></p>
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/turlamai/publy/releases/download/0.8.7/publy-obsidian-0.8.7.zip"><span data-lang="en">Download the Obsidian plugin</span><span data-lang="zh">下载 Obsidian 插件</span> <span aria-hidden="true">↓</span></a>
+      <a class="btn" href="api.html"><span data-lang="en">Read the API guide</span><span data-lang="zh">查看 API 指南</span> <span aria-hidden="true">→</span></a>
+    </div>
+  </div>
+  <aside class="note">
+    <strong><span data-lang="en">No purchase required.</span><span data-lang="zh">无需付费。</span></strong>
+    <span data-lang="en"> Publy is not selling hosted subscriptions yet. Everything on this page works without a Publy account or payment; a self-hosted server is free.</span>
+    <span data-lang="zh"> Publy 目前不出售托管订阅。本页所有方式都不需要 Publy 账号或付款；自托管服务器免费。</span>
+    <div style="margin-top:10px"><a href="hosted.html" style="font-weight:700"><span data-lang="en">Hosted service status</span><span data-lang="zh">查看托管服务状态</span> →</a></div>
+  </aside>
+</section>
+
+<section class="wrap section">
+  <div class="section-head">
+    <div><div class="kicker"><span data-lang="en">Choose your path</span><span data-lang="zh">选择你的路径</span></div><h2><span data-lang="en">Four ways in.</span><span data-lang="zh">四种上手方式。</span></h2></div>
+    <p><span data-lang="en">The Obsidian plugin is the shortest path for writers. The CLI works with Typora or any folder of Markdown. Self-hosting unlocks draft delivery.</span><span data-lang="zh">写作者走 Obsidian 插件最短；Typora 或任意 Markdown 文件夹可用 CLI；自托管服务器负责真正的草稿投递。</span></p>
+  </div>
+  <div class="grid">
+    <article class="card">
+      <h3><span data-lang="en">1 · Obsidian plugin</span><span data-lang="zh">1 · Obsidian 插件</span> <span class="badge green"><span data-lang="en">recommended</span><span data-lang="zh">推荐</span></span></h3>
+      <p><span data-lang="en">Obsidian desktop 1.5+. Preview and copy work without a server; delivery needs your own Publy server.</span><span data-lang="zh">Obsidian 桌面版 1.5+。预览和复制无需服务器；投递需要你自己的 Publy 服务端。</span></p>
+      <ol>
+        <li><span data-lang="en">Download the ZIP from the 0.8.7 release.</span><span data-lang="zh">从 0.8.7 Release 下载 ZIP。</span></li>
+        <li><span data-lang="en">Unzip into <code>&lt;vault&gt;/.obsidian/plugins/publy/</code> and enable it.</span><span data-lang="zh">解压到 <code>&lt;vault&gt;/.obsidian/plugins/publy/</code> 并启用。</span></li>
+        <li><span data-lang="en">Open a note: preview/copy are local. For drafts, set the server URL and API key in Publy settings.</span><span data-lang="zh">打开笔记即可预览/复制；要投递草稿，在设置里填服务器地址和 API key。</span></li>
+      </ol>
+      <div class="links"><a href="https://github.com/turlamai/publy/releases/tag/0.8.7"><span data-lang="en">0.8.7 release</span><span data-lang="zh">0.8.7 Release</span></a><a href="https://github.com/turlamai/publy/blob/main/packages/obsidian-plugin/README.md"><span data-lang="en">Plugin README</span><span data-lang="zh">插件说明</span></a></div>
+    </article>
+
+    <article class="card">
+      <h3><span data-lang="en">2 · Typora + CLI</span><span data-lang="zh">2 · Typora + CLI</span></h3>
+      <p><span data-lang="en">Keep Typora as the editor; run the CLI on the same file. There is no signed installer yet — build from source with Node 22+ and pnpm.</span><span data-lang="zh">继续用 Typora 写作，CLI 读取同一个文件。目前还没有签名安装包，用 Node 22+ 和 pnpm 从源码构建。</span></p>
+      <pre><code>git clone https://github.com/turlamai/publy.git
+cd publy &amp;&amp; pnpm install --frozen-lockfile &amp;&amp; pnpm -r build
+node packages/cli/dist/index.js check note.md --json
+node packages/cli/dist/index.js preview note.md --json --out /tmp/review.html</code></pre>
+      <div class="links"><a href="https://github.com/turlamai/publy/blob/main/docs/typora.md"><span data-lang="en">Typora guide</span><span data-lang="zh">Typora 指南</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/agent-cli.md"><span data-lang="en">CLI contract</span><span data-lang="zh">CLI 契约</span></a></div>
+    </article>
+
+    <article class="card">
+      <h3><span data-lang="en">3 · Agent / CI</span><span data-lang="zh">3 · Agent / CI</span></h3>
+      <p><span data-lang="en">Every advertised command supports <code>--json</code> with declared prerequisites and approval requirements. Discovery is offline.</span><span data-lang="zh">所有声明命令都支持 <code>--json</code>，并声明前置条件与授权要求；能力发现完全离线。</span></p>
+      <pre><code>publy capabilities --json
+publy check article.md --json
+publy publish article.md --account "My Account" --json</code></pre>
+      <p><span data-lang="en">Agents must obtain explicit approval before creating a draft, retrying or cancelling a job. Unknown outcomes preserve the request ID.</span><span data-lang="zh">Agent 创建草稿、重试或取消任务前必须获得明确授权；结果未知时保留原请求 ID。</span></p>
+      <div class="links"><a href="https://github.com/turlamai/publy/blob/main/skills/publy-publish/SKILL.md"><span data-lang="en">Agent skill</span><span data-lang="zh">Agent 技能</span></a></div>
+    </article>
+
+    <article class="card">
+      <h3><span data-lang="en">4 · Self-host the server</span><span data-lang="zh">4 · 自托管服务器</span> <span class="badge amber"><span data-lang="en">for delivery</span><span data-lang="zh">投递所需</span></span></h3>
+      <p><span data-lang="en">Linux + Node 22/24. The server stores credentials, creates drafts and never publishes publicly. This is the path behind the Obsidian/CLI "publish" action.</span><span data-lang="zh">Linux + Node 22/24。服务端保管凭据、创建草稿，不做公开发布；Obsidian/CLI 的“投递”就是连它。</span></p>
+      <ol>
+        <li><span data-lang="en">Clone and build only the server workspace.</span><span data-lang="zh">克隆并只构建 server 工作区。</span></li>
+        <li><span data-lang="en">Write <code>/etc/publy/server.json</code> (admin key, data dir, WeChat accounts).</span><span data-lang="zh">写 <code>/etc/publy/server.json</code>（admin key、数据目录、公众号账号）。</span></li>
+        <li><span data-lang="en">Install the systemd unit, open <code>/admin</code>, create a user key and test the account.</span><span data-lang="zh">安装 systemd 单元，打开 <code>/admin</code>，创建用户 key 并测试账号连通。</span></li>
+      </ol>
+      <div class="links"><a href="https://github.com/turlamai/publy/blob/main/docs/operations.md"><span data-lang="en">Deployment &amp; recovery</span><span data-lang="zh">部署与恢复</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.md"><span data-lang="en">Operator guide</span><span data-lang="zh">运营者指南</span></a></div>
+    </article>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="hosted">
+    <div>
+      <h2><span data-lang="en">Don't want to run a server?</span><span data-lang="zh">不想自己维护服务器？</span></h2>
+      <p><span data-lang="en">The hosted draft-delivery service is in a private pilot. Registration and payment are not open; there is no checkout and no price list on this site.</span><span data-lang="zh">托管草稿投递服务处于内测阶段，暂不开放注册与付款；本站没有结账入口，也不展示价格。</span></p>
+    </div>
+    <a class="btn" href="hosted.html"><span data-lang="en">See hosted status</span><span data-lang="zh">查看托管状态</span> →</a>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Common questions</span><span data-lang="zh">常见问题</span></div><h2><span data-lang="en">Before your first draft.</span><span data-lang="zh">投第一篇草稿之前。</span></h2></div></div>
+  <div class="grid">
+    <div class="card"><h3><span data-lang="en">Do I need to pay?</span><span data-lang="zh">需要付费吗？</span></h3><p><span data-lang="en">No. Local preview, copying rich text, the plugin and a self-hosted server are free. Hosted delivery is not for sale yet.</span><span data-lang="zh">不需要。本地预览、复制富文本、插件和自托管服务都免费；托管投递尚未开卖。</span></p></div>
+    <div class="card"><h3><span data-lang="en">Does Publy publish automatically?</span><span data-lang="zh">Publy 会自动群发吗？</span></h3><p><span data-lang="en">No. It creates a draft in your own Official Account. Publishing or mass-sending stays a manual decision in WeChat.</span><span data-lang="zh">不会。它只在你自己的公众号里创建草稿；公开或群发仍由你在微信后台决定。</span></p></div>
+    <div class="card"><h3><span data-lang="en">Where do my files go?</span><span data-lang="zh">我的文件会被复制走吗？</span></h3><p><span data-lang="en">They stay in your folders. Publy reads the file you select; it does not create a second notebook.</span><span data-lang="zh">留在原文件夹。Publy 只读取你选中的文件，不会另建一套笔记库。</span></p></div>
+    <div class="card"><h3><span data-lang="en">What about API keys?</span><span data-lang="zh">API key 从哪来？</span></h3><p><span data-lang="en">A self-hosted operator creates local users in the admin console. The hosted service is not issuing public keys yet. See the <a href="api.html">API guide</a>.</span><span data-lang="zh">自托管运营者在后台创建本地用户；托管服务尚未公开发放 key。见 <a href="api.html">API 指南</a>。</span></p></div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap inner">
+  <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">A calmer path from notes to drafts.</span><span data-lang="zh">让笔记到草稿的路更从容。</span></div></div>
+  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md"><span data-lang="en">User guide</span><span data-lang="zh">使用指南</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
+</div></footer>
+<script>
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  if (params.get('lang') === 'zh') { root.lang = 'zh-CN'; document.querySelectorAll('[data-switch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.switch === 'zh'))); }
+  document.querySelectorAll('[data-switch]').forEach(button => button.addEventListener('click', () => {
+    const zh = button.dataset.switch === 'zh';
+    root.lang = zh ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-switch]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    history.replaceState(null, '', zh ? '?lang=zh' : location.pathname);
+  }));
+</script>
+</body>
+</html>
