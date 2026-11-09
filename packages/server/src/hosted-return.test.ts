@@ -13,7 +13,7 @@ function commerceFetcher(privateKey: crypto.KeyObject): typeof fetch {
       format: "JSON", charset: "utf-8", sign_type: "RSA2", timestamp: "2026-11-09 10:00:00",
       version: "1.0", notify_url: "https://example.test/notify", return_url: "https://example.test/hosted/return",
       biz_content: JSON.stringify({ out_trade_no: "ali" + "c".repeat(32), total_amount: "29.00", product_code: "FAST_INSTANT_TRADE_PAY" }) };
-    const canonical = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("&");
+    const canonical = Object.keys(fields).filter((k) => k !== "sign" && k !== "sign_type").sort().map((k) => `${k}=${fields[k]}`).join("&");
     fields.sign = crypto.sign("sha256", Buffer.from(canonical), { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }).toString("base64");
     return Response.json({ status: "checkout-ready", order_id: "ali" + "c".repeat(32),
       gateway: "https://openapi-sandbox.dl.alipaydev.com/gateway.do", fields });
