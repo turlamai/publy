@@ -377,3 +377,14 @@ if (form) form.addEventListener('submit', async function (event) {
 });
 </script></body></html>`;
 }
+
+/** Small result page for the hosted return. It never includes credentials or
+ * payment parameters; the server has already re-checked Commerce/Permit. */
+export function hostedResultPage(title: string, message: string, ok: boolean): string {
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} · Publy</title><style>body{margin:0;background:#f7f8f4;color:#16271e;font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:500 30px/1.2 Georgia,serif;margin:0 0 10px}p{color:#5d6d64}
+.card{background:#fff;border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:#cfe3cd;background:#eef5ec}
+a{color:#176842}</style></head><body><main><h1>${title}</h1><div class="card ${ok ? "ok" : ""}"><p>${message}</p></div>
+<p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">购买页</a></p></main></body></html>`;
+}

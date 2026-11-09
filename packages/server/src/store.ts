@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { HostedIdentityBindings } from "./hosted-identity.js";
+import { HostedEntitlementFence } from "./hosted-entitlement-fence.js";
 
 export type Plan = "free" | "personal" | "studio";
 
@@ -86,6 +87,7 @@ export function newApiKey(): string {
 export class Store {
   private db: DatabaseSync;
   private hostedIdentities: HostedIdentityBindings;
+  private hostedFences: HostedEntitlementFence;
   private secretKey: string | null = null;
 
   constructor(dataDir: string) {
@@ -136,6 +138,13 @@ export class Store {
     `);
     this.migrateImmediateClaims();
     this.hostedIdentities = new HostedIdentityBindings(this.db);
+    this.hostedFences = new HostedEntitlementFence(this.db);
+    this.db.exec(`CREATE TABLE IF NOT EXISTS hosted_purchases (
+      user_id TEXT PRIMARY KEY,
+      offer_id TEXT NOT NULL,
+      request_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`);
   }
 
   /**
@@ -222,6 +231,32 @@ export class Store {
   /** Internal lookup; an absent or disabled user cannot resolve a subject. */
   resolveHostedSubject(userId: string): string | null {
     return this.hostedIdentities.resolve(userId);
+  }
+
+  /** Durable anti-rollback fence; callers must still verify current proof. */
+  hostedFence(): HostedEntitlementFence {
+    return this.hostedFences;
+  }
+
+  /** Remember the most recent offer used to start a Commerce checkout. This
+   * selects the Proof scope later; it is not payment evidence. */
+  recordHostedPurchase(userId: string, offerId: string, requestId: string): void {
+    this.db.prepare(`INSERT INTO hosted_purchases(user_id, offer_id, request_id, created_at)
+      VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET offer_id=excluded.offer_id,
+      request_id=excluded.request_id, created_at=excluded.created_at`).run(userId, offerId, requestId, Date.now());
+  }
+
+  latestHostedOffer(userId: string): string | null {
+    const row = this.db.prepare("SELECT offer_id FROM hosted_purchases WHERE user_id = ?").get(userId) as { offer_id: string } | undefined;
+    return row?.offer_id ?? null;
+  }
+
+  /** Set the paid plan to the verified Permit paid-through instant. The
+   * caller must have verified a current Commerce proof; this is a local cache,
+   * not payment evidence or authorization by itself. */
+  setPlanUntil(userId: string, plan: Exclude<Plan, "free">, expiresAt: number): void {
+    if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) throw new Error("PLAN_EXPIRY_INVALID");
+    this.db.prepare("UPDATE users SET plan = ?, expires_at = ? WHERE id = ?").run(plan, expiresAt, userId);
   }
 
   /** paid expiry extension: adds months from the later of now / current expiry */

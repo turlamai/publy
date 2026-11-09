@@ -64,3 +64,42 @@ real Alipay order; it does not by itself grant hosted rights.
 `packages/server/src/hosted-purchase.test.ts` covers config parsing, secret
 non-disclosure, signup gating/duplicates, page closed/open states and a signed
 Commerce checkout response.
+
+## Admission / activation (current slice)
+
+`hostedAdmission` is a second, independent config block:
+
+```json
+{
+  "hostedAdmission": {
+    "endpoint": "https://commerce.example.com/v1/hosted/proof",
+    "serviceId": "publy",
+    "secretFile": "/etc/publy/commerce.hmac",
+    "issuer": "example",
+    "offerId": "publy-personal-monthly",
+    "racketExecutable": "/usr/bin/racket",
+    "verifierScript": "/opt/publy/racket/publy-hosted-admission-cli.rkt",
+    "trustStore": "/etc/publy/permit-trust.json",
+    "enroll": false
+  }
+}
+```
+
+When set, a non-admin user on `personal`/`studio` must pass a current
+Commerce proof plus the local Permit admission check before **every** immediate
+publish and again when a scheduled job starts. The proof is queried for the
+offer most recently recorded by `/v1/hosted/checkout` (falling back to the
+configured `offerId`), and a durable fence rejects lower revisions, lineage
+changes and replay.
+
+`GET /hosted/return` (set `hostedCheckout.returnUrl` to it) can sync the local
+plan after payment. It uses an HttpOnly, one-hour, in-memory session cookie,
+re-queries Commerce for that exact offer, verifies the Permit edition at the
+current time, and only then sets `users.plan/expires_at`. A URL return alone
+never grants anything. Sessions do not survive a server restart; a paid user
+whose return was lost is recovered by the operator (durable claim sessions are
+a later slice).
+
+The existing monthly user usage counter is still the quota source; the hosted
+quota ledger is not yet wired. Do not open sales until the sandbox drill and
+the quota slice pass.
