@@ -20,7 +20,8 @@ import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, Wech
 import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
 import { requestHostedCheckout } from "./commerce-checkout-request.js";
-import { purchasePage } from "./pages.js";
+import { purchasePage, hostedPurchasePage } from "./pages.js";
+import { HOSTED_OFFERS, isHostedOfferId } from "./hosted-offers.js";
 import { adminPage } from "./admin-page.js";
 
 export interface ServerAccount {
@@ -51,6 +52,14 @@ export interface ServerConfig {
   sandboxCheckout?: {
     endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
     appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
+    fetcher?: typeof fetch;
+  };
+  /** Production/sandbox Commerce checkout. Read from server.json only when
+   *  secretFile exists; the secret is never returned or logged. */
+  hostedCheckout?: {
+    endpoint: string; serviceId: string; secret: Uint8Array; issuer: string;
+    appId: string; merchantPublicKeyPem: string; notifyUrl: string; returnUrl: string;
+    environment: "sandbox" | "production";
     fetcher?: typeof fetch;
   };
   payments?: {
@@ -138,6 +147,44 @@ export function loadServerConfig(configPath?: string): ServerConfig {
     publicIp: raw.publicIp,
     secretKey: raw.secretKey,
     payments: raw.payments,
+    hostedCheckout: loadHostedCheckout(raw.hostedCheckout, file),
+  };
+}
+
+function loadHostedCheckout(raw: unknown, configFile: string): ServerConfig["hostedCheckout"] {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`server config ${configFile} hostedCheckout must be an object`);
+  }
+  const value = raw as Record<string, unknown>;
+  const text = (key: string): string => {
+    const v = value[key];
+    if (typeof v !== "string" || !v.trim()) throw new Error(`hostedCheckout.${key} must be a non-empty string`);
+    return v;
+  };
+  const endpoint = new URL(text("endpoint"));
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(endpoint.hostname);
+  if ((endpoint.protocol !== "https:" && !(loopback && endpoint.protocol === "http:")) ||
+      endpoint.pathname !== "/v1/hosted/alipay-checkout" || endpoint.search || endpoint.username || endpoint.password) {
+    throw new Error("hostedCheckout.endpoint must be an absolute /v1/hosted/alipay-checkout URL (https unless loopback)");
+  }
+  for (const key of ["notifyUrl", "returnUrl"]) {
+    const url = new URL(text(key));
+    if (url.protocol !== "https:") throw new Error(`hostedCheckout.${key} must be https`);
+  }
+  const environment = text("environment");
+  if (environment !== "sandbox" && environment !== "production") {
+    throw new Error("hostedCheckout.environment must be sandbox or production");
+  }
+  const secretFile = text("secretFile");
+  if (!path.isAbsolute(secretFile)) throw new Error("hostedCheckout.secretFile must be an absolute path");
+  let secret: Buffer;
+  try { secret = fs.readFileSync(secretFile); } catch { throw new Error("hostedCheckout.secretFile is not readable"); }
+  if (secret.length < 32 || secret.length > 128) throw new Error("hostedCheckout secret must be 32-128 raw bytes");
+  return {
+    endpoint: endpoint.toString(), serviceId: text("serviceId"), secret, issuer: text("issuer"),
+    appId: text("appId"), merchantPublicKeyPem: text("merchantPublicKeyPem"),
+    notifyUrl: text("notifyUrl"), returnUrl: text("returnUrl"), environment,
   };
 }
 
@@ -499,7 +546,8 @@ export function buildApp(config: ServerConfig) {
   app.addHook("onRequest", async (req, reply) => {
     // the /admin page SHELL is public (it's just html); its data endpoints
     // (/v1/admin/*) still require the admin key
-    if (req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
+    if (req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
+        req.url === "/v1/signup" || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
     const caller = auth(req.headers["x-api-key"] as string | undefined);
     if (!caller) {
       await reply.code(401).send({ code: "UNAUTHORIZED", message: "Invalid API key" });
@@ -530,6 +578,10 @@ export function buildApp(config: ServerConfig) {
     ? reply.type("text/html").send(purchasePage(config.publicIp ?? "（探测中，稍后刷新可见）"))
     : reply.type("text/html").send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Publy</title><body><main><h1>Publy</h1><p>Local preview, CLI and self-hosted publishing are available. Public hosted subscriptions are not open.</p><a href="https://github.com/turlamai/publy">Source and documentation</a></main></body></html>'));
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
+  app.get("/hosted", async (_req, reply) => {
+    reply.header("cache-control", "no-store");
+    return reply.type("text/html").send(hostedPurchasePage(Boolean(config.hostedCheckout), config.publicUrl));
+  });
 
   // The disabled path must never initialize a configured external gateway.
   const payments = createProvider(legacyCheckoutEnabled ? config.payments : { provider: "manual" }, store, (order) => {
@@ -625,23 +677,49 @@ export function buildApp(config: ServerConfig) {
     return { plan: caller.user.plan, used: store.getUsage(caller.user), limit, expiresAt: caller.user.expiresAt || undefined };
   });
 
+  // Public, rate-limited account creation for the hosted purchase flow. It
+  // only exists when a Commerce checkout is configured; a free key alone never
+  // grants paid rights. Duplicate contacts fail closed instead of leaking a key.
+  const signupAttempts = new Map<string, number[]>();
+  app.post<{ Body: unknown }>("/v1/signup", async (req, reply) => {
+    const hosted = config.hostedCheckout;
+    if (!hosted) return reply.code(503).send({ code: "SIGNUP_NOT_AVAILABLE", message: "hosted purchase is not configured" });
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).sort().join(",") !== "contact") {
+      return reply.code(400).send({ code: "BAD_SIGNUP_REQUEST" });
+    }
+    const contact = (body as Record<string, unknown>).contact;
+    if (typeof contact !== "string" || !/^\S{3,120}$/.test(contact)) {
+      return reply.code(400).send({ code: "BAD_CONTACT" });
+    }
+    const now = Date.now();
+    const ip = req.ip || "unknown";
+    const attempts = (signupAttempts.get(ip) ?? []).filter((t) => now - t < 3600_000);
+    if (attempts.length >= 5) return reply.code(429).send({ code: "RATE_LIMITED" });
+    attempts.push(now);
+    signupAttempts.set(ip, attempts);
+    if (store.findUserByContact(contact)) return reply.code(409).send({ code: "CONTACT_TAKEN" });
+    const user = store.createUser(contact, "free", 1);
+    const subject = store.enrollHostedSubject(user.id);
+    audit({ event: "hosted-signup", userId: user.id });
+    reply.header("cache-control", "no-store");
+    return { userId: user.id, apiKey: user.apiKey, subject };
+  });
+
   // Sandbox-only integration seam: no configuration file can enable this
   // route. It prepares a signed order, never confirms payment or grants rights.
   const sandboxCheckoutAttempts = new Map<string, number[]>();
   app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
     const sandbox = config.sandboxCheckout;
-    if (!sandbox) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
+    if (!sandbox && !config.hostedCheckout) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
     const caller = (req as unknown as { caller: Caller }).caller;
     if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).sort().join(",") !== "offer,requestId") return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
     const value = body as Record<string, unknown>;
-    const offers: Record<string, number> = Object.freeze({
-      "publy-personal-monthly": 2900, "publy-personal-annual": 29000,
-      "publy-studio-monthly": 7900, "publy-studio-annual": 79000,
-    });
-    if (typeof value.offer !== "string" || !Object.hasOwn(offers, value.offer) ||
+    if (!isHostedOfferId(value.offer) ||
         typeof value.requestId !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.requestId)) {
       return reply.code(400).send({ code: "BAD_CHECKOUT_REQUEST" });
     }
@@ -654,9 +732,11 @@ export function buildApp(config: ServerConfig) {
     sandboxCheckoutAttempts.set(caller.user.id, attempts);
     // Namespacing prevents one user's request ID from colliding with another's.
     const requestId = crypto.createHash("sha256").update(subject).update("\0").update(value.requestId).digest("hex");
+    const checkout = (config.hostedCheckout ?? sandbox)!;
     const result = await requestHostedCheckout({
-      ...sandbox, environment: "sandbox", requestId, amountFen: offers[value.offer],
-      scope: { issuer: sandbox.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
+      ...checkout, environment: config.hostedCheckout ? config.hostedCheckout.environment : "sandbox",
+      requestId, amountFen: HOSTED_OFFERS[value.offer].fen,
+      scope: { issuer: checkout.issuer, subjectType: "account", subjectId: subject, offerId: value.offer, productId: "publy" },
     });
     reply.header("cache-control", "no-store");
     return result.status === "ready" ? result : reply.code(503).send({ code: "CHECKOUT_OUTCOME_UNKNOWN" });
