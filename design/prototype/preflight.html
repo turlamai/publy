@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publy — 发布前检查（失败态）原型</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 发布前检查报告：失败态（fix）+ 警告（warn）+ 通过项 ==== */
+  .leafsub { font-size: 11.5px; color: var(--mute); padding: 8px 16px 0; }
+  .leafsub b { color: var(--ink); font-weight: 600; }
+  .toolbar .tbtn.primary:disabled { opacity: .6; pointer-events: none; }
+  .pf-list { margin: 10px 12px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .pf { display: flex; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .pf:last-child { border-bottom: none; }
+  .pf .ic { width: 18px; flex: none; text-align: center; font-size: 13px; font-weight: 700; line-height: 1.5; }
+  .pf.is-pass .ic { color: var(--accent); }
+  .pf.is-warn .ic { color: var(--amber); }
+  .pf.is-fail .ic { color: var(--danger); }
+  .pf .main { flex: 1; min-width: 0; }
+  .pf .tt { font-size: 13px; font-weight: 600; }
+  .pf.is-fail .tt { color: var(--danger); }
+  .pf.is-warn .tt { color: var(--amber); }
+  .pf .dd { font-size: 12px; color: var(--mute); margin-top: 2px; line-height: 1.55; overflow-wrap: anywhere; }
+  .pf .dd code { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg-alt); border-radius: 4px; padding: 1px 4px; }
+  .pf .dd .act { margin-top: 6px; display: inline-flex; }
+  .pf .dd .tbtn { font-size: 12px; padding: 3px 10px; }
+  .pf.is-fail { background: rgba(229,72,77,.04); }
+  .dark .pf.is-fail { background: rgba(248,113,113,.05); }
+  .sumline { margin: 0 12px 14px; padding: 8px 12px; border-radius: 8px; background: var(--bg-alt); font-size: 12px; color: var(--mute); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .sumline b { font-weight: 600; }
+  .sumline .n-fail { color: var(--danger); } .sumline .n-warn { color: var(--amber); } .sumline .n-pass { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="tabbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="tabs">
+        <div class="tab">手冲参数速查表.md</div>
+        <div class="tab active">居家咖啡指南.md</div>
+      </div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="split">
+      <section class="editor">
+        <div class="src">
+          <div class="fm">---<br><span class="tag">title:</span> 居家咖啡指南：从磨豆到第一杯手冲<br><span class="tag">cover:</span> assets/cover.png<br>---</div>
+          <h1>居家咖啡指南：从磨豆到第一杯手冲</h1>
+          <p>很多人以为好咖啡靠设备，其实前三杯靠的是三个数字……</p>
+          <h2>水粉比是第一性原理</h2>
+          <p>先记住 <code>1:15</code>——15 克粉配 225 克水……</p>
+          <div class="fm">![[brew/水流.jpg]] &nbsp; ![[brew/闷蒸.svg]] &nbsp; ![[brew/注水圈.jpg]] &nbsp; ![[brew/成品.jpg]]</div>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="leafhead">
+          <span class="vt">✓ 发布前检查</span>
+          <span class="sp"></span>
+          <button class="iconbtn" title="重新检查">↻</button>
+        </div>
+        <div class="leafsub">检查 <b>居家咖啡指南.md</b> · 14:32 · 本地运行，不联网</div>
+        <div class="body">
+          <div class="strip is-error" role="alert">
+            <span>✕</span><span>素材未就绪，草稿未发送。修复 1 项后重新检查。</span>
+          </div>
+          <div class="toolbar" style="position:static;border-top:none;">
+            <span class="sp"></span>
+            <button class="tbtn primary" disabled title="存在未修复项时投递被拦截">➤ 投递「TuringLambdaAI」草稿箱</button>
+          </div>
+          <div class="pf-list">
+            <div class="pf is-fail">
+              <span class="ic">✕</span>
+              <div class="main">
+                <div class="tt">封面</div>
+                <div class="dd">frontmatter <code>cover: assets/cover.png</code> 指向的文件不存在，也没有可用的正文首图。</div>
+                <div class="dd"><span class="act"><button class="tbtn">选择封面…</button></span></div>
+              </div>
+            </div>
+            <div class="pf is-warn">
+              <span class="ic">⚠</span>
+              <div class="main">
+                <div class="tt">SVG 补白底</div>
+                <div class="dd">图 2 <code>brew/闷蒸.svg</code> 是透明背景，已自动补白底——公众号会把透明渲染成黑色。</div>
+              </div>
+            </div>
+            <div class="pf is-warn">
+              <span class="ic">⚠</span>
+              <div class="main">
+                <div class="tt">长度</div>
+                <div class="dd">6,842 字，预计阅读 9 分钟。建议拆成系列，或把开头压缩到 300 字内。</div>
+              </div>
+            </div>
+            <div class="pf is-pass">
+              <span class="ic">✓</span>
+              <div class="main">
+                <div class="tt">图片引用</div>
+                <div class="dd">正文 4 张图片全部在本地找到（源目录 + 附件目录），嵌套路径保持原样。</div>
+              </div>
+            </div>
+            <div class="pf is-pass">
+              <span class="ic">✓</span>
+              <div class="main">
+                <div class="tt">脚注</div>
+                <div class="dd">6 个外链已转为文末脚注（默认开启，<code>--no-footnote</code> 可关闭）。</div>
+              </div>
+            </div>
+            <div class="pf is-pass">
+              <span class="ic">✓</span>
+              <div class="main">
+                <div class="tt">敏感元素</div>
+                <div class="dd">未发现诱导分享文案、二维码截图或违规词。</div>
+              </div>
+            </div>
+          </div>
+          <div class="sumline">
+            <b class="n-fail">1 项需修复</b>·<b class="n-warn">2 项建议复核</b>·<b class="n-pass">3 项通过</b>
+            <span>· 原文未修改 · 未创建草稿</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="statusbar">
+      <span>本地检查 · 未联网 · 原文未修改</span>
+      <span class="sp"></span>
+      <span>Obsidian · Publy 0.8.7</span>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publy — 预览面板（文章）原型</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 预览面板·文章（英雄屏） ==== */
+  .canvas { background: var(--bg-alt); padding: 20px 12px 32px; }
+  .paper {
+    max-width: 100%; margin: 0 auto; background: var(--paper); color: var(--paper-ink);
+    border-radius: 10px; padding: 24px 22px 30px; box-shadow: var(--shadow-paper);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .paper .title { margin: 0 0 12px; font-size: 21px; font-weight: 600; line-height: 1.4; letter-spacing: .01em; color: var(--paper-ink); }
+  .paper .meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .paper .avatar { width: 20px; height: 20px; border-radius: 50%; background: rgba(183,92,61,.12); color: var(--wx-avatar); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .paper .acct { font-size: 13px; color: var(--wx-link); }
+  .paper .author { font-size: 13px; color: #999999; }
+  .paper .pill { margin-left: auto; font-size: 11px; color: #b0b0b0; background: #f6f6f6; border-radius: 999px; padding: 2px 9px; flex: none; }
+  .paper .hairline { height: 1px; background: var(--paper-line); margin: 14px 0 18px; }
+  .paper .body { font-size: 15px; line-height: 1.6; }
+  .paper .body p { margin: 0 0 14px; }
+  .paper .body h2 { font-size: 17px; margin: 22px 0 10px; line-height: 1.4; }
+  .paper .body ul { margin: 0 0 14px; padding-left: 22px; }
+  .paper .body li { margin: 4px 0; }
+  .paper .body blockquote { border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--paper-ink); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 0 0 14px; font-size: 14px; }
+  .paper .body code { font-size: 13px; background: #f6f6f6; border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .paper .body sup { color: var(--wx-link); font-size: 11px; }
+  .imgph {
+    height: 150px; border-radius: 8px; margin: 0 0 4px;
+    background: linear-gradient(135deg, #3d3126, #6b5335 60%, #8a6a3e);
+    display: flex; align-items: flex-end; justify-content: flex-start; color: rgba(255,255,255,.85); font-size: 11px; padding: 8px 10px;
+  }
+  .figcap { font-size: 12px; color: #999999; margin: 0 0 14px; }
+  .fnotes { border-top: 1px solid var(--paper-line); margin-top: 20px; padding-top: 10px; font-size: 12.5px; color: #888888; line-height: 1.7; }
+  .fnotes a { color: var(--wx-link); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="tabbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="tabs">
+        <div class="tab">手冲参数速查表.md</div>
+        <div class="tab active">居家咖啡指南.md</div>
+      </div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="split">
+      <section class="editor">
+        <div class="src">
+          <h1>居家咖啡指南：从磨豆到第一杯手冲</h1>
+          <p>很多人以为好咖啡靠设备，其实前三杯靠的是三个数字。这篇文章只讲能把家用手冲提升一个档位的最小改动。</p>
+          <h2>水粉比是第一性原理<sup>[1]</sup></h2>
+          <p>先记住 <code>1:15</code>——15 克粉配 225 克水。偏浓往 1:16 走，偏淡往 1:14 回，每次只动一个变量。</p>
+          <ul>
+            <li>研磨度：白砂糖颗粒感（中细）</li>
+            <li>水温：92°C，深烘降到 88°C</li>
+            <li>时间：两段式注水，总时长 2 分 30 秒</li>
+          </ul>
+          <div class="imgph">cover.jpg · 1200×800</div>
+          <div class="figcap">图 1 · 注水从中心开始，绕圈到边缘</div>
+          <blockquote>参数是起点不是终点：同一支豆子，换个烘焙度就要重新校准。</blockquote>
+          <div class="fnotes">
+            <div>[1] <a href="#">SCA 冲煮控制表 · sca.coffee</a></div>
+            <div>[2] <a href="#">三段式注水手法详解 · example.com/brewing</a></div>
+          </div>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="leafhead">
+          <span class="vt">➤ Publy 预览</span>
+          <span class="sp"></span>
+          <button class="iconbtn" title="打开发布历史与待发任务">≡</button>
+        </div>
+        <div class="toolbar">
+          <button class="tbtn" title="重新渲染预览">↻</button>
+          <button class="tbtn" title="复制排版 rich text">⧉</button>
+          <div class="segpill" title="手机宽（390px）——公众号读者大多在手机">
+            <button class="seg on">390</button>
+            <button class="seg">700</button>
+          </div>
+          <select class="tsel" title="本次发布形式"><option>跟随文档（文章）</option></select>
+          <select class="tsel" title="文章主题（切换即时重渲染）"><option>Claude</option></select>
+          <span class="sp"></span>
+          <button class="tbtn primary"><span>➤</span><span>投递「TuringLambdaAI」草稿箱</span></button>
+        </div>
+        <div class="body">
+          <div class="strip is-ok" role="status">
+            <span>✓</span><span>已进草稿箱——《居家咖啡指南》→「TuringLambdaAI」（6.2 秒）</span>
+          </div>
+          <div class="canvas">
+            <div class="paper">
+              <div class="title">居家咖啡指南：从磨豆到第一杯手冲</div>
+              <div class="meta-row">
+                <span class="avatar">T</span>
+                <span class="acct">TuringLambdaAI</span>
+                <span class="author">阿稳</span>
+                <span class="pill">草稿预览</span>
+              </div>
+              <div class="hairline"></div>
+              <div class="body">
+                <p>很多人以为好咖啡靠设备，其实前三杯靠的是三个数字。这篇文章只讲能把家用手冲提升一个档位的最小改动。</p>
+                <h2>水粉比是第一性原理<sup>[1]</sup></h2>
+                <p>先记住 <code>1:15</code>——15 克粉配 225 克水。偏浓往 1:16 走，偏淡往 1:14 回，每次只动一个变量。</p>
+                <ul>
+                  <li>研磨度：白砂糖颗粒感（中细）</li>
+                  <li>水温：92°C，深烘降到 88°C</li>
+                  <li>时间：两段式注水，总时长 2 分 30 秒</li>
+                </ul>
+                <div class="imgph">cover.jpg · 1200×800</div>
+                <div class="figcap">图 1 · 注水从中心开始，绕圈到边缘</div>
+                <blockquote>参数是起点不是终点：同一支豆子，换个烘焙度就要重新校准。</blockquote>
+                <p>更多背景与手法对比见文末脚注<sup>[2]</sup>。改完一个参数，先冲三杯再评价。</p>
+              </div>
+              <div class="fnotes">
+                <div>[1] <a href="#">SCA 冲煮控制表 · sca.coffee</a></div>
+                <div>[2] <a href="#">三段式注水手法详解 · example.com/brewing</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="statusbar">
+      <span>本地预览 · 未联网 · 原文未修改</span>
+      <span class="sp"></span>
+      <span>Obsidian · Publy 0.8.7</span>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publy — 设置与连接原型</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== Obsidian 设置弹窗内的 Publy 设置页（凭据托管状态） ==== */
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; z-index: 20; }
+  .dbox { width: 620px; max-width: calc(100% - 48px); height: 640px; background: var(--bg); color: var(--ink); border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.35); display: flex; flex-direction: column; overflow: hidden; }
+  .dhead { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .dhead .crumb { font-size: 13px; color: var(--mute); }
+  .dhead .crumb b { color: var(--ink); font-weight: 600; }
+  .dhead .sp { flex: 1; }
+  .dbody { flex: 1; overflow-y: auto; padding: 4px 20px 20px; }
+  .intro { background: var(--bg-alt); border-radius: 8px; padding: 12px 14px; margin: 14px 0 4px; font-size: 12.5px; line-height: 1.9; color: var(--ink); opacity: .92; }
+  .intro b { font-weight: 600; }
+  .sgrp { margin-top: 18px; }
+  .sgrp > h2 { font-size: 12px; font-weight: 700; letter-spacing: .6px; color: var(--mute); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .frow { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+  .frow:last-child { border-bottom: none; }
+  .frow .fl { font-size: 13.5px; }
+  .frow .fd { font-size: 12px; color: var(--mute); margin-top: 2px; line-height: 1.5; }
+  .frow .sp { flex: 1; }
+  .input { flex: 1; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--mute); font-size: 13px; display: flex; align-items: center; min-width: 0; }
+  .input.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .drop { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font-size: 13px; display: inline-flex; align-items: center; gap: 10px; }
+  .drop::after { content: "▾"; color: var(--mute); font-size: 11px; }
+  .keyrow { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .connres { font-size: 12.5px; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+  .connres .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .switch { width: 36px; height: 22px; border-radius: 999px; background: var(--line); position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 2px; left: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 16px; }
+  .custody { display: flex; gap: 10px; margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: var(--accent-soft); font-size: 12.5px; line-height: 1.7; color: var(--ink); }
+  .custody .ic { color: var(--accent); font-weight: 700; flex: none; }
+  .custody b { font-weight: 600; }
+  .custody code { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="tabbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="tabs"><div class="tab active">居家咖啡指南.md</div></div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="split">
+      <section class="editor">
+        <div class="src">
+          <h1>居家咖啡指南：从磨豆到第一杯手冲</h1>
+          <p>很多人以为好咖啡靠设备，其实前三杯靠的是三个数字……</p>
+          <p>面板被设置弹窗临时遮挡；关闭后预览恢复。</p>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="leafhead"><span class="vt">➤ Publy 预览</span></div>
+        <div class="body"><div class="empty" style="min-height:50vh;">
+          <div class="eicon">➤</div>
+          <div>预览将在设置关闭后恢复</div>
+        </div></div>
+      </aside>
+    </div>
+    <div class="overlay">
+      <div class="dbox">
+        <div class="dhead">
+          <span class="crumb">设置 › <b>Publy</b></span>
+          <span class="sp"></span>
+          <button class="iconbtn" title="关闭">✕</button>
+        </div>
+        <div class="dbody">
+          <div class="intro"><b>本地预览和复制富文本无需服务或账号。</b>若要保存到公众号草稿箱，先配置自己的 Publy 服务端、API key 和公众号账号，再测试连接；当前不提供可购买的托管服务。</div>
+          <div class="sgrp">
+            <h2>连接</h2>
+            <div class="frow">
+              <div><div class="fl">Server 地址</div><div class="fd">Publy 服务地址，带协议</div></div>
+              <div class="input mono">https://publy.example.com</div>
+            </div>
+            <div class="frow">
+              <div style="min-width:0;"><div class="fl">API key</div><div class="fd">只保存在本机 vault 配置里</div></div>
+              <div class="keyrow">
+                <div class="input mono">publy_••••••••••••••••3f7a</div>
+                <button class="tbtn">测试连接</button>
+              </div>
+            </div>
+            <div class="frow">
+              <div class="connres"><span class="dot"></span>连接正常 — 套餐 pilot · 本月 6/30 篇</div>
+            </div>
+          </div>
+          <div class="sgrp">
+            <h2>账号与素材</h2>
+            <div class="frow">
+              <div><div class="fl">公众号账号名</div><div class="fd">服务端绑定的账号名；投递按钮按它显式命名目标</div></div>
+              <div class="sp"></div>
+              <div class="drop">TuringLambdaAI</div>
+            </div>
+            <div class="frow">
+              <div><div class="fl">媒体目录</div><div class="fd">本地图片查找目录；留空 = 跟随 vault 附件设置</div></div>
+              <div class="input">自动（vault 附件目录）</div>
+            </div>
+            <div class="frow">
+              <div><div class="fl">文章主题</div><div class="fd">切换即时重渲染；CLI 安装的主题重开后可选</div></div>
+              <div class="sp"></div>
+              <div class="drop">Claude</div>
+            </div>
+          </div>
+          <div class="sgrp">
+            <h2>预览行为</h2>
+            <div class="frow">
+              <div><div class="fl">打开笔记时自动预览</div><div class="fd">高频预览零交互；预览面板已开时切换笔记自动跟随</div></div>
+              <div class="sp"></div>
+              <div class="switch on"></div>
+            </div>
+            <div class="frow">
+              <div><div class="fl">界面语言</div><div class="fd">自动跟随 Obsidian 界面语言</div></div>
+              <div class="sp"></div>
+              <div class="drop">自动</div>
+            </div>
+          </div>
+          <div class="custody">
+            <span class="ic">◆</span>
+            <div><b>凭据托管</b>：API key 只存本机 vault，不进同步盘；公众号 AppSecret 只存在于你的自托管服务端（<code>server.json</code>），加密托管、永不下发。预览与检查全程不联网。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar">
+      <span>设置 · 本地预览免费 · 托管订阅未开放</span>
+      <span class="sp"></span>
+      <span>Obsidian · Publy 0.8.7</span>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

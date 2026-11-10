@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publy — 发布历史与待发任务原型</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 发布历史面板：待发队列（空）+ 最近记录（四态节点）==== */
+  .ti .kind { font-size: 11px; color: var(--mute); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; flex: none; }
+  .ti.is-unknown .ic { color: var(--amber); }
+  .ti .warnsub { font-size: 12px; color: var(--amber); margin-top: 2px; line-height: 1.5; }
+  .ti .errsub { font-size: 12px; color: var(--danger); margin-top: 2px; overflow-wrap: anywhere; }
+  .conn { margin: 4px 12px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 12px; }
+  .conn .row1 { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+  .conn .quota { margin-left: auto; font-weight: 400; color: var(--mute); }
+  .conn .row2 { margin-top: 6px; color: var(--mute); line-height: 1.6; }
+  .conn code { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg-alt); border-radius: 4px; padding: 1px 4px; }
+  .ti .acts { display: inline-flex; gap: 6px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="tabbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="tabs">
+        <div class="tab active">手冲参数速查表.md</div>
+        <div class="tab">居家咖啡指南.md</div>
+      </div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="split">
+      <section class="editor">
+        <div class="src">
+          <h1>手冲参数速查表</h1>
+          <p>按烘焙度查参数：浅烘 93°C / 1:16，中烘 92°C / 1:15，深烘 88°C / 1:14。</p>
+          <h2>注水节奏</h2>
+          <p>闷蒸 30 秒 → 第一段绕圈到 150 克 → 等水位下降 → 第二段到 225 克。</p>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="leafhead">
+          <span class="vt">≡ Publy 发布历史</span>
+          <span class="sp"></span>
+          <button class="iconbtn" title="刷新">↻</button>
+        </div>
+        <div class="body">
+          <div class="sect">待发任务（0）</div>
+          <div class="mutedline">没有待发的定时任务。右键笔记或用命令面板可排期。</div>
+          <div class="sect">最近记录</div>
+          <div class="tl">
+            <div class="ti is-ok">
+              <div class="main">
+                <div class="t">手冲参数速查表</div>
+                <div class="sub">11-10 21:32 · TuringLambdaAI · 已进草稿箱</div>
+              </div>
+              <span class="kind">文章</span>
+            </div>
+            <div class="ti is-wait">
+              <div class="main">
+                <div class="t">居家咖啡指南</div>
+                <div class="sub">已排期 11-12 09:00 · TuringLambdaAI</div>
+                <div class="acts"><button class="tbtn">取消任务</button></div>
+              </div>
+              <span class="kind">文章</span>
+            </div>
+            <div class="ti is-unknown">
+              <div class="main">
+                <div class="t">磨豆机选购避坑</div>
+                <div class="sub">11-09 14:02 · 结果未知 — 草稿可能已创建</div>
+                <div class="warnsub">先核对公众号草稿箱，不要直接重发。</div>
+                <div class="acts"><button class="tbtn">查询结果</button><button class="tbtn">重试原请求</button></div>
+              </div>
+              <span class="kind">文章</span>
+            </div>
+            <div class="ti is-fail">
+              <div class="main">
+                <div class="t">设备清洁指南</div>
+                <div class="sub">11-08 20:15 · 发布失败 — 服务端明确拒绝</div>
+                <div class="errsub">QUOTA_EXCEEDED · 本月配额已用完，下月 1 日重置</div>
+              </div>
+              <span class="kind">文章</span>
+            </div>
+            <div class="ti is-ok">
+              <div class="main">
+                <div class="t">拉花新手常见误区</div>
+                <div class="sub">11-07 09:00 · TuringLambdaAI · 已进草稿箱</div>
+              </div>
+              <span class="kind">图片消息</span>
+            </div>
+          </div>
+          <div class="conn">
+            <div class="row1"><span class="dot"></span>已连接 <span class="quota">套餐 pilot · 本月 30/30 篇 · 已达上限</span></div>
+            <div class="row2">服务 <code>https://publy.example.com</code> · API key 只存本机 vault · 公众号 AppSecret 由服务端加密托管，永不下发。</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="statusbar">
+      <span>投递结果指回提交时的目标账号与标题 · 超时不算失败</span>
+      <span class="sp"></span>
+      <span>Obsidian · Publy 0.8.7</span>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

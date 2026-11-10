@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Publy — 预览面板（图片消息拼版）原型</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 预览面板·图片消息（渐进渲染进行态 6/9） ==== */
+  .canvas { background: var(--bg-alt); padding: 20px 12px 32px; }
+  .strip-of-cards { display: flex; gap: 16px; overflow-x: auto; width: fit-content; max-width: 100%; margin: 0 auto; padding: 4px 4px 16px; }
+  .card {
+    width: 150px; height: 200px; flex: none; border-radius: 12px; background: #f8f6f0; color: #2b2620;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 12px 32px rgba(0,0,0,.18);
+    padding: 18px 16px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; font-family: inherit;
+  }
+  .card .wm { position: absolute; right: 10px; bottom: 8px; font-size: 9px; letter-spacing: .18em; color: #c9c2b4; font-weight: 600; }
+  .card .pg { position: absolute; right: 10px; top: 10px; font-size: 9.5px; color: #b3ab99; }
+  .card .bar { width: 26px; height: 3px; background: #07c160; border-radius: 2px; margin-bottom: 12px; }
+  .card.cover { justify-content: center; }
+  .card.cover .k { font-size: 9.5px; letter-spacing: .3em; color: #b3ab99; margin-bottom: 10px; }
+  .card.cover .big { font-size: 21px; font-weight: 700; line-height: 1.35; }
+  .card.cover .sub { font-size: 11px; color: #8d8471; margin-top: 12px; line-height: 1.6; }
+  .card .pt { font-size: 15px; font-weight: 600; line-height: 1.5; }
+  .card .ptd { font-size: 11.5px; color: #8d8471; margin-top: 8px; line-height: 1.7; }
+  .card.dense { justify-content: flex-start; padding-top: 30px; }
+  .card.dense .li { font-size: 11.5px; line-height: 1.5; padding: 6px 0; border-bottom: 1px dashed #e3ddcd; display: flex; gap: 6px; }
+  .card.dense .li:last-child { border-bottom: none; }
+  .card.dense .li b { color: #07c160; font-weight: 700; }
+  .card.ending .big2 { font-size: 16px; font-weight: 700; line-height: 1.5; }
+  .card.ending .cta { font-size: 11px; color: #07c160; margin-top: 10px; }
+  /* 未渲染完成的骨架：进度可感知 */
+  .card.skel { background: var(--bg-alt); border: 1px dashed var(--line); box-shadow: none; }
+  .card.skel .ln { height: 10px; border-radius: 5px; background: var(--line); margin: 8px 0; animation: pulse 1.2s ease infinite; }
+  .card.skel .ln:nth-child(2) { width: 70%; } .card.skel .ln:nth-child(4) { width: 50%; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .counter {
+    max-width: 100%; margin: 0 auto 12px; width: fit-content; font-size: 13px; color: var(--accent);
+    background: var(--accent-soft); border-radius: 999px; padding: 4px 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .counter .mini { width: 12px; height: 12px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: rotate .7s linear infinite; }
+  .caption {
+    max-width: 100%; margin: 0 auto; background: var(--paper); color: var(--paper-ink);
+    border-radius: 10px; padding: 16px 18px; font-size: 14px; line-height: 1.8; white-space: pre-wrap; box-shadow: var(--shadow-paper);
+  }
+  .caption .tagline { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="tabbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="tabs">
+        <div class="tab">居家咖啡指南.md</div>
+        <div class="tab active">小绿书 · 咖啡冷知识.md</div>
+      </div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="split">
+      <section class="editor">
+        <div class="src">
+          <div class="fm">---<br>title: 咖啡冷知识 05<br><span class="tag">mode:</span> cards<br><span class="tag">theme:</span> naive<br><span class="tag">caption:</span> 冷知识第 5 期…<br>---</div>
+          <h2>cover</h2>
+          <p>咖啡其实是一种水果的种子</p>
+          <h2>point</h2>
+          <p>咖啡樱桃是核果，咖啡豆是它的种子</p>
+          <h2>list</h2>
+          <p>三个反常识的事实…</p>
+          <h2>ending</h2>
+          <p>关注我，下期讲处理法</p>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="leafhead">
+          <span class="vt">➤ Publy 预览</span>
+          <span class="sp"></span>
+          <button class="iconbtn" title="打开发布历史与待发任务">≡</button>
+        </div>
+        <div class="toolbar">
+          <button class="tbtn" title="重新渲染预览">↻</button>
+          <button class="tbtn" title="复制排版 rich text">⧉</button>
+          <select class="tsel" title="本次发布形式"><option>文字卡片</option></select>
+          <select class="tsel" title="卡片主题"><option>naive</option></select>
+          <span class="sp"></span>
+          <button class="tbtn primary"><span>➤</span><span>投递「TuringLambdaAI」草稿箱</span></button>
+        </div>
+        <div class="body">
+          <div class="canvas">
+            <div class="strip-of-cards">
+              <div class="card cover">
+                <span class="pg">1 / 9</span>
+                <div class="k">冷知识 · 05</div>
+                <div class="big">咖啡其实是<br>一种水果的种子</div>
+                <div class="sub">三个反常识的事实</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card">
+                <span class="pg">2 / 9</span>
+                <div class="bar"></div>
+                <div class="pt">咖啡樱桃是核果</div>
+                <div class="ptd">我们喝的豆子，是樱桃果核里的两粒种子</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card">
+                <span class="pg">3 / 9</span>
+                <div class="bar"></div>
+                <div class="pt">绝大多数豆子是双胞胎</div>
+                <div class="ptd">一颗果实里通常并排两粒平面豆；圆豆只占约 5%</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card">
+                <span class="pg">4 / 9</span>
+                <div class="bar"></div>
+                <div class="pt">烘焙不是烤焦</div>
+                <div class="ptd">美拉德反应给豆子上色，一爆是水分冲破细胞壁的声音</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card dense">
+                <span class="pg">5 / 9</span>
+                <div class="li"><b>1</b>咖啡因是植物的杀虫剂</div>
+                <div class="li"><b>2</b>浅烘的咖啡因并不更少</div>
+                <div class="li"><b>3</b>猫屎咖啡本质是消化筛选</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card">
+                <span class="pg">6 / 9</span>
+                <div class="bar"></div>
+                <div class="pt">「阿拉比卡」不是产地</div>
+                <div class="ptd">它是物种名；产地叫埃塞俄比亚，物种起源地</div>
+                <div class="wm">NAIVE</div>
+              </div>
+              <div class="card skel"><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>
+              <div class="card skel"><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>
+              <div class="card skel"><div class="ln"></div><div class="ln"></div><div class="ln"></div><div class="ln"></div></div>
+            </div>
+            <div class="counter"><span class="mini"></span>正在渲染图片消息卡片… 6 / 9</div>
+            <div class="caption">咖啡冷知识第 5 期：其实你一直在喝水果的种子 🍒
+三个反常识事实都在卡片里，第 5 张最意外。
+<span class="tagline">#咖啡 #咖啡冷知识 #手冲咖啡</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div class="statusbar">
+      <span>本地渲染 · 未联网 · 原文未修改</span>
+      <span class="sp"></span>
+      <span>Obsidian · Publy 0.8.7</span>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>
