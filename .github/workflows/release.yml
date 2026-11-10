@@ -1,0 +1,132 @@
+# Tag-triggered Obsidian plugin release. This codifies the manual release
+# discipline of docs/obsidian-submission.md section 3 (机器可验证门禁) into a
+# pipeline: every gate below must pass before a release is created — any
+# failure aborts the run and nothing is published (fail-closed).
+#
+# versions.json is NEVER written by this workflow. The Obsidian directory
+# model reads versions.json from the repository, so the entry for a version
+# must be committed BEFORE its tag exists; the gate below only verifies it
+# and fails with instructions otherwise.
+#
+# Trigger shape: plugin releases use bare semver tags ("0.8.7"), matching the
+# existing tag habit. Historical "v0.x" and "npm-v*" tags do not match. The
+# glob is a coarse filter only; the exact regex gate is the first step, so
+# multi-digit versions and any stray match fail closed instead of publishing.
+#
+# First real-world validation is the next plugin version release; tags on
+# commits that predate this workflow do not trigger it.
+name: Obsidian plugin release
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+
+concurrency:
+  # One release per tag; never cancel a running publish — an interrupted
+  # release is worse than a queued one.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 — check-plugin-metadata.mjs matches every versions.json
+      # entry against a local git tag; a shallow checkout has no tags and the
+      # gate fails spuriously (Wave-1 lesson).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate - tag is a bare plugin version
+        run: |
+          if ! printf '%s' "$GITHUB_REF_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag '$GITHUB_REF_NAME' is not a bare plugin version (expected N.N.N, e.g. 0.8.7). Historical 'v*' and 'npm-v*' tags are not plugin releases."
+            exit 1
+          fi
+
+      - name: Gate - manifest.json version equals the tag
+        run: |
+          version="$(jq -r .version manifest.json)"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::manifest.json version is '$version' but the tag is '$GITHUB_REF_NAME'. Bump root and packages/obsidian-plugin manifest.json (and packages/obsidian-plugin/package.json), commit, then re-tag."
+            exit 1
+          fi
+
+      - name: Gate - versions.json has a committed entry for this tag
+        run: |
+          if ! jq -e --arg v "$GITHUB_REF_NAME" 'has($v)' versions.json > /dev/null; then
+            echo "::error::versions.json has no entry for '$GITHUB_REF_NAME'. Commit the versions.json update BEFORE tagging (the Obsidian directory model reads versions.json from the repository), then delete and re-push the tag."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # docs/obsidian-submission.md section 3.1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm -r test
+
+      - name: Gate - distribution policy (no npm Registry)
+        run: node scripts/check-distribution-policy.mjs
+
+      - name: Gate - plugin metadata (manifest/versions/git-tag consistency)
+        run: node scripts/check-plugin-metadata.mjs
+
+      - name: Gate - simulated Community Directory three-file install
+        run: node scripts/verify-plugin.mjs --community-only
+
+      - name: Gate - CHANGELOG has a section for this version
+        run: |
+          section="$(awk -v tag="$GITHUB_REF_NAME" '
+            $0 ~ ("^## \\[" tag "\\]( |$)") { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)"
+          if [ -z "$(printf '%s' "$section" | tr -d '[:space:]')" ]; then
+            echo "::error::CHANGELOG.md has no '## [$GITHUB_REF_NAME]' section. Add the release notes to CHANGELOG.md, commit, then re-tag."
+            exit 1
+          fi
+          printf '%s\n' "$section" > release-notes.md
+
+      # Asset shape mirrors the 0.8.7 release: main.js, manifest.json,
+      # styles.css, versions.json (also inside the zip), the zip itself, and
+      # SHA256SUMS.txt covering all five files.
+      - name: Package release assets
+        run: |
+          set -euo pipefail
+          stage="$GITHUB_WORKSPACE/release-assets"
+          mkdir -p "$stage"
+          cp packages/obsidian-plugin/dist/main.js packages/obsidian-plugin/dist/manifest.json packages/obsidian-plugin/dist/styles.css "$stage/"
+          cp versions.json "$stage/"
+          (
+            cd "$stage"
+            zip -q "publy-obsidian-$GITHUB_REF_NAME.zip" main.js manifest.json styles.css versions.json
+            sha256sum main.js manifest.json styles.css versions.json "publy-obsidian-$GITHUB_REF_NAME.zip" > SHA256SUMS.txt
+          )
+          cat "$stage/SHA256SUMS.txt"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "Publy for Obsidian $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            release-assets/main.js \
+            release-assets/manifest.json \
+            release-assets/styles.css \
+            release-assets/versions.json \
+            "release-assets/publy-obsidian-$GITHUB_REF_NAME.zip" \
+            release-assets/SHA256SUMS.txt
