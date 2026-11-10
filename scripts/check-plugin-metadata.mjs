@@ -1,7 +1,9 @@
 // Keep the root Obsidian directory manifest and release metadata in sync
-// with the monorepo plugin source. This does NOT verify GitHub Release assets,
+// with the monorepo plugin source. Every versions.json entry must have a
+// matching local git tag; this does NOT verify GitHub Release assets,
 // true 3-file directory installation, or private Obsidian review status.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,4 +28,18 @@ for (const file of ["main.js", "manifest.json", "styles.css"]) {
   assert.ok(fs.existsSync(path.join(root, "packages/obsidian-plugin/dist", file)), "missing built plugin asset " + file);
 }
 assert.deepEqual(read("packages/obsidian-plugin/dist/manifest.json"), sourceManifest, "built manifest differs from source");
-console.log("PASS — Obsidian source/root/built manifest and versions consistent (" + sourceManifest.version + ")");
+
+// Every advertised plugin version must exist as a git tag. CI checkouts
+// must run with fetch-depth: 0 so all tags are present. GitHub Release
+// consistency stays a manual/pre-release step.
+const tags = new Set(
+  execFileSync("git", ["tag", "--list"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] })
+    .split("\n")
+    .map((tag) => tag.trim())
+    .filter(Boolean),
+);
+assert.ok(tags.size > 0, "git tag list is empty — fetch tags before running this check");
+for (const version of Object.keys(sourceVersions)) {
+  assert.ok(tags.has(version), `versions.json entry ${version} has no matching git tag`);
+}
+console.log("PASS — Obsidian source/root/built manifest and versions consistent (" + sourceManifest.version + "); " + Object.keys(sourceVersions).length + " versions.json entries all have git tags");

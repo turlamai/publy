@@ -15,7 +15,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      # fetch-depth: 0 so check-plugin-metadata.mjs can match every
+      # versions.json entry against a local git tag.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11
