@@ -18,7 +18,7 @@ await esbuild.build({
   bundle: true,
   platform: "node",
   format: "esm",
-  target: "node20",
+  target: "node22",
   outfile: path.join(here, "dist", "index.js"),
   sourcemap: false,
   banner: { js: "/*!\n" + fs.readFileSync(path.join(here, "third-party-notices.txt"), "utf8").replaceAll("*/", "* /") + "\n*/" },

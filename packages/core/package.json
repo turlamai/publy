@@ -28,7 +28,6 @@
   },
   "exports": {
     ".": "./dist/index.js",
-    "./article": "./dist/article.js",
     "./math-bundled": "./dist/math-bundled.js"
   }
 }
