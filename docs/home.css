@@ -71,11 +71,18 @@
 }
 .preview-bottom {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 6px;
     margin-top: 17px;
     font-size: 11px;
     color: var(--kit-text-3);
+}
+.preview-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 .pill {
     display: inline-flex;
