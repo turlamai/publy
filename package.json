@@ -1,7 +1,7 @@
 {
   "name": "publy-monorepo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.8.7",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test"
