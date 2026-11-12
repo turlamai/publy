@@ -32,7 +32,7 @@ fs.mkdirSync(output, { recursive: false, mode: 0o755 });
 // pnpm computes relative links during deploy; provide a canonical path so
 // symlinked ancestors such as /var -> /private/var cannot corrupt them.
 const app = path.join(fs.realpathSync(output), "app");
-const deployArgs = ["--filter", "@turlamai/publy", "--prod", "deploy", "--legacy", app];
+const deployArgs = ["--filter", "@publy/cli", "--prod", "deploy", "--legacy", app];
 // Invoking pnpm's JavaScript entry avoids shell interpretation of output paths.
 const result = options["--pnpm-entry"]
   ? spawnSync(process.execPath, [fs.realpathSync(options["--pnpm-entry"]), ...deployArgs], { cwd: root, stdio: "inherit" })

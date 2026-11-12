@@ -5,7 +5,7 @@ authoritative, full-text notice lists are the files that ship with the
 packages carrying the third-party code:
 
 - [`packages/cli/third-party-notices.txt`](packages/cli/third-party-notices.txt)
-  — the publishing CLI (`@turlamai/publy`) and its bundled runtime
+  — the publishing CLI (`@publy/cli`) and its bundled runtime
   dependencies: css-tree 3.1.0 (MIT), mdn-data (CC0 1.0).
 - [`packages/obsidian-plugin/third-party-notices.txt`](packages/obsidian-plugin/third-party-notices.txt)
   — the Obsidian plugin's embedded rendering components: Noto Sans SC

@@ -26,7 +26,7 @@ The GitHub Actions workflow [racket-probe.yml](../.github/workflows/racket-probe
 ## No-npm Node packaging probe — 2026-11-03
 
 On macOS 26.6.2 arm64, a local candidate was built with Node 26.12.0 and
-pnpm 11.8.0 using `pnpm --filter @turlamai/publy --prod deploy --legacy`.
+pnpm 11.8.0 using `pnpm --filter @publy/cli --prod deploy --legacy`.
 The deployed CLI was run using the official Node **22.23.4** macOS arm64
 binary with an empty temporary home and a system-only PATH: `capabilities
 --json` and offline card `preview --json` completed, and preview reported
