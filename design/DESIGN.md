@@ -19,24 +19,18 @@ Tokens 提取自 `packages/obsidian-plugin/styles.css` 现行值；亮暗两套�
 - **防错一致**：本地媒体未就绪时投递被拦截并给出可执行的修复清单；富文本复制遇到图片/公式附件时取消并披露原因，而不是复制无效链接。
 - **层级克制**：面板窄幅垂直排布，bg < bg-alt < 纸面三层足够；accent 绿只给交互与状态；纸面是唯一「强白」表面，靠阴影而非描边堆叠表达浮起。
 
-## Tokens（亮/暗成对）
+## Tokens（语义；值不在此复制）
 
-| Token | Light | Dark | 用途 |
-|---|---|---|---|
-| `--bg` | `#ffffff` | `#1e1e1e` | 面板画布（Obsidian --background-primary） |
-| `--bg-alt` | `#f2f3f5` | `#161616` | 次级画布/卡片底（--background-secondary） |
-| `--line` | `#dcdde0` | `#363636` | 描边/分隔（--background-modifier-border） |
-| `--ink` | `#222222` | `#dcddde` | 主文字 |
-| `--mute` | `#7a7a7a` | `#999999` | 次级文字 |
-| `--accent` | `#07c160` | `#07c160` | 微信绿：主投递按钮/选中态/成功态（styles.css --publy-accent） |
-| `--accent-hover` | `#06ad56` | `#06ad56` | accent 悬停/进行中 |
-| `--accent-soft` | `rgba(7,193,96,.10)` | `rgba(7,193,96,.14)` | accent 弱底（选中段/成功条） |
-| `--danger` | `#e5484d` | `#f87171` | 失败/拦截（--publy-danger） |
-| `--amber` | `#b8860b` | `#d9a514` | 已排期/结果未知/警告（--publy-amber） |
-| `--paper` | `#ffffff`（恒定） | `#ffffff`（恒定） | 公众号纸面：不随主题变化 |
-| `--paper-ink` | `#1a1a1a`（恒定） | `#1a1a1a`（恒定） | 纸面正文 |
-| `--wx-link` | `#576b95` | `#576b95` | 微信账号名蓝（views.ts meta 行） |
-| `--wx-avatar` | `#b75c3d` | `#b75c3d` | 微信头像锈红 |
+值类 token 真源 = `packages/obsidian-plugin/styles.css` 现行值；底色与文字取 Obsidian 默认主题变量语义（插件声明「One accent token on top of Obsidian's native CSS variables」），暗态红/琥珀参考 `packages/server/src/pages.ts` 控制台暗色页；原型 `design/prototype/shared.css` 与其一一对应，本表只记语义与层级。
+
+| Token | 语义 |
+|---|---|
+| `--bg --bg-alt --line` | 面板画布（Obsidian `--background-primary`）/ 次级画布卡片底（`--background-secondary`）/ 描边分隔（`--background-modifier-border`） |
+| `--ink --mute` | 主/次级文字 |
+| `--accent --accent-hover --accent-soft` | 微信绿：主投递按钮/选中态/成功态（`--publy-accent`）+ 悬停进行中 + 弱底 |
+| `--danger --amber` | 失败/拦截（`--publy-danger`）/ 已排期·结果未知·警告（`--publy-amber`） |
+| `--paper --paper-ink` | 公众号纸面：恒白恒黑不随主题变化（唯一恒白表面，见不变式 1） |
+| `--wx-link --wx-avatar` | 微信账号名蓝（views.ts meta 行）/ 头像锈红（微信品牌色，不随主题变化） |
 
 - **字体**：`-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif`（与 views.ts 纸面、server 页面同栈）；面板 UI 13px 为主、次级 12px、面板标题 15px/600；纸面标题 21px/600、正文 15px/1.6。
 - **圆角**：纸面 10px · 结果条/卡片 8px · 控件 6px · 徽标/宽度胶囊 999px。**间距节奏**：4/8/12/16/24。**动效**：120–150ms ease（结果条滑入 250ms），不过度。
