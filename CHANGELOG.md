@@ -11,6 +11,19 @@ released**: they have no git tag and no GitHub release, so the jump from
 
 ## [Unreleased]
 
+### Added
+
+- Add a disposable private purchase lifecycle probe: real Publy signup,
+  checkout and current-proof activation, authenticated synthetic Alipay
+  callback/query through the Commerce journal/projector/evidence-gated issuer,
+  independent Permit verification, restart/operator recovery, wrong-account
+  refusal and signed refund/withdrawal denial. Inspect persisted row counts
+  to prove duplicate payment/refund does not add a revision. All fixture
+  listeners are loopback-only, control uses stdin, and external Node fetches
+  are refused. Run it in the pinned Commerce CI lane. This uses synthetic
+  money and a one-day test right, not an official Alipay sandbox transaction,
+  monthly billing policy, live merchant approval or WeChat delivery.
+
 ### Fixed
 
 - Verify Commerce-generated Alipay Vibe Pay page-pay fields using the outbound
