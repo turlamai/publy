@@ -52,6 +52,12 @@ Image-post: write sections (`## cover` / `## point` / `## list` / `## ending`) w
 
 Full manual: [English manual](docs/guide.md) · [中文手册](docs/guide.zh-CN.md) · Theme gallery: [themes.publy.jrtx.site](https://themes.publy.jrtx.site/)
 
+## Payment integration checks
+
+The [Commerce probe guide](scripts/README.md) documents pinned, loopback-only
+Vibe Pay checkout and signed-rights checks. They use temporary fixtures and do
+not contact Alipay or WeChat, enable checkout, or prove merchant admission.
+
 ## License
 
 AGPL-3.0

@@ -19,7 +19,7 @@ function signedCommerceFetcher(privateKey: crypto.KeyObject, requests: Array<Rec
       notify_url: "https://example.test/notify", return_url: "https://example.test/return",
       biz_content: JSON.stringify({ out_trade_no: order, total_amount: "29.00", product_code: "FAST_INSTANT_TRADE_PAY" }),
     };
-    const canonical = Object.keys(fields).filter((k) => k !== "sign" && k !== "sign_type").sort().map((k) => `${k}=${fields[k]}`).join("&");
+    const canonical = Object.keys(fields).filter((k) => k !== "sign").sort().map((k) => `${k}=${fields[k]}`).join("&");
     fields.sign = crypto.sign("sha256", Buffer.from(canonical), { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }).toString("base64");
     return new Response(JSON.stringify({ status: "checkout-ready", order_id: order,
       gateway: "https://openapi-sandbox.dl.alipaydev.com/gateway.do", fields }));

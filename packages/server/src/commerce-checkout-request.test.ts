@@ -11,7 +11,7 @@ test("checkout request authenticates exact bytes and verifies the returned merch
   const fields: Record<string, string> = { app_id: "fixture-app", method: "alipay.trade.page.pay", format: "JSON", charset: "utf-8",
     sign_type: "RSA2", timestamp: "2026-11-04 10:00:00", version: "1.0", notify_url: "https://example.test/notify",
     return_url: "https://example.test/return", biz_content: JSON.stringify({ out_trade_no: orderId, total_amount: "29.00", product_code: "FAST_INSTANT_TRADE_PAY" }) };
-  const canonical = Object.keys(fields).filter((k) => k !== "sign" && k !== "sign_type").sort().map((k) => `${k}=${fields[k]}`).join("&");
+  const canonical = Object.keys(fields).filter((k) => k !== "sign").sort().map((k) => `${k}=${fields[k]}`).join("&");
   fields.sign = crypto.sign("sha256", Buffer.from(canonical), { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }).toString("base64");
   let calls = 0;
   const fetcher: typeof fetch = async (url, init) => {
@@ -40,8 +40,8 @@ test("checkout request authenticates exact bytes and verifies the returned merch
   const tampered: typeof fetch = async () => new Response(JSON.stringify({ status: "checkout-ready", order_id: orderId,
     gateway: "https://openapi-sandbox.dl.alipaydev.com/gateway.do", fields: { ...fields, notify_url: "https://attacker.test" } }));
   assert.equal((await requestHostedCheckout({ ...input, fetcher: tampered })).status, "unknown");
-  const includingSignType = Object.keys(fields).filter((k) => k !== "sign").sort().map((k) => `${k}=${fields[k]}`).join("&");
-  const wrongSignature = crypto.sign("sha256", Buffer.from(includingSignType), { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }).toString("base64");
+  const notificationOnly = Object.keys(fields).filter((k) => k !== "sign" && k !== "sign_type").sort().map((k) => `${k}=${fields[k]}`).join("&");
+  const wrongSignature = crypto.sign("sha256", Buffer.from(notificationOnly), { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }).toString("base64");
   const incorrectlySigned: typeof fetch = async () => new Response(JSON.stringify({ status: "checkout-ready", order_id: orderId,
     gateway: "https://openapi-sandbox.dl.alipaydev.com/gateway.do", fields: { ...fields, sign: wrongSignature } }));
   assert.equal((await requestHostedCheckout({ ...input, fetcher: incorrectlySigned })).status, "unknown");
