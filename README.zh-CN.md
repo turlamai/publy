@@ -57,6 +57,11 @@ PowerShell 请将 `"$PUBLY_API_KEY"` 换成 `"$env:PUBLY_API_KEY"`。CLI 会通�
 - [docs/business.md](docs/business.md) — 开源边界、定价、GTM
 - [docs/roadmap.md](docs/roadmap.md) — 当前交付与商业门禁
 
+## 支付接入验证
+
+[Commerce 联调说明](scripts/README.md)列出固定依赖版本的 Vibe Pay 下单与签名权益验证。
+测试仅使用临时数据和本机回环，不连接支付宝或微信，不开启支付，也不代表商户已获准入。
+
 ## License
 
 AGPL-3.0

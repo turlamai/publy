@@ -33,12 +33,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: turlamai/permit
-          ref: 4ac89f540bf6ddc3f337239d974a198612f8e705
+          ref: a55632bb5e380aebfc114b9069b7abd7218c2386
           path: .deps/permit
       - uses: actions/checkout@v4
         with:
           repository: turlamai/commerce
-          ref: 61d12372f8dcfeb1a9a997f63a07bc5583c226ca
+          ref: af6494a18109b96f94e53cac96fbb4769af9ccc4
           path: .deps/commerce
       - run: raco pkg install --auto --batch --no-docs --name permit .deps/permit
       - run: raco pkg install --auto --batch --no-docs --name commerce .deps/commerce
@@ -46,6 +46,11 @@ jobs:
       - run: pnpm -r build
       - name: Verify synthetic signed withdrawal and replay fence
         run: node scripts/verify-commerce-shadow.mjs
+        env:
+          COMMERCE_ROOT: ${{ github.workspace }}/.deps/commerce
+          PERMIT_ROOT: ${{ github.workspace }}/.deps/permit
+      - name: Verify Vibe Pay checkout against the Racket Commerce signer
+        run: node scripts/verify-commerce-checkout.mjs
         env:
           COMMERCE_ROOT: ${{ github.workspace }}/.deps/commerce
           PERMIT_ROOT: ${{ github.workspace }}/.deps/permit
@@ -95,7 +100,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: turlamai/permit
-          ref: 4ac89f540bf6ddc3f337239d974a198612f8e705
+          ref: a55632bb5e380aebfc114b9069b7abd7218c2386
           path: .deps/permit
       - name: Install websocket and Permit test dependencies
         run: |

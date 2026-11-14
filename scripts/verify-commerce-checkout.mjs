@@ -12,7 +12,7 @@ import { buildApp } from "../packages/server/dist/index.js";
 const commerce = process.env.COMMERCE_ROOT && path.resolve(process.env.COMMERCE_ROOT);
 const permit = process.env.PERMIT_ROOT && path.resolve(process.env.PERMIT_ROOT);
 if (!commerce || !permit) throw new Error("Set COMMERCE_ROOT and PERMIT_ROOT to clean pinned checkouts");
-for (const [dir, revision] of [[commerce, "0e1531fb80e71f5970b7e97b5b7718d6e7a25c2e"], [permit, "4ac89f540bf6ddc3f337239d974a198612f8e705"]]) {
+for (const [dir, revision] of [[commerce, "af6494a18109b96f94e53cac96fbb4769af9ccc4"], [permit, "a55632bb5e380aebfc114b9069b7abd7218c2386"]]) {
   const head = spawnSync("git", ["-C", dir, "rev-parse", "HEAD"], { encoding: "utf8" });
   const dirty = spawnSync("git", ["-C", dir, "status", "--porcelain"], { encoding: "utf8" });
   if (head.status !== 0 || head.stdout.trim() !== revision || dirty.status !== 0 || dirty.stdout.trim()) {

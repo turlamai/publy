@@ -11,6 +11,19 @@ released**: they have no git tag and no GitHub release, so the jump from
 
 ## [Unreleased]
 
+### Fixed
+
+- Verify Commerce-generated Alipay Vibe Pay page-pay fields using the outbound
+  OpenAPI signature contract, which includes `sign_type`. Notification rules
+  excluded that field and caused valid checkout responses to be rejected as
+  unknown. Correct the fixtures for both sandbox and configured hosted
+  checkout/return paths and reject notification-style signatures for requests.
+- Pin the synthetic Commerce probes and CI to Commerce `af6494a` and Permit
+  `a55632b`. Run the real Racket checkout signer against Publy's verifier in CI
+  so matching mock mistakes cannot hide this interoperability failure. This
+  uses temporary keys and loopback only; it does not establish merchant
+  admission, real payment or entitlement fulfilment.
+
 ## [0.8.7] - 2026-11-08
 
 ### Added

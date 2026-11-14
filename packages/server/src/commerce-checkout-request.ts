@@ -71,8 +71,9 @@ export async function requestHostedCheckout(input: {
         !/^[A-Za-z0-9+/]+={0,2}$/.test(fields.sign) || fields.notify_url !== input.notifyUrl || fields.return_url !== input.returnUrl) return unknown();
     const publicKey = crypto.createPublicKey(input.merchantPublicKeyPem);
     if (publicKey.asymmetricKeyType !== "rsa" || (publicKey.asymmetricKeyDetails?.modulusLength ?? 0) < 2048) return unknown();
-    // Alipay RSA2 excludes both `sign` and `sign_type` from the signed content.
-    const signingContent = Object.keys(fields).filter((key) => key !== "sign" && key !== "sign_type").sort()
+    // This is an outbound OpenAPI request, not an asynchronous notification:
+    // sign_type is signed. Only the signature itself is excluded.
+    const signingContent = Object.keys(fields).filter((key) => key !== "sign").sort()
       .map((key) => `${key}=${fields[key]}`).join("&");
     if (!crypto.verify("sha256", Buffer.from(signingContent), { key: publicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
       Buffer.from(fields.sign, "base64"))) return unknown();
