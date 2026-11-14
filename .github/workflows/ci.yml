@@ -54,6 +54,11 @@ jobs:
         env:
           COMMERCE_ROOT: ${{ github.workspace }}/.deps/commerce
           PERMIT_ROOT: ${{ github.workspace }}/.deps/permit
+      - name: Verify private purchase, recovery and refund lifecycle
+        run: node scripts/verify-commerce-lifecycle.mjs
+        env:
+          COMMERCE_ROOT: ${{ github.workspace }}/.deps/commerce
+          PERMIT_ROOT: ${{ github.workspace }}/.deps/permit
 
   test:
     strategy:
