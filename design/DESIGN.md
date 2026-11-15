@@ -48,3 +48,17 @@ Tokens 提取自 `packages/obsidian-plugin/styles.css` 现行值；亮暗两套�
 3. 结果绑定提交：结果文本必须指名提交时的账号与标题；「结果未知 ≠ 失败」，先查询/核对草稿箱再决定，重试沿用原请求身份；超时不推断为失败。
 4. 预览与检查零副作用：不修改原文、不联网、不创建草稿；媒体未就绪时投递被拦截，修复清单给出具体文件与动作，不允许「发布成功但图片静默丢失」。
 5. 亮暗成对：每个表面两种主题同时设计（恒白纸面除外，见 1）；面板窄幅垂直排布，层级 ≤3 层（bg < bg-alt < 纸面/浮层），层级靠底色与 `line` 分隔，不用阴影堆叠表达（纸面浮起是唯一例外）。
+
+
+## 2026-11-15 · 原型交互补齐
+
+入口为 prototype/preview-article.html。文章、图片消息、历史、设置可互达，宽度切换、富文本复制、连接演示、历史操作均有反馈；阻断状态页仍保留未修复项，绝不把选择封面等同于全部发布检查通过。
+
+根级 index.html 只负责首次进入主界面；页面切换直接到目标界面，不再保留页面目录。原型运行脚本 prototype-runtime.js / prototype-flow.js 只表达浏览器内的交互合同；正式产品业务仍由既定引擎实现。真实设备、模型和发布服务均未连接。凭据演示不保存密钥，破坏性示例与派发保留确认和取消。
+
+这些是可评审的增量改动，未替用户勾选满意度、HIG 最终验收或设计冻结条件。
+
+
+## Prototype source checkpoint — 2026-11-15
+
+`index.html` opens the primary prototype directly. Screen-directory launchers have been removed. All local scripts, styles and referenced assets needed by this checkpoint are versioned under this directory; OpenDesign metadata is excluded. This is an editable prototype checkpoint, not a claim that the native product or external services implement these interactions.
