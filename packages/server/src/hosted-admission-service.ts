@@ -4,6 +4,7 @@
 // and the revision must advance the stored fence. Any failure denies.
 import { observeHostedProof, type HostedProofScope } from "./commerce-proof-request.js";
 import { verifyHostedAdmission } from "./hosted-admission.js";
+import { verifyAndFenceHostedSnapshot } from "./hosted-snapshot-verifier.js";
 import type { HostedEntitlementFence } from "./hosted-entitlement-fence.js";
 
 export interface HostedAdmissionDecision {
@@ -45,6 +46,14 @@ export async function checkHostedAdmission(input: {
     const observation = await observeHostedProof({ endpoint: input.endpoint, serviceId: input.serviceId,
       secret: input.secret, scope, minimumRevision: previous?.revision ?? null,
       expectedEntitlementId: previous?.entitlementId ?? null, fetcher: input.fetcher });
+    if (observation.status === "recorded-withdrawal") {
+      // A withdrawal never admits work, but its independently verified signed
+      // revision must survive retries/restarts and reject older grant proofs.
+      const snapshot = await verifyAndFenceHostedSnapshot({ observation, subject: input.subject, plan: input.plan,
+        racketExecutable: input.racketExecutable, verifierScript: input.verifierScript, trustStore: input.trustStore,
+        fence: input.fence, offer: input.offerId, enroll: input.enroll });
+      return deny(snapshot ? "proof-recorded-withdrawal" : "withdrawal-unverified");
+    }
     if (observation.status !== "verified-proof") return deny(`proof-${observation.status}`);
     // Permit policy expects second-resolution RFC3339; a millisecond
     // suffix is rejected as an invalid timestamp, not treated as the same instant.

@@ -63,3 +63,11 @@ refund/recovery, authoritative hosted quota integration and real deployment
 evidence remain tracked in Publy #17/#8 and Commerce #23/#4/#5. Never replace
 those gates with synthetic probe success. No customer data or private keys
 belong in probe output or Git.
+
+The lifecycle probe also requires the actual hosted admission path to persist a
+verified withdrawal's revision in the durable fence. Returning a denial alone
+is insufficient: a later old grant must remain below the recorded watermark.
+The internal admission CLI accepts `purpose: "snapshot"` for independent
+snapshot verification; that mode always returns `authorizes_use: false` and
+never replaces a fresh current-state admission check. Unsigned withdrawal
+labels cannot advance the fence.

@@ -11,6 +11,13 @@ released**: they have no git tag and no GitHub release, so the jump from
 
 ## [Unreleased]
 
+### Fixed
+
+- Persist independently verified withdrawal revisions in hosted admission's
+  durable fence before denying use, so an older signed grant cannot reopen an
+  account after refund. The internal Racket CLI exposes an explicit snapshot
+  verification mode that never authorizes work.
+
 ### Added
 
 - Add a disposable private purchase lifecycle probe: real Publy signup,
