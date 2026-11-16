@@ -36,7 +36,7 @@ export async function verifyHostedSnapshot(input: HostedSnapshotVerifierInput): 
       !observed.credential || typeof observed.credential !== "object" || Array.isArray(observed.credential)) return null;
   let body: string;
   try {
-    body = JSON.stringify({ account: input.subject, plan: input.plan, entitlement_id: observed.entitlementId,
+    body = JSON.stringify({ purpose: "snapshot", account: input.subject, plan: input.plan, entitlement_id: observed.entitlementId,
       revision: observed.revision, credential: observed.credential });
   } catch { return null; }
   if (Buffer.byteLength(body, "utf8") > 1024 * 1024) return null;

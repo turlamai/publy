@@ -167,6 +167,9 @@ try {
   const noRecovery = await app.inject({ method: "POST", url: "/v1/admin/hosted/reconcile",
     headers: { "x-api-key": "synthetic-admin" }, payload: { userId } });
   assert.equal(noRecovery.statusCode, 409);
+  const withdrawnFence = app.store.hostedFence().lookup(account.subject, offer);
+  assert.equal(withdrawnFence.entitlementId, paid.entitlement_id);
+  assert.equal(withdrawnFence.revision, 1, "withdrawal must advance the durable fence before denying");
   app.store.upsertAccount({ name: "owned", appId: "wx_fixture_owned", appSecret: "synthetic", ownerUserId: userId });
   const noPublish = await app.inject({ method: "POST", url: "/v1/publish", headers: { "x-api-key": account.apiKey },
     payload: { account: "owned", title: "Synthetic blocked draft", type: "article", html: "<p>fixture</p>" } });

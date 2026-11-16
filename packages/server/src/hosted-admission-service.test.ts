@@ -51,3 +51,37 @@ test("hosted admission requires enrolled, current proof and a matching Permit de
     assert.equal((await checkHostedAdmission({ ...base, enroll: false })).allowed, false);
   } finally { db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
 });
+
+test("verified withdrawal advances the fence and prevents replaying the previous grant", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-withdrawal-fence-"));
+  const db = new DatabaseSync(":memory:");
+  try {
+    const script = path.join(dir, "verify.js"), trust = path.join(dir, "trust.json");
+    fs.writeFileSync(trust, "{}");
+    fs.writeFileSync(script, `let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{
+      const x=JSON.parse(s);
+      if(x.purpose==='snapshot')return process.stdout.write(JSON.stringify(x.credential.valid
+        ?{status:'verified-snapshot',authorizes_use:false,entitlement_id:'ent-1',revision:4,payload_sha256:'b'.repeat(64)}
+        :{status:'denied',authorizes_use:false}));
+      process.stdout.write(JSON.stringify({status:'admitted',authorizes_use:true,entitlement_id:'ent-1',revision:3,
+        payload_sha256:'a'.repeat(64),use_expires_at:'2026-12-01T00:00:00Z'}));});`);
+    const fence = new HostedEntitlementFence(db);
+    fence.record({ subject: "account-a", offer: "publy-personal-monthly", entitlementId: "ent-1", revision: 3,
+      payloadSha256: "a".repeat(64) }, true);
+    const base = { endpoint: "http://127.0.0.1:9/v1/hosted/proof", serviceId: "publy", secret: Buffer.alloc(32, 4),
+      issuer: "fixture", offerId: "publy-personal-monthly", subject: "account-a", plan: "personal" as const,
+      racketExecutable: process.execPath, verifierScript: script, trustStore: trust, fence, enroll: false };
+    const withdrawal: typeof fetch = async () => Response.json({ status: "recorded-withdrawal", entitlement_id: "ent-1",
+      revision: 4, credential: { valid: true } });
+    assert.equal((await checkHostedAdmission({ ...base, fetcher: withdrawal })).allowed, false);
+    assert.equal(fence.lookup("account-a", base.offerId)?.revision, 4, "independently verified withdrawal must persist");
+    const requests: Array<Record<string, unknown>> = [];
+    assert.equal((await checkHostedAdmission({ ...base, fetcher: proofFetcher("verified-proof", requests, 3) })).allowed, false,
+      "old signed grant cannot reopen the account after a withdrawal");
+    assert.equal(requests[0].minimum_revision, 4);
+    const forged: typeof fetch = async () => Response.json({ status: "recorded-withdrawal", entitlement_id: "ent-1",
+      revision: 99, credential: { valid: false } });
+    assert.equal((await checkHostedAdmission({ ...base, fetcher: forged })).allowed, false);
+    assert.equal(fence.lookup("account-a", base.offerId)?.revision, 4, "unverified status cannot poison the fence");
+  } finally { db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
+});
