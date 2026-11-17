@@ -16,7 +16,7 @@ import { pathToFileURL } from "node:url";
 import Fastify from "fastify";
 import type { FastifyError, FastifyReply } from "fastify";
 import type { JobInfo, JobStatus, PublishRequest, PublishResponse, PublishResultInfo } from "@publy/shared";
-import { draftIdempotencyKey, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, listDraftSummaries, type AccountCredential, type WechatDraftSummary } from "@publy/core";
+import { draftIdempotencyKey, draftDelete, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, listDraftSummaries, type AccountCredential, type WechatDraftSummary } from "@publy/core";
 import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
 import { createProvider } from "./payments.js";
 import { requestHostedCheckout } from "./commerce-checkout-request.js";
@@ -1117,6 +1117,66 @@ export function buildApp(config: ServerConfig) {
     return { accounts: visible.map((a) => ({ name: a.name })) };
   });
 
+  // Draft box visibility for the CLI (`publy draft list`): the real WeChat
+  // box, read-only. Reconciliation after a lost publish response needs live
+  // evidence, not a cached claim (#7). Ownership mirrors /v1/publish: users
+  // see only accounts bound to their user; admin sees everything.
+  app.get<{ Querystring: { account?: string; limit?: string } }>("/v1/drafts", async (req, reply) => {
+    const caller = (req as unknown as { caller: Caller }).caller;
+    const account = (req.query as { account?: string }).account ?? "";
+    if (!account) return reply.code(400).send({ code: "BAD_REQUEST", message: '"account" query parameter is required' });
+    const limitRaw = parseInt((req.query as { limit?: string }).limit ?? "100", 10);
+    const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 100, 1), 200);
+    const cred = resolveAccount(account, caller);
+    if (!cred) {
+      const code = caller.admin ? "ACCOUNT_NOT_FOUND" : "ACCOUNT_NOT_OWNED";
+      return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${account}"` });
+    }
+    try {
+      const token = await tokens.get(cred.appId, cred.appSecret);
+      const listing = await listDraftSummaries(token, limit);
+      return {
+        account: cred.name,
+        totalCount: listing.totalCount,
+        complete: listing.items.length >= listing.totalCount,
+        items: listing.items,
+      };
+    } catch (err) {
+      if (err instanceof WechatError) {
+        return reply.code(502).send({ code: `WECHAT_${err.errcode}`, message: "Could not read the WeChat draft box." });
+      }
+      throw err;
+    }
+  });
+
+  // Delete one draft by media_id (`publy draft delete`). Deletion is
+  // irreversible on WeChat's side, so the CLI surfaces the listing first and
+  // the operator picks the target; the server only checks ownership, relays
+  // WeChat's verdict, and leaves an audit trail naming who removed what.
+  app.delete<{ Params: { mediaId: string }; Querystring: { account?: string } }>("/v1/drafts/:mediaId", async (req, reply) => {
+    const caller = (req as unknown as { caller: Caller }).caller;
+    const mediaId = (req.params as { mediaId: string }).mediaId ?? "";
+    const account = (req.query as { account?: string }).account ?? "";
+    if (!mediaId) return reply.code(400).send({ code: "BAD_REQUEST", message: "mediaId path parameter is required" });
+    if (!account) return reply.code(400).send({ code: "BAD_REQUEST", message: '"account" query parameter is required' });
+    const cred = resolveAccount(account, caller);
+    if (!cred) {
+      const code = caller.admin ? "ACCOUNT_NOT_FOUND" : "ACCOUNT_NOT_OWNED";
+      return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${account}"` });
+    }
+    try {
+      const token = await tokens.get(cred.appId, cred.appSecret);
+      await draftDelete(token, mediaId);
+      audit({ event: "draft-deleted", account: cred.name, mediaId, user: caller.admin ? "admin" : caller.user.contact });
+      return { deleted: true, account: cred.name, mediaId };
+    } catch (err) {
+      if (err instanceof WechatError) {
+        return reply.code(502).send({ code: `WECHAT_${err.errcode}`, message: "WeChat rejected the draft deletion." });
+      }
+      throw err;
+    }
+  });
+
   // tenant isolation: a user key sees only publish-relevant events for its
   // own accounts; the admin key sees the full audit trail
   app.get<{ Querystring: { limit?: string } }>("/v1/history", async (req) => {
@@ -1125,7 +1185,7 @@ export function buildApp(config: ServerConfig) {
     let history = readHistory(limit * 4);
     if (!caller.admin) {
       const owned = new Set(store.listAccounts().filter((a) => a.ownerUserId === caller.user.id).map((a) => a.name));
-      const visible = new Set(["published", "failed", "scheduled", "cancelled", "deduped"]);
+      const visible = new Set(["published", "failed", "scheduled", "cancelled", "deduped", "draft-deleted"]);
       history = history.filter((e) => visible.has(e.event) && owned.has(e.account));
     }
     return { history: history.slice(-limit) };

@@ -129,6 +129,26 @@ Server lookup (`publish-result --json`) returns the same server state;
 an unknown result exits with code 4, even in JSON mode. Check the WeChat
 draft backend where necessary.
 
+## Draft box evidence and cleanup
+
+```sh
+# Read-only listing of the real WeChat draft box (never creates anything):
+publy draft list --account "my-wechat-account" --json
+
+# Delete one draft by media_id (irreversible on WeChat's side):
+publy draft delete <mediaId> --account "my-wechat-account" --json
+```
+
+`draft list` returns `kind:"draft-list"`, the account, `totalCount`,
+`complete` (whether the listing covers the whole box) and `drafts[]` with
+`mediaId`, `title` and `updateTime`. This is the live evidence for
+reconciling an unknown publish outcome against what actually landed, and
+for telling re-published batches apart by time instead of guessing. A lost
+DELETE response reports `status:"unknown"` — the draft may or may not be
+gone on WeChat's side; re-check with `draft list` before acting again.
+Deleting is a state-changing action: pick the target from a listing with
+the user's approval, never by guessing media IDs.
+
 ## Tool-use safety and exit statuses
 
 - Reading, checking and previewing are safe autonomous operations, but

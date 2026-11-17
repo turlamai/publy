@@ -1229,6 +1229,8 @@ const AGENT_USAGE: Record<string, string> = {
   card: "publy card <file.md> --json --out <directory>",
   publish: "publy publish <file.md> --account <name> --json",
   "publish-result": "publy publish-result <requestId> --json",
+  "draft list": "publy draft list --account <name> --json",
+  "draft delete": "publy draft delete <mediaId> --account <name> --json",
   "jobs list": "publy jobs list --json",
   "jobs cancel": "publy jobs cancel <jobId> --json",
   "jobs retry": "publy jobs retry <jobId> --json",
@@ -1413,6 +1415,99 @@ export function createProgram(): Command {
       } else {
         console.log("结果未知：服务端没有可验证的草稿 Media ID。请先在公众号草稿箱人工核对，不能据此自动重投。");
         process.exitCode = 4;
+      }
+    });
+
+  const draftCmd = program.command("draft").description("inspect and clean an account's WeChat draft box (reconciliation evidence)");
+  draftCmd
+    .command("list")
+    .description("list drafts in the account's WeChat draft box (read-only)")
+    .option("--account <name>", "target account (defaults to config default_account)")
+    .option("--limit <n>", "max drafts to list (1-200)", "100")
+    .option("--server <url>", "publy server base url")
+    .option("--api-key <key>", "server api key")
+    .option("--json", "machine-readable output")
+    .action(async (opts: Record<string, any>) => {
+      const config = readAgentConfig(opts, "draft-list");
+      if (!config) return;
+      const account = opts.account ?? config.default_account;
+      if (!account) {
+        if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, ok: false, kind: "draft-list", code: "NO_ACCOUNT" }));
+        console.error("publy: NO_ACCOUNT — pass --account or set default_account (publy config set default_account <name>)");
+        process.exitCode = 2;
+        return;
+      }
+      const limit = Math.min(Math.max(parseInt(opts.limit, 10) || 100, 1), 200);
+      const requestConfig = { ...config, server: opts.server ?? config.server, api_key: opts.apiKey ?? config.api_key };
+      const reply = await requestServerJson(requestConfig, `/v1/drafts?account=${encodeURIComponent(account)}&limit=${limit}`);
+      if (!reply.ok) { reportReadFailure(opts, "draft-list", reply.code); return; }
+      const body = reply.body as { account?: unknown; totalCount?: unknown; complete?: unknown; items?: unknown };
+      // Never spread untrusted server objects into agent-facing JSON: pick
+      // and type-check each field, dropping malformed entries.
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      const drafts = rawItems.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const it = item as { mediaId?: unknown; title?: unknown; updateTime?: unknown };
+        if (typeof it.mediaId !== "string" || it.mediaId.trim().length === 0) return [];
+        return [{
+          mediaId: it.mediaId,
+          title: typeof it.title === "string" ? it.title : "",
+          updateTime: typeof it.updateTime === "number" && Number.isFinite(it.updateTime) ? it.updateTime : 0,
+        }];
+      });
+      const totalCount = typeof body.totalCount === "number" && Number.isFinite(body.totalCount) ? body.totalCount : drafts.length;
+      const complete = body.complete === true;
+      if (opts.json) {
+        console.log(JSON.stringify({
+          schemaVersion: 1, kind: "draft-list", ok: true,
+          account: typeof body.account === "string" ? body.account : account,
+          totalCount, complete, drafts,
+        }));
+      } else if (!drafts.length) {
+        console.log(`草稿箱为空或范围内没有草稿（${account}）。`);
+      } else {
+        for (const d of drafts) {
+          const when = d.updateTime > 0 ? new Date(d.updateTime * 1000).toISOString().slice(0, 16).replace("T", " ") : "?";
+          console.log(`${d.mediaId}  ${when}  ${d.title}`);
+        }
+        if (!complete) console.error(`publy: 草稿箱共约 ${totalCount} 条，本次列出 ${drafts.length} 条（--limit 可放大到 200）。`);
+      }
+    });
+  draftCmd
+    .command("delete")
+    .description("delete one draft by media id (irreversible on WeChat's side; list first and pick deliberately)")
+    .argument("<mediaId>")
+    .option("--account <name>", "target account (defaults to config default_account)")
+    .option("--server <url>", "publy server base url")
+    .option("--api-key <key>", "server api key")
+    .option("--json", "machine-readable outcome")
+    .action(async (mediaId: string, opts: Record<string, any>) => {
+      const config = readAgentConfig(opts, "draft-delete");
+      if (!config) return;
+      const account = opts.account ?? config.default_account;
+      const report = (code: string) => {
+        // A lost DELETE response is genuinely unknown: the draft may or may
+        // not be gone on WeChat's side. Report that, never a clean failure.
+        const uncertain = ["SERVER_UNREACHABLE", "SERVER_ERROR", "INVALID_SERVER_RESPONSE"].includes(code);
+        if (opts.json) console.log(JSON.stringify({
+          schemaVersion: 1, ok: false, kind: "draft-delete", mediaId, code,
+          status: uncertain ? "unknown" : "rejected",
+        }));
+        console.error("publy: " + code);
+        process.exitCode = code === "CONFIG_INVALID" || code === "NO_ACCOUNT" ? 1 : 5;
+      };
+      if (!account) { report("NO_ACCOUNT"); return; }
+      const requestConfig = { ...config, server: opts.server ?? config.server, api_key: opts.apiKey ?? config.api_key };
+      const reply = await requestServerJson(requestConfig, `/v1/drafts/${encodeURIComponent(mediaId)}?account=${encodeURIComponent(account)}`, "DELETE");
+      if (!reply.ok) { report(reply.code); return; }
+      if (reply.body.deleted !== true) { report("SERVER_REJECTED"); return; }
+      if (opts.json) {
+        console.log(JSON.stringify({
+          schemaVersion: 1, ok: true, kind: "draft-delete", status: "deleted",
+          account: typeof reply.body.account === "string" ? reply.body.account : account, mediaId,
+        }));
+      } else {
+        console.log(`已删除 ${account} 草稿箱中的 ${mediaId}（微信侧不可撤销）。`);
       }
     });
 

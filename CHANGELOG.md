@@ -11,6 +11,17 @@ released**: they have no git tag and no GitHub release, so the jump from
 
 ## [Unreleased]
 
+### Added
+
+- Draft box management for agents and operators: `publy draft list` reads
+  the real WeChat draft box (read-only evidence for reconciling an unknown
+  publish outcome and telling re-published batches apart by time), and
+  `publy draft delete <mediaId>` removes one draft, reporting `unknown`
+  on a lost response instead of a clean failure. Server routes
+  `GET /v1/drafts` and `DELETE /v1/drafts/:mediaId` enforce the same
+  account-ownership rules as publish; deletions are audited as
+  `draft-deleted` and surface in `/v1/history`.
+
 ### Fixed
 
 - Persist independently verified withdrawal revisions in hosted admission's

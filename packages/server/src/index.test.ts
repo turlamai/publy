@@ -174,3 +174,119 @@ test("history returns an array", async () => {
   assert.equal(res.statusCode, 200);
   assert.ok(Array.isArray(res.json().history));
 });
+
+// Draft box management (list + delete): WeChat endpoints are stubbed at the
+// fetch boundary, exactly like the core-level tests, so the routes are
+// exercised against synthetic WeChat verdicts without network access.
+type FetchCall = { url: string; body: any };
+
+function stubWechatFetch(responses: Record<string, unknown>, calls: FetchCall[]): void {
+  globalThis.fetch = (async (input: any, init: any) => {
+    const url = String(input);
+    let body: any = null;
+    try { body = init?.body ? JSON.parse(init.body) : null; } catch { body = null; }
+    calls.push({ url, body });
+    for (const [pattern, payload] of Object.entries(responses)) {
+      if (url.includes(pattern)) return Response.json(payload);
+    }
+    return Response.json({ errcode: 99999, errmsg: "unexpected endpoint in test" });
+  }) as typeof fetch;
+}
+
+test("draft listing requires an account parameter", async () => {
+  const res = await app.inject({ method: "GET", url: "/v1/drafts", headers: { "x-api-key": "test-key" } });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.json().code, "BAD_REQUEST");
+});
+
+test("draft listing rejects an unknown account", async () => {
+  const res = await app.inject({ method: "GET", url: "/v1/drafts?account=Missing", headers: { "x-api-key": "test-key" } });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.json().code, "ACCOUNT_NOT_FOUND");
+});
+
+test("draft listing returns live WeChat box contents for an owned account", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: FetchCall[] = [];
+  stubWechatFetch({
+    "cgi-bin/token": { access_token: "synthetic-token", expires_in: 7200 },
+    "cgi-bin/draft/batchget": {
+      total_count: 2,
+      item_count: 2,
+      item: [
+        { media_id: "draft-a", content: { news_item: [{ title: "嵌入式 C 设计模式 1" }] }, update_time: 1700000000 },
+        { media_id: "draft-b", content: { news_item: [{ title: "嵌入式 C 设计模式 2" }] }, update_time: 1700000100 },
+      ],
+    },
+  }, calls);
+  try {
+    const res = await app.inject({ method: "GET", url: "/v1/drafts?account=TestAcct&limit=100", headers: { "x-api-key": "test-key" } });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.account, "TestAcct");
+    assert.equal(body.totalCount, 2);
+    assert.equal(body.complete, true);
+    assert.deepEqual(body.items, [
+      { mediaId: "draft-a", title: "嵌入式 C 设计模式 1", updateTime: 1700000000 },
+      { mediaId: "draft-b", title: "嵌入式 C 设计模式 2", updateTime: 1700000100 },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draft listing fails closed with the WeChat error code", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: FetchCall[] = [];
+  stubWechatFetch({
+    "cgi-bin/token": { access_token: "synthetic-token", expires_in: 7200 },
+    "cgi-bin/draft/batchget": { errcode: 40001, errmsg: "invalid credential" },
+  }, calls);
+  try {
+    const res = await app.inject({ method: "GET", url: "/v1/drafts?account=TestAcct", headers: { "x-api-key": "test-key" } });
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.json().code, "WECHAT_40001");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draft deletion relays the media_id and leaves an audit trail", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: FetchCall[] = [];
+  stubWechatFetch({
+    "cgi-bin/token": { access_token: "synthetic-token", expires_in: 7200 },
+    "cgi-bin/draft/delete": { errcode: 0, errmsg: "ok" },
+  }, calls);
+  try {
+    const res = await app.inject({ method: "DELETE", url: "/v1/drafts/draft-old?account=TestAcct", headers: { "x-api-key": "test-key" } });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), { deleted: true, account: "TestAcct", mediaId: "draft-old" });
+    const deleteCall = calls.find((c) => c.url.includes("draft/delete"));
+    assert.ok(deleteCall, "a draft/delete request must have been sent");
+    assert.deepEqual(deleteCall.body, { media_id: "draft-old" });
+    const history = await app.inject({ method: "GET", url: "/v1/history?limit=10", headers: { "x-api-key": "test-key" } });
+    assert.ok(
+      history.json().history.some((e: { event: string; mediaId?: string }) => e.event === "draft-deleted" && e.mediaId === "draft-old"),
+      "the deletion must be auditable in /v1/history",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draft deletion surfaces WeChat rejection codes", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: FetchCall[] = [];
+  stubWechatFetch({
+    "cgi-bin/token": { access_token: "synthetic-token", expires_in: 7200 },
+    "cgi-bin/draft/delete": { errcode: 40007, errmsg: "invalid media_id" },
+  }, calls);
+  try {
+    const res = await app.inject({ method: "DELETE", url: "/v1/drafts/gone?account=TestAcct", headers: { "x-api-key": "test-key" } });
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.json().code, "WECHAT_40007");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

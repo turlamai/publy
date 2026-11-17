@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { TokenManager, draftBatchGet, listDraftSummaries } from "./wechat.js";
+import { TokenManager, draftBatchGet, draftDelete, listDraftSummaries } from "./wechat.js";
 
 test("TokenManager rejects missing or malformed success tokens without caching them", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-token-validation-"));
@@ -216,6 +216,33 @@ test("draft box listing refuses a response without a usable total_count", async 
     for (const _ of responses) {
       await assert.rejects(draftBatchGet("synthetic-token"), /no usable total_count/);
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draftDelete posts exactly the target media_id and succeeds on errcode 0", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; body: any }> = [];
+  globalThis.fetch = (async (input: any, init: any) => {
+    requests.push({ url: String(input), body: JSON.parse(init.body) });
+    return Response.json({ errcode: 0, errmsg: "ok" });
+  }) as typeof fetch;
+  try {
+    await draftDelete("synthetic-token", "draft-a");
+    assert.equal(requests.length, 1);
+    assert.match(requests[0].url, /draft\/delete/);
+    assert.deepEqual(requests[0].body, { media_id: "draft-a" }, "delete must carry only the target media_id");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("draftDelete fails closed with the WeChat error code", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => Response.json({ errcode: 40007, errmsg: "invalid media_id" })) as typeof fetch;
+  try {
+    await assert.rejects(draftDelete("stale-token", "gone"), /40007: invalid media_id/);
   } finally {
     globalThis.fetch = originalFetch;
   }
