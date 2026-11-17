@@ -8,6 +8,7 @@ const TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
 const ADD_MATERIAL_URL = "https://api.weixin.qq.com/cgi-bin/material/add_material";
 const DRAFT_ADD_URL = "https://api.weixin.qq.com/cgi-bin/draft/add";
 const DRAFT_BATCHGET_URL = "https://api.weixin.qq.com/cgi-bin/draft/batchget";
+const DRAFT_DELETE_URL = "https://api.weixin.qq.com/cgi-bin/draft/delete";
 
 /** Read-only summary of one WeChat draft. Titles are the operator-visible
  *  identity; media_id is the value a confirmed draft must retain. */
@@ -180,6 +181,19 @@ export async function listDraftSummaries(accessToken: string, limit = 100): Prom
     if (page.items.length === 0 || items.length >= totalCount) break;
   }
   return { totalCount: Math.max(totalCount, items.length), items: items.slice(0, max) };
+}
+
+/** Delete one draft by media_id. Deletion is irreversible on WeChat's side,
+ *  so callers must have already shown the operator the listing they are
+ *  deleting from; this layer only relays the media_id and WeChat's verdict. */
+export async function draftDelete(accessToken: string, mediaId: string): Promise<void> {
+  const res = await fetch(`${DRAFT_DELETE_URL}?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ media_id: mediaId }),
+  });
+  const data = await res.json() as any;
+  assertOk(data);
 }
 
 /** Connectivity check for novice onboarding: does this AppID/AppSecret work

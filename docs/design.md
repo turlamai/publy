@@ -164,9 +164,21 @@ SQLite 中持久占位；并发重复或结果未知的原请求不会自动再�
 和 `networkUsed:false`。这是源码构建 CLI 的新增能力，不表示已有普通用户
 安装包；生产安装验收仍由 #25 负责。
 
+**2026-11-18 新增开发版命令：** `publy draft list --account <name>
+[--limit n] [--json]` 与 `publy draft delete <mediaId> --account <name>
+[--json]`，对应服务端 `GET /v1/drafts` 与
+`DELETE /v1/drafts/:mediaId`。list 是只读证据：返回真实微信草稿箱的
+`mediaId`/`title`/`updateTime` 与 `complete` 标记，用于结果未知时对照
+草稿箱对账、以及重发后按时间区分新旧草稿批次；delete 按选定 media_id
+删除单篇草稿，微信侧不可撤销，删除写入审计（`draft-deleted`）并出现在
+`/v1/history`。所有权规则与 `/v1/publish` 一致：用户键只能访问绑定账号，
+admin 键可见全部账号。delete 的丢失响应对齐 job-cancel 语义：报告
+`unknown` 而非干净失败，先 `draft list` 核对再决定下一步。退出码沿用
+本节既有约定：配置/账号缺失为 1，服务端与网络问题为 5。
 
 
-设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前所有已声明命令均支持 `--json`，包括 `capabilities`、`check`、`render`、`preview`、`card`、`publish`、`publish-result`、`account list/add`、`config set`、`jobs list/cancel/retry`、`history`、`quota`、`theme ls/pack/add/update/remove/preview` 与 `tunnel`；每个入口同时声明 `usage`、`prerequisites` 与 `requiresUserApproval`，以 `capabilities --json` 为唯一事实来源。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
+
+设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前所有已声明命令均支持 `--json`，包括 `capabilities`、`check`、`render`、`preview`、`card`、`publish`、`publish-result`、`draft list/delete`、`account list/add`、`config set`、`jobs list/cancel/retry`、`history`、`quota`、`theme ls/pack/add/update/remove/preview` 与 `tunnel`；每个入口同时声明 `usage`、`prerequisites` 与 `requiresUserApproval`，以 `capabilities --json` 为唯一事实来源。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
 
 ```bash
 publy render a.md --theme claude -o out.html   # Markdown → 公众号 HTML（免费路径，可贴入后台）

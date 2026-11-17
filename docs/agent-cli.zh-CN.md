@@ -101,6 +101,24 @@ publy publish-result <requestId> --json
 必要时在微信后台核对草稿。
 `publish-result --json` 返回 unknown 时退出码为 4。
 
+## 草稿箱证据与清理
+
+```bash
+# 只读列出真实微信草稿箱（绝不创建任何东西）：
+publy draft list --account "我的公众号" --json
+
+# 按 media_id 删除单篇草稿（微信侧不可撤销）：
+publy draft delete <mediaId> --account "我的公众号" --json
+```
+
+`draft list` 返回 `kind:"draft-list"`、账号、`totalCount`、
+`complete`（本次列表是否覆盖整个草稿箱）与 `drafts[]`
+（`mediaId`/`title`/`updateTime`）。这是结果未知时对照真实草稿箱对账的
+现场证据，也是重发后按时间区分新旧批次、不靠猜的依据。delete 的丢失
+响应报告 `status:"unknown"`——草稿在微信侧可能已删也可能还在，先
+`draft list` 核对再决定下一步。删除是改状态操作：从列表里选定目标并
+征得用户同意，绝不猜测 media_id。
+
 ## Agent 接入原则
 
 - **stdout 只输出 JSON，stderr 输出诊断信息**；不要解析中文成功提示。
