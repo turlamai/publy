@@ -1,5 +1,7 @@
 # Publy
 
+**产品：**[产品主页](https://publy.jrtx.site/) · **支持：**[问题与反馈](https://github.com/turlamai/publy/issues) · [当前交付策略](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.zh-CN.md)
+
 不绑定写作软件的 Markdown → 微信公众号草稿工具：本地检查与排版、Obsidian 集成、自托管草稿投递。公开托管订阅与普通用户独立安装器尚未交付。
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE) ![status](https://img.shields.io/badge/status-pipeline%20implemented-blue)
