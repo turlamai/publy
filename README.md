@@ -1,7 +1,5 @@
 # Publy
 
-**Product:** [Website](https://publy.jrtx.site/) · **Support:** [Issues & feedback](https://github.com/turlamai/publy/issues) · [Development policy](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md)
-
 Editor-independent Markdown-to-WeChat draft publishing: local rendering and preflight, an Obsidian integration, and a self-hosted delivery service. Hosted subscriptions and a universal installer are not yet available.
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE) ![status](https://img.shields.io/badge/status-pipeline%20implemented-blue)
