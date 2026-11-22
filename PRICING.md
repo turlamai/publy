@@ -4,7 +4,7 @@
 
 ## Launch status and implementation boundaries
 
-- Policy version: `2026-11-personal-prepaid-1`, 2026-11-16. The owner approved Personal CNY 29 for one month, purchased manually without automatic renewal. This replaces the earlier multi-tier launch target; there is no existing customer cohort to migrate. **The offer is approved for implementation, not on sale or evidence that all launch gates have passed.**
+- Policy version: `2026-11-personal-nowpay-direct-1`, 2026-11-20. The owner approved Personal CNY 29 for one month, purchased manually without automatic renewal. This replaces the earlier multi-tier launch target; there is no existing customer cohort to migrate. **The offer is approved for implementation, not on sale or evidence that all launch gates have passed.**
 - Entitlements cover delivered platforms only. New commercial plans do not change the LICENSE of released source. Source use, modification and redistribution rights are separate from official products, updates and services.
 - Security fixes and reading, backing up or exporting your own data must not require another purchase. BYOK keys, payment-provider secrets and issuer private keys have different owners. Native hosts do not collect payment or issue credentials directly.
 
@@ -16,7 +16,9 @@ The first offer is **Personal: CNY 29 for one calendar month, one-time payment, 
 
 Stable egress, credential lifecycle, scheduling and recovery are continuous services. Do not offer lifetime hosting, a theme-market commission, unlimited accounts or an enterprise SLA.
 
-The selected admission route is Alipay's individual restricted basic web collection application, subject to approval for this operator and service. This is distinct from NowPay Direct and does not prove approval for that channel. Provider limits and application validity must come from the actual approval and be enforced before enabling checkout. A temporary collection approval must not shorten a purchased month or leave paid service unsupported after collection stops.
+The selected launch route is Alipay NowPay Direct. Product eligibility, an effective account whitelist, completed merchant/application requirements and a sellable product are separate gates; eligibility does not enable checkout. Configure one `ONE_TIME_DURATION` / `MONTH` offer at CNY29 in the official management mini-program. Require the actual product capability to be `ENABLED` before offering a new purchase. Collection closing must not erase already purchased rights.
+
+Contract: [official Direct guide](https://aipay.alipay.com/docs/vibe-pay/nowpay/direct/nowpay-direct.html) and [signed access decision](https://aipay.alipay.com/docs/vibe-pay/nowpay/direct/api-list/purchase_consult.md).
 
 ## Free and paid scope
 
@@ -26,9 +28,9 @@ Paid Personal scope: 1 WeChat Official Account, 30 successful publishing jobs pe
 
 ## Paid-period boundaries
 
-Hosted usage is metered by account, not device. A successful, independently verified payment starts one calendar month, calculated in UTC; if the corresponding day is absent in the next month, clamp to that month's last day and retain the time. The interval includes its start and excludes its end. A month is not a fixed 30 days. Delayed or repeated notifications must not move the start or extend the end.
+Hosted usage is metered by account, not device. Direct supplies the authoritative `valid_from` / `valid_until` window in its signed access decision. Parse the documented Asia/Shanghai timestamps and normalize them to UTC for Permit and metering; do not recompute the provider's month from a local payment timestamp. The interval includes its start and excludes its end. A month is not a fixed 30 days. Repeated reads or page returns must not extend it.
 
-There is no recurring debit agreement, renewal scheduler or cancellation step needed to prevent another charge. A further purchase requires a fresh explicit customer action. The initial implementation must define and verify whether purchases during an active period are allowed before exposing that action; do not promise early renewal or stack periods merely because a checkout can accept another payment. After expiry, hosted compute stops; local data remains readable and exportable. No automatic overage charge or hidden fair-use restriction. Refund rules, retention/deletion periods and total price must be clear before real checkout and verified end to end.
+There is no recurring debit agreement, renewal scheduler or cancellation step needed to prevent another charge. A further purchase requires a fresh explicit customer action. Direct does not allow another duration purchase while rights remain valid. Offer a later manual purchase only after expiry and a fresh provider decision requiring purchase; do not offer early renewal or stacked time. After expiry, hosted compute stops; local data remains readable and exportable. No automatic overage charge or hidden fair-use restriction. Refund rules, retention/deletion periods and total price must be clear before real checkout and verified end to end.
 
 ## Authorization decision for implementation
 
@@ -42,9 +44,9 @@ Decision revision: `2026-10-auth-1` (2026-10-23). This is a service design, not 
 
 ## Next gate before sales
 
-Complete idempotent publishing, duplicate prevention, credential rotation, revocation and quotas in #7. Quotas follow the UTC payment billing cycle, do not roll over, and stop new jobs when exhausted without silent overage charges. At expiry, stop new hosted jobs, allow 30 days to export content, then delete hosted content copies; backup/log retention must be separately published with definite periods. Local content is unaffected. Hosting is not on sale.
+Complete idempotent publishing, duplicate prevention, credential rotation, revocation and quotas in #7. Quotas follow the provider-paid interval normalized to UTC, do not roll over, and stop new jobs when exhausted without silent overage charges. At expiry, stop new hosted jobs, allow 30 days to export content, then delete hosted content copies; backup/log retention must be separately published with definite periods. Local content is unaffected. Hosting is not on sale.
 
-Before the first sale, #17 must also prove calendar-month issuance from trusted payment evidence, month-end/leap-year boundaries, delayed and duplicate notifications, a later manual purchase, cross-order refund isolation and server-side offer allowlisting. The existing one-day sandbox policy is not a production monthly policy. Merchant approval, contract acceptance and application review remain separate gates; configuring production keys does not pass them.
+Before the first sale, #17 must prove signed Direct decision-to-Permit issuance, product/account/request binding, provider period handling, active-period purchase refusal, expiry and later purchase, supported refund-to-withdrawal behavior and offer allowlisting. A page return grants no rights; a fresh authenticated access decision is required. The basic page-pay sandbox, including its monthly and refund tests, does not validate the Direct adapter. Do not fabricate payment events from an unbound `ALLOW` response or assume the old refund API applies to Direct. Merchant approval, contract acceptance and application review remain separate gates; configuring production keys does not pass them.
 
 Execution entry: [issue #7](https://github.com/turlamai/publy/issues/7). Complete this bounded slice before expanding commercial features.
 
