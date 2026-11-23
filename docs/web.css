@@ -54,3 +54,6 @@ html.publy-web {
 .publy-web .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger)}
 
 .publy-web .small,.publy-web .plan-meta,.publy-web .card p,.publy-web .card ul,.publy-web .card ol{font-size:14px}
+
+.publy-web .grid{min-width:0}.publy-web .grid>*{min-width:0}.publy-web .pw-prose{overflow-wrap:anywhere}.publy-web .pw-prose pre{max-width:100%;overflow-x:auto;white-space:pre;background:var(--tint);padding:16px;border-radius:8px;font:14px/1.7 var(--mono)}
+@media(max-width:820px){.publy-web .grid{grid-template-columns:minmax(0,1fr)}}

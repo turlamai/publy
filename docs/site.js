@@ -3,7 +3,9 @@
   var root=document.documentElement;
   function read(k){try{return localStorage.getItem(k)}catch(_){return null}}
   function save(k,v){try{localStorage.setItem(k,v)}catch(_){}}
-  var language=new URLSearchParams(location.search).get('lang')||read('publy-lang-override-v2');
+  var explicitLanguage=new URLSearchParams(location.search).get('lang');
+  if(explicitLanguage==='zh'||explicitLanguage==='en')save('publy-lang-override-v2',explicitLanguage);
+  var language=explicitLanguage||read('publy-lang-override-v2');
   if(language!=='zh'&&language!=='en')language=(navigator.language||'en').startsWith('zh')?'zh':'en';
   function lang(v){root.lang=v==='zh'?'zh-CN':'en';document.querySelectorAll('[data-switch]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.switch===v))})}
   if(document.querySelector('[data-switch]'))lang(language);
