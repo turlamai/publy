@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Focus the recommended writing experience on Obsidian, with an editor-independent CLI and official agent skill.
+- Use explicit operation parameters instead of note frontmatter for every publication option; preserve and skip existing properties without YAML evaluation.
+- Require a format for draft creation, add consistent title/cover/author/summary/caption options to checks and previews, and provide an Obsidian draft options dialog.
+
+
 All notable changes to Publy are documented in this file. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 

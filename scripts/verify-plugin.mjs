@@ -162,6 +162,8 @@ class Setting {
   }
   addButton() { return this; }
 }
+let operationAction="publish";
+let operationHook=null;
 class Modal {
   constructor() { this.contentEl = new Component(); }
   open() {
@@ -172,6 +174,12 @@ class Modal {
     if (typeof this.onPick === "function") {
       this.picked = true;
       this.onPick("auto");
+    }
+    if (typeof this.onSubmit === "function" && this.options) {
+      this.completed = true;
+      const action=operationAction;operationAction="publish";
+      operationHook?.();operationHook=null;
+      this.onSubmit(action === "cancel" ? null : {options:this.options, action});
     }
     this.close();
   }
@@ -354,7 +362,8 @@ if (calls.some((c) => c.startsWith("server-request:"))) fail("local preview cont
 // card deck render into the in-app preview view (wasm + satori + harfbuzzjs)
 app.workspace.activeFile = { path: "samples/card-sample.md", basename: "card-sample", extension: "md" };
 try {
-  await inst.previewCurrentNote(); // smart dispatch -> card deck
+  inst.chooseFormat("samples/card-sample.md", "cards");
+  await inst.previewCurrentNote(); // explicit cards
   // Resvg retains module state across disable/enable. A second onload must
   // accept already-initialized WASM and still render formula PNGs.
   delete req.cache[req.resolve(path.resolve(mainJs))];
@@ -385,6 +394,28 @@ await inst.publishCurrentNote();
 if (!calls.some((c) => c.includes("WeChat drafts"))) fail("publish success toast missing — calls: " + calls.join(" | "));
 const dupes = calls.filter((c) => c.includes("WeChat drafts")).length;
 if (dupes !== 1) fail("unexpected publish toast count: " + dupes);
+
+// The operation dialog distinguishes preview/cancel from draft authorization.
+const authorizedCount=calls.filter(c=>c==="request:publish").length;
+operationAction="cancel";await inst.publishCurrentNote();
+if(calls.filter(c=>c==="request:publish").length!==authorizedCount)fail("cancelled operation submitted a draft");
+operationAction="preview";await inst.publishCurrentNote();
+if(calls.filter(c=>c==="request:publish").length!==authorizedCount)fail("preview operation submitted a draft");
+const reviewPath="samples/private-options.md";
+const privateValue="PLUGIN_NOTE_PROPERTIES_CANARY_20261123";
+const reviewRaw="---\ntitle: "+privateValue+"\nauthor: "+privateValue+"\ntheme: ../private\ntype: image\ncaption: "+privateValue+"\n---\n# Visible note\n\nBody.";
+app.vaultContentByPath[reviewPath]=reviewRaw;
+app.workspace.activeFile={path:reviewPath,basename:"private-options",extension:"md"};
+inst.operationChoices.set(reviewPath,{format:"article",title:"Chosen title",author:"Chosen author",digest:"Chosen summary"});
+await inst.publishCurrentNote();
+if(lastSubmitted.title!=="Chosen title"||lastSubmitted.author!=="Chosen author"||lastSubmitted.digest!=="Chosen summary")fail("operation values did not reach request");
+if(JSON.stringify(lastSubmitted).includes(privateValue)||lastPreviewHtml.includes(privateValue))fail("private note properties leaked into preview or request");
+if(app.vaultContentByPath[reviewPath]!==reviewRaw)fail("operation rewrote source properties");
+const beforeChanged=calls.filter(c=>c==="request:publish").length;
+operationHook=()=>{app.vaultContentByPath[reviewPath]=reviewRaw+" changed";};
+await inst.publishCurrentNote();
+if(calls.filter(c=>c==="request:publish").length!==beforeChanged)fail("source changed in dialog but draft was sent");
+app.workspace.activeFile={path:"samples/article-sample.md",basename:"article-sample",extension:"md",stat:{mtime:Date.now()}};
 
 // A bare HTTP 200 or a confirmation without a media ID is not proof.
 const confirmedBefore = calls.filter((c) => c.startsWith("notice:✅")).length;
@@ -445,6 +476,7 @@ try {
     path: "samples/standalone-cover.md", basename: "standalone-cover", extension: "md",
     stat: { mtime: Date.now() },
   };
+  inst.operationChoices.set("samples/standalone-cover.md", {format:"article", cover:coverPath});
   const previousPostCount = calls.filter((c) => c === "request:publish").length;
   await inst.publishCurrentNote();
   if (calls.filter((c) => c === "request:publish").length !== previousPostCount + 1) {
@@ -456,7 +488,7 @@ try {
     fail("frontmatter-only cover was not included as exact PNG material");
   }
   const pathKey = "samples/format-choice.md";
-  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + path.basename(coverPath) + ")";
+  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + coverPath.split(path.sep).join("/") + ")";
   app.vaultContentByPath[pathKey] = source;
   app.workspace.activeFile = { path: pathKey, basename: "format-choice", extension: "md", stat: { mtime: Date.now() } };
   inst.chooseFormat(pathKey, "image");
@@ -471,7 +503,7 @@ try {
     fail("chosen image format did not submit the same image-and-caption payload");
   }
   if (app.vaultContentByPath[pathKey] !== source) fail("format choice modified the original note");
-  inst.chooseFormat(pathKey, "auto");
+  inst.chooseFormat(pathKey, "article");
 } finally {
   fs.rmSync(coverPath, { force: true });
 }
@@ -482,6 +514,8 @@ app.workspace.activeFile = {
   path: "samples/card-sample.md", basename: "card-sample", extension: "md",
   stat: { mtime: Date.now() },
 };
+inst.chooseFormat("samples/card-sample.md", "cards");
+inst.chooseTheme("samples/card-sample.md", "midnight");
 const beforeCards = calls.filter((c) => c === "request:publish").length;
 await inst.publishCurrentNote();
 if (calls.filter((c) => c === "request:publish").length !== beforeCards + 1) {
@@ -517,6 +551,7 @@ try {
     path: identityPath, basename: "idempotency", extension: "md",
     stat: { mtime: 1700000000000 },
   };
+  inst.operationChoices.set(identityPath, {format:"article",cover:idCover});
   await inst.publishCurrentNote();
   const first = lastSubmitted;
   if (!first?.idempotencyKey || !first.html?.includes("Alpha")) {

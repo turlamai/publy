@@ -45,3 +45,8 @@ The plugin entry point is `src/main.ts` (the controller: settings load, registra
 ## Report an issue
 
 Open an [issue](https://github.com/turlamai/publy/issues) with plugin version, Obsidian version, OS, installation method, reproducible steps and redacted output. Never attach API keys, AppSecrets or private notes.
+
+
+## Explicit draft options
+
+Obsidian is the recommended editor. Select article, images with a caption, or text cards; draft actions open an operation dialog naming the note and account. Choose a title, author, summary and caption, preview locally, then explicitly confirm draft delivery. The existing cover picker and theme settings supply the other operation options. Cancel never submits. No note properties control publication, and the original file remains unchanged. CLI and the official skill use the same core parameter contract; no external CLI binary is needed by the plugin. Public hosted checkout remains closed.

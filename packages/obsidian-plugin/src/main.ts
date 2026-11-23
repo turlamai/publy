@@ -9,7 +9,9 @@ import {
   renderCards,
   captionToHtml,
   imagePostCaption,
-  parseSource,
+  publicationTitle,
+  publicationDigest,
+  type PublicationOptions,
   resolvePublication,
   type PublicationFormat,
   blockingMediaWarning,
@@ -27,7 +29,7 @@ import { availableArticleThemes, articleThemeCss } from "./article-themes.js";
 import { imageContentType, fileToBase64, pickLocalImageFiles } from "./image-input.js";
 import { VIEW_TYPE_PUBLY_PREVIEW, PUBLY_HISTORY_VIEW, DEFAULT_SETTINGS, type PublySettings, type PublishResponse, type PublishResultInfo, type HistoryEntry, type JobEntry } from "./types.js";
 import { PublyPreviewView, PublyHistoryView } from "./views.js";
-import { AccountModal, CoverPickerModal, ScheduleModal } from "./modals.js";
+import { AccountModal, CoverPickerModal, ScheduleModal, PublicationOptionsModal } from "./modals.js";
 import { PublySettingTab } from "./settings-tab.js";
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
 import embeddedResvgWasm from "@resvg/resvg-wasm/index_bg.wasm";
@@ -42,11 +44,17 @@ import embeddedBoldFont from "../../core/fonts/NotoSansSC-subset-Bold.otf";
 
 export default class PublyPlugin extends Plugin {
   declare settings: PublySettings;
-  private readonly formatChoices = new Map<string, PublicationFormat>();
-  formatForNote(path: string): PublicationFormat | undefined { return this.formatChoices.get(path); }
-  chooseFormat(path: string, value: PublicationFormat | "auto"): void {
-    if (!path) return;
-    if (value === "auto") this.formatChoices.delete(path); else this.formatChoices.set(path, value);
+  private readonly operationChoices = new Map<string, PublicationOptions>();
+  optionsForNote(notePath: string): PublicationOptions { return { ...this.operationChoices.get(notePath) }; }
+  formatForNote(notePath: string): PublicationFormat { return this.optionsForNote(notePath).format ?? "article"; }
+  chooseTheme(notePath: string, theme: string): void {
+    if (notePath) this.operationChoices.set(notePath, {...this.optionsForNote(notePath), theme});
+  }
+  chooseFormat(notePath: string, format: PublicationFormat): void {
+    if (!notePath) return;
+    const options={...this.optionsForNote(notePath), format};
+    if (format === "cards" && !Object.hasOwn(BUILTIN_CARD_THEMES, options.theme ?? this.settings.theme)) options.theme="naive";
+    this.operationChoices.set(notePath, options);
   }
   wasmOk = false;
   statusBarItem: HTMLElement | null = null;
@@ -261,13 +269,16 @@ export default class PublyPlugin extends Plugin {
     return (leaf?.view as PublyPreviewView | undefined) ?? null;
   }
 
-  private renderOptions() {
+  private renderOptions(file?: TFile, operation?: PublicationOptions) {
+    const theme = operation?.theme ?? this.optionsForNote(file?.path ?? "").theme ?? this.settings.theme ?? "claude";
     return {
-      baseDir: this.basePath(),
+      ...this.optionsForNote(file?.path ?? ""),
+      ...operation,
+      baseDir: file ? path.dirname(path.join(this.basePath(), file.path)) : this.basePath(),
       mediaDirs: this.mediaDirs(),
-      theme: this.settings.theme || "claude",
-      themeCss: articleThemeCss(this.settings.theme || "claude"),
-      highlightCss: this.settings.theme === "terminal" ? hljsGithubDarkCss : hljsGithubCss,
+      theme,
+      themeCss: articleThemeCss(theme),
+      highlightCss: theme === "terminal" ? hljsGithubDarkCss : hljsGithubCss,
     };
   }
 
@@ -275,7 +286,7 @@ export default class PublyPlugin extends Plugin {
     const f = file ?? this.currentFile();
     if (!f) throw new Error(t("errNoActiveNote"));
     const raw = await this.app.vault.cachedRead(f);
-    const rendered = renderMarkdown(raw, this.renderOptions());
+    const rendered = renderMarkdown(raw, this.renderOptions(f));
     try {
       for (const w of rendered.warnings) console.warn("[publy] " + w);
       return this.inlineImages(rendered.html, rendered.attachments);
@@ -402,9 +413,9 @@ export default class PublyPlugin extends Plugin {
    *  must never paint over a note the user switched to afterwards */
   private previewGen = 0;
 
-  /** one preview command: picks article or image-post cards from frontmatter.
+  /** One preview command uses session-local explicit operation options.
    *  public: the preview-view toolbar and the theme dropdown call back into it. */
-  async previewCurrentNote(file?: TFile): Promise<void> {
+  async previewCurrentNote(file?: TFile, previewAccount?: string): Promise<void> {
     const f = file ?? this.currentFile();
     if (!f) {
       new Notice(t("noActiveNote"));
@@ -418,11 +429,10 @@ export default class PublyPlugin extends Plugin {
     let docFormat: PublicationFormat;
     let format: PublicationFormat;
     try {
-      const meta = parseSource(raw).meta;
-      docFormat = resolvePublication(meta).format;
-      format = resolvePublication(meta, this.formatForNote(f.path)).format;
+      docFormat = "article";
+      format = resolvePublication(this.formatForNote(f.path)).format;
     } catch {
-      new Notice(t("renderFail", { msg: "Invalid document metadata" }));
+      new Notice(t("renderFail", { msg: "Invalid operation options" }));
       return;
     }
     if (format === "cards") {
@@ -433,7 +443,7 @@ export default class PublyPlugin extends Plugin {
     await new Promise<void>((r) => setTimeout(r, 0));
     if (gen !== this.previewGen) return;
     try {
-      const rendered = renderMarkdown(raw, this.renderOptions());
+      const rendered = renderMarkdown(raw, this.renderOptions(f));
       try {
         for (const w of rendered.warnings) console.warn("[publy] " + w);
         if (format === "image" && (!rendered.attachments.length || rendered.warnings.some(blockingMediaWarning))) {
@@ -445,12 +455,12 @@ export default class PublyPlugin extends Plugin {
         view.documentFormat = docFormat;
         view.refresh = () => this.previewCurrentNote(f);
         const html = format === "image"
-          ? `<div>${rendered.attachments.map((a) => `<img alt="" src="data:${a.contentType};base64,${fs.readFileSync(a.path).toString("base64")}">`).join("")}${captionToHtml(imagePostCaption(raw))}</div>`
+          ? `<div>${rendered.attachments.map((a) => `<img alt="" src="data:${a.contentType};base64,${fs.readFileSync(a.path).toString("base64")}">`).join("")}${captionToHtml(imagePostCaption(raw, this.optionsForNote(f.path).caption))}</div>`
           : this.inlineImages(rendered.html, rendered.attachments);
         view.setHtml(html, {
-          title: rendered.title || f.basename,
+          title: publicationTitle(raw, this.optionsForNote(f.path).title, f.basename),
           author: rendered.meta.author,
-          account: this.settings.account || undefined,
+          account: (previewAccount ?? this.settings.account) || undefined,
         });
       } finally { rendered.cleanup(); }
     } catch (err) {
@@ -476,13 +486,15 @@ export default class PublyPlugin extends Plugin {
       outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       const view = (await this.activateView(VIEW_TYPE_PUBLY_PREVIEW)) as PublyPreviewView;
       view.notePath = f.path;
-      view.documentFormat = resolvePublication(parseSource(raw).meta).format;
+      view.documentFormat = "article";
       view.refresh = () => this.previewCurrentNote(f);
       // progressive: the panel skeleton appears immediately and each card
       // pops in as its rasterization lands — 9-card decks stop feeling
       // like a 9x wait
       view.beginCards();
       const result = await renderCards(raw, {
+        ...this.optionsForNote(f.path),
+        theme: this.optionsForNote(f.path).theme ?? this.settings.theme,
         outDir,
         offline: true, // Never download a full font during offline plugin preview.
         onCard: (card) => {
@@ -515,7 +527,7 @@ export default class PublyPlugin extends Plugin {
     }
     const raw = await this.app.vault.cachedRead(f);
     try {
-      const rendered = renderMarkdown(raw, this.renderOptions());
+      const rendered = renderMarkdown(raw, this.renderOptions(f));
       try {
         for (const w of rendered.warnings) console.warn("[publy] " + w);
         // A successful copy should be directly usable in the target editor:
@@ -580,17 +592,31 @@ export default class PublyPlugin extends Plugin {
     }
     this.publishInFlight = true;
     try {
-      await this.doPublishInner(f, publishAt);
+      const raw = await this.app.vault.cachedRead(f);
+      const account = this.settings.account;
+      const initial = { ...this.optionsForNote(f.path), format: this.formatForNote(f.path),
+        theme: this.optionsForNote(f.path).theme ?? this.settings.theme,
+        title: publicationTitle(raw, this.optionsForNote(f.path).title, f.basename) };
+      const choice = await new Promise<{options: PublicationOptions; action: "preview" | "publish"} | null>((resolve) => {
+        new PublicationOptionsModal(this.app, f.basename, account, initial, resolve, publishAt).open();
+      });
+      if (!choice) return;
+      if (choice.options.format === "cards" && !Object.hasOwn(BUILTIN_CARD_THEMES, choice.options.theme ?? this.settings.theme)) choice.options.theme="naive";
+      this.operationChoices.set(f.path, choice.options);
+      if (choice.action === "preview") { await this.previewCurrentNote(f); return; }
+      // Refresh with exactly the confirmed options, then submit the captured source.
+      await this.previewCurrentNote(f, account);
+      if (await this.app.vault.cachedRead(f) !== raw) { new Notice(t("sourceChanged")); return; }
+      await this.doPublishInner(f, publishAt, choice.options, account, raw);
     } finally {
       this.publishInFlight = false;
     }
   }
 
-  private async doPublishInner(f: TFile, publishAt?: string): Promise<void> {
+  private async doPublishInner(f: TFile, publishAt: string | undefined, operation: PublicationOptions, submitAccount: string, raw: string): Promise<void> {
     if (!this.ensureConfigured()) return;
     // never submit to an unnamed default account: the destination must be
     // part of what the user sees before anything leaves the machine (#7)
-    const submitAccount = this.settings.account;
     if (!submitAccount) {
       new Notice(t("needAccount"), 8000);
       void this.switchAccount();
@@ -602,7 +628,6 @@ export default class PublyPlugin extends Plugin {
       new Notice(t("badServer"));
       return;
     }
-    const raw = await this.app.vault.cachedRead(f);
     this.status(t("rendering"));
     const view = this.previewView();
     view?.setPublishing(true);
@@ -618,22 +643,15 @@ export default class PublyPlugin extends Plugin {
     let title: string;
     let author: string | undefined;
     try {
-      const rendered = renderMarkdown(raw, this.renderOptions());
-      try {
-        for (const w of rendered.warnings) console.warn("[publy] " + w);
-        const problems = rendered.warnings.filter(blockingMediaWarning);
-        if (problems.length) {
-          throw new Error(t("mediaNotReady") + " " + problems.join("; "));
-        }
-        const selection = resolvePublication(rendered.meta, this.formatForNote(f.path));
-        type = selection.type;
-        title = rendered.title || f.basename;
-        author = rendered.meta.author;
-        if (selection.format === "cards") {
+      const selection = resolvePublication(operation.format);
+      type = selection.type;
+      title = publicationTitle(raw, operation.title, f.basename);
+      author = operation.author;
+      if (selection.format === "cards") {
           if (!this.wasmOk) throw new Error(t("wasmDown"));
           const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-publish-cards-"));
           try {
-            const cards = await renderCards(raw, { outDir, offline: true });
+            const cards = await renderCards(raw, { ...operation, theme: operation.theme ?? this.settings.theme, outDir, offline: true });
             if (!cards.lint.ok) {
               throw new Error(t("mediaNotReady") + " " + cards.lint.problems.join("; "));
             }
@@ -652,7 +670,12 @@ export default class PublyPlugin extends Plugin {
             // of private note content in the system temp directory.
             fs.rmSync(outDir, { recursive: true, force: true });
           }
-        } else {
+      } else {
+        const rendered = renderMarkdown(raw, this.renderOptions(f, operation));
+        try {
+          for (const warning of rendered.warnings) console.warn("[publy] " + warning);
+          const problems = rendered.warnings.filter(blockingMediaWarning);
+          if (problems.length) throw new Error(t("mediaNotReady") + " " + problems.join("; "));
           payloadAttachments = rendered.attachments.map((a) => ({
             name: a.name,
             data: fs.readFileSync(a.path).toString("base64"),
@@ -663,14 +686,14 @@ export default class PublyPlugin extends Plugin {
           }
           if (type === "image_post") {
             coverName = payloadAttachments[0]?.name;
-            html = captionToHtml(imagePostCaption(raw));
+            html = captionToHtml(imagePostCaption(raw, operation.caption));
           } else if (rendered.cover) {
             const existing = rendered.attachments.find((a) => a.path === rendered.cover);
             if (existing) {
               coverName = existing.name;
               explicitCover = true;
             } else {
-              // The cover can be a standalone frontmatter image, not in body.
+              // The cover can be a standalone explicitly selected image, not in body.
               const ext = path.extname(rendered.cover).toLowerCase();
               const data = fs.readFileSync(rendered.cover);
               const png = ext === ".png" &&
@@ -694,8 +717,8 @@ export default class PublyPlugin extends Plugin {
             }
           }
           if (type === "article") html = rendered.html;
-        }
-      } finally { rendered.cleanup(); }
+        } finally { rendered.cleanup(); }
+      }
     } catch (err) {
       progress.hide();
       this.status("");
@@ -714,7 +737,7 @@ export default class PublyPlugin extends Plugin {
         k === "auto" || payloadAttachments.some((c) => c.name === k) || this.localImages.has(k) || fs.existsSync(k);
       const pre = last && known(last) ? last : payloadAttachments[0]?.name ?? "auto";
       const choice = await new Promise<string | null>((resolve) => {
-        new CoverPickerModal(this.app, this, f, payloadAttachments, pre, resolve).open();
+        new CoverPickerModal(this.app, this, f, payloadAttachments, pre, resolve, title).open();
       });
       if (choice === null) {
         progress.hide();
@@ -761,6 +784,7 @@ export default class PublyPlugin extends Plugin {
       images: payloadAttachments,
       cover: coverName,
       author,
+      digest: publicationDigest(raw, operation),
       ...(coverMode ? { coverMode } : {}),
       ...(publishAt ? { publishAt } : {}),
     };

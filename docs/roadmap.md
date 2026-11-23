@@ -23,7 +23,7 @@ local integration work, not a merge, release, deployed service or sales claim.
   cannot contain later deliveries, revoked keys or account changes; isolated
   reconciliation and a real restore rehearsal remain required (#7/#8).
 - Product proof still required: clean Obsidian install/update on target
-  systems, real Typora/Obsidian source-to-draft walkthrough, and a no-npm
+  systems, real Obsidian source-to-draft walkthrough, and a no-npm
   packaged CLI. Synthetic three-file smoke is not directory listing or a
   desktop/WeChat acceptance (#12/#14/#15/#18/#25/#26/#37).
 - Hosted admission remains closed: Commerce commit
@@ -84,16 +84,7 @@ are **implementation history**, not acceptance of current production gates.
 
 ## Editor-neutral customer experience / 跨编辑器客户体验 — 2026-10-30
 
-Publy must earn a real-user subscription via an excellent **existing editor
-→ original Markdown → preflight → preview/copy → explicit selected WeChat
-draft → verified outcome** journey, not a larger list of unverified editor
-plugins. **Typora and Obsidian are the only first-class writing
-experiences.** Ordinary Markdown remains a shared input format, not another
-editor-support program. Cloud-document and extra editor adapters are out
-of scope; a small file-picker companion is only a delivery UX candidate,
-**not delivered**. The first developer
-slice is source-relative/Typora image-path fidelity and an offline
-`publy check` command; retain exact image identity and file immutability.
+Publy focuses its human experience on Obsidian. The editor-independent CLI and official skill share one explicit operation parameter contract. Note properties no longer control publication; there is no Typora-specific expansion or publishing-companion plan. Prioritize source/media fidelity, offline preview/check, explicit selected-account draft delivery and verified outcomes.
 See [product UX #25](https://github.com/turlamai/publy/issues/25),
 [interop/format evidence #26](https://github.com/turlamai/publy/issues/26),
 [EN](editor-workflows.md) and [中文](editor-workflows.zh-CN.md).
@@ -121,7 +112,7 @@ Read [the current product/interaction decision](design.md#current-scope-and-inte
 - [x] `@publy/core` 微信客户端：token 缓存（单飞 + 600s buffer）、add_material、draft/add（文章 + newspic 图片消息两种草稿）
 - [x] `publy-server` 协议 v1（/health /verify /v1/publish，base64 附件 + attachment:// 引用替换）——本地冒烟通过（含微信 API 真实调用错误路径）
 - [x] 2026-09-29 记录过个人服务器部署；历史地址/端口不作为公开配置约定或当前可用性证明。当前访问、TLS、固定出口与凭据边界以 #8 的受控试点和实际 runbook 验证为准。
-- [x] cards 模式发布实测：`mode: cards` 自动推断 image_post（tlai-wechat-card 产出无需 type 字段）——4 卡 newspic 草稿全链路通过
+- [x] cards 模式发布实测：历史 frontmatter 自动推断（2026-11-23 已由明确 `--format cards` 取代）——4 卡 newspic 草稿全链路通过
 
 **验收**：✅ 真实公众号全流程发布 1 篇文章（渲染 → 服务器 → 草稿箱，6.5s，幂等命中与审计日志实测通过）+ 1 篇 cards 图片消息。
 
@@ -130,7 +121,7 @@ Read [the current product/interaction decision](design.md#current-scope-and-inte
 - [x] satori + resvg 卡片渲染：markdown 分节（cover/point/list/ending 四版式原型）→ 3:4 PNG（1080×1440）
 - [x] `publy card` + `--preview` 拼版预览页 + lint（caption ≤1000 字、3–9 张、cover/ending 必备）
 - [x] 2 个内置卡片主题（naive 白底墨色 / claude 暖燕麦）；Noto Sans SC 按需下载缓存（jsDelivr + GitHub 双源）
-- [x] 发布链路：`mode: cards` → 卡片即 images → image_post 草稿（lint 不过拒发）
+- [x] 发布链路：明确 `--format cards` → 卡片即 images → image_post 草稿（lint 不过拒发）
 
 **验收**：实测 4 张卡片 2.5s 出图，汉字像素级正确；两主题渲染通过。
 

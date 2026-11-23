@@ -40,23 +40,14 @@ test("missing named folder never silently resolves another same-name image", () 
   });
 });
 
-test("Typora typora-root-url resolves rooted image references and covers", () => {
+test("note properties cannot redirect asset roots or select a cover", () => {
   fixture((root) => {
-    const actual = put(root, "website/blog/images/card.png");
-    const localRoot = path.join(root, "website").replaceAll("\\", "/");
-    const raw = [
-      "---",
-      "title: Typora fixture",
-      `typora-root-url: "${localRoot}"`,
-      "cover: /blog/images/card.png",
-      "---",
-      "",
-      "![card](/blog/images/card.png)",
-    ].join("\n");
-    const result = renderMarkdown(raw, { baseDir: root });
-    assert.deepEqual(result.warnings, []);
-    assert.equal(result.cover, actual);
-    assert.deepEqual(result.attachments.map((a) => a.path), [actual]);
+    put(root,"website/blog/images/card.png");
+    const raw="---\ntypora-root-url: website\ncover: /blog/images/card.png\n---\n# Visible";
+    const result=renderMarkdown(raw,{baseDir:root});
+    assert.equal(result.cover,undefined);
+    assert.deepEqual(result.attachments,[]);
+    assert.ok(!result.html.includes("website"));
   });
 });
 
@@ -66,7 +57,7 @@ test("relative cover resolves from note directory and leaves source unchanged", 
     fs.mkdirSync(sourceDir);
     const cover = put(root, "images/cover.png");
     const raw = "---\ncover: ../images/cover.png\n---\n\n# This is a note";
-    const result = renderMarkdown(raw, { baseDir: sourceDir });
+    const result = renderMarkdown(raw, { baseDir: sourceDir, cover: "../images/cover.png" });
     assert.equal(result.cover, cover);
     assert.ok(!result.warnings.some((w) => w.includes("Cover not found")));
     assert.equal(raw.includes("../images/cover.png"), true);
@@ -111,24 +102,6 @@ test("Typora's legacy %u Chinese filename escapes resolve the original local fil
   });
 });
 
-test("Typora roots support escaped non-ASCII filenames and covers", () => {
-  fixture((root) => {
-    const actual = put(root, "site/blog/配图/封面.png");
-    const yaml = [
-      "---",
-      `typora-root-url: "${path.join(root, "site").split(path.sep).join("/")}"`,
-      "cover: /blog/%u914D%u56FE/%u5C01%u9762.png",
-      "typora-copy-images-to: assets/pasted",
-      "---",
-      "",
-      "![img](/blog/%u914D%u56FE/%u5C01%u9762.png)",
-    ].join("\n");
-    const rendered = renderMarkdown(yaml, { baseDir: root });
-    assert.deepEqual(rendered.warnings, []);
-    assert.equal(rendered.cover, actual);
-    assert.deepEqual(rendered.attachments.map((a) => a.path), [actual]);
-  });
-});
 
 test("Typora local URL decoding does not recursively turn an encoded slash into a new folder", () => {
   fixture((root) => {

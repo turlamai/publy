@@ -1,129 +1,30 @@
-# Write anywhere, deliver through Publy
+# Obsidian, CLI and agent workflow
 
-[简体中文](editor-workflows.zh-CN.md) · English
+**English** · [简体中文](editor-workflows.zh-CN.md)
 
-**Product decision (2026-10-30): Typora and Obsidian share one Markdown-to-WeChat workflow.** The writer
-keeps their original file and preferred editor. Publy owns review, WeChat
-formatting and explicit **draft** delivery, not the act of writing. The product
-must earn a subscription through reliable hosted delivery and recovery, not
-lock content into an editor, copy a vault or impose a subscription on offline
-preview.
+Owner decision `2026-11-23-operation-options`: Obsidian is the only recommended editor and plugin experience. The CLI remains editor-independent and the official [skill](../skills/publy-publish/SKILL.md) calls it. No Typora-specific integration, acceptance programme or publishing companion is planned. WeChat Official Account drafts remain the sole destination.
 
-## What works in the current developer build
+## One operation contract
 
-| Writing source | Intake | Readiness |
-| --- | --- | --- |
-| Typora | Open an existing `.md` / `.markdown` file in Publy CLI | Standard Markdown images and local `typora-root-url` support; no Typora plugin required |
-| Other programs that save standard Markdown | Generic file input only | No editor-specific integration, validation or support commitment |
-| Obsidian | Existing plugin or file path from CLI | Obsidian-style embeds; Community Directory three-file installation still blocked by #12 |
-| Notion, Feishu/Lark, Yuque, Word/WPS, Google Docs | **Out of scope** | No product integration or connector planned |
-| Browser paste, mobile share or URL import | **Out of scope** | Not a planned publishing feature |
+Use explicit `--format article`, `--format image` or `--format cards`. Pass the same format, title, cover, theme, author, summary and caption to check, preview and delivery. `publish` requires an explicit format and account. Local check/preview default to article when no format is supplied; they never infer it from note properties or picture count. A skill asks when intent is unclear.
 
-A file-based editor that can save compatible Markdown is an input, **not**
-a tested endorsement or supported proprietary plugin.
+The plugin provides a three-choice format selector and a draft options dialog. Preview does not submit; confirm delivery explicitly after reviewing the selected note, target account and options. Cancel creates no draft. The plugin uses the same core parameter contract without spawning an external CLI binary.
 
-## Typora first
-
-Typora can store images next to a document, in relative subfolders, or
-under an optional YAML `typora-root-url`. Choose **the original Markdown file**,
-not an exported PDF or HTML. Publy resolves image paths from the source
-directory first, preserving nested directories and preventing two unrelated
-`logo.png` files from being confused. It also respects a **local filesystem**
-`typora-root-url` for references starting with `/`. Remote root URLs are not
-downloaded. The source file is not edited. **Privacy note:** the preview HTML contains
-embedded copies of local media for display, stored in a temporary file by
-default or at an explicitly selected `--out` path. Handle that preview as
-private content and delete it when done. Remote HTTP images are left as
-remote references and may cause network requests **when opened in a browser**;
-`publy check` itself performs no network requests.
-
-Example alongside a real file and `assets/cover.jpg`:
-
-```md
----
-title: My first draft
-cover: assets/cover.jpg
----
-
-# Hello
-
-![Cover](assets/cover.jpg)
-```
-
-Developer-built CLI (no public one-click installer yet):
+Frontmatter is not a Publy configuration source. Leading note properties are skipped without parsing YAML, never exported as content or copied into publication metadata. Existing notes are not rewritten. Close the properties block before the body. Use operation parameters or plugin settings for defaults. Titles fall back to a body H1 then filename. Image captions fall back to body prose; card captions fall back to prose before the first `## cover/point/list/ending` section, or use `--caption-file`.
 
 ```sh
-publy check "/path/to/draft.md" --json    # offline, checks assets and card lint
-publy preview "/path/to/draft.md"       # offline preview embeds local images
-publy preview "/path/to/draft.md" --no-open --out preview.html  # for review/automation
-# Only after confirming the destination, and configuring an approved self-hosted server:
-publy publish "/path/to/draft.md" --account my-account
+publy check note.md --format article --title "Draft title" --cover assets/cover.png --json
+publy preview note.md --format article --title "Draft title" --cover assets/cover.png --json
+# Only after authorization for this file and account:
+publy publish note.md --format article --title "Draft title" --cover assets/cover.png --account me --json
 ```
 
-`check` reports missing media and other problems as a nonzero exit (input
-errors: 2; preflight issues: 4) and emits a machine-readable JSON report.
-It does not call a server or submit a draft. Preview and CLI/source builds
-are currently developer capabilities, **not** a shipped clean-install user
-experience. See [distribution](distribution.md).
+## Files and recovery
 
-**Draft safety in the developer CLI:** unresolved local images, covers,
-SVG/math conversion failures and remote/data images that cannot be uploaded
-all block `publish` with exit code 4 **before** any draft request. Use
-`check` for a private local problem report and `preview` for a prominent
-on-page warning banner. Save external images into the original note's
-media folder. The local HTML preview applies a restrictive browser Content Security Policy:
-remote images, scripts and connections are blocked while embedded local
-images display; explicit user navigation to a link is still a separate
-browser action. `check` itself does not fetch remote resources.
+Standard Markdown relative images and Obsidian embeds are supported by the shared renderer. Resolve paths from the source directory and configured media directories; keep nested paths distinct. No frontmatter asset roots are read. Missing media blocks delivery. Original Markdown and assets stay in place.
 
-## Commercial-grade universal workflow (target, not already shipped)
+Local checks and previews require no service account and make no network request. Draft creation requires the configured server, its fixed outbound IP and the account's official API permissions. Unknown outcomes retain their original request identity and destination. Query/reconcile before trying again; a missing response is not proof of failure.
 
-1. **Open:** Open-with, drag a local file, or select it in a small cross-platform
-   Publy companion; existing editors remain the place to write. No content
-   library copy, repository import or cloud account needed for local preview.
-2. **Review:** One accurate WeChat preview, usable typography, phone-width
-   toggle, themes and a clear **asset checklist** (present, missing, remote,
-   unsupported, duplicated basenames) with actionable fixes.
-3. **Choose:** Separate **Copy formatted HTML** (text-only, with no unresolved media/formula attachments; it refuses to overwrite the clipboard if a required asset is missing) from
-   **Save to selected account's draft box**. Show account, title, cover and
-   operation before the remote action. Never silently broadcast/send.
-4. **Resolve:** Confirmed draft, duplicate suppressed, queued, pending/unknown,
-   failed are distinct. Timeout requires query/reconcile under the original
-   request identity, not a blind retry.
-5. **Return:** The original source stays in place, remains editable by Typora,
-   Obsidian, VS Code etc., and retains the same relative media paths.
+## Acceptance boundaries
 
-A future publishing companion should make delivery easier while preserving
-the original files. Any such application must meet the cross-platform
-installation and accessibility requirements before release.
-
-## Priority and acceptance
-
-**P0 — content fidelity:** exact local media path resolution; source
-unchanged; no same-name substitution; clean preview; missing asset and cover
-problems visible before submit. Exercise Chinese file names, whitespace,
-Unicode paths, Windows drive paths, UTF-8, linked media outside the note
-directory, data/file/http references and hostile Markdown.
-
-**P1 — no-technical-setup installation:** signed, reproducible Win/macOS/Linux
-assets, clean install/update/uninstall, first local preview without Node,
-Racket, npm, server configuration, account registration or a terminal. The
-future companion can open file paths or drag-and-drop; no proprietary editor
-API dependency. Real screen-reader/keyboard use, dark/light mode and error
-copy matter as much as screenshots.
-
-**P2 — dependable paid value:** customer self-service onboarding, stable
-outbound IP, account checks, clear permissions, secure credentials,
-restorable backups, live status and quotas, reconciliation, cancellation,
-refunds and accessible support. Commerce/Permit is the server authority.
-No hosted checkout before merchant and operational gates pass.
-
-**P3 — format/connector expansion:** import-only adapters only if necessary to validate Typora/Obsidian compatibility; fixtures must
-prove headings, local/remote images, captions, tables, code, maths, callouts,
-references and cover identity. Prioritize actual requests and measured demand,
-not a speculative plugin for each editor.
-
-For all paths record: 1) clean install; 2) sample source + expected media
-manifest; 3) preview visual comparison; 4) copy/publish identity; 5) offline
-behavior and errors; 6) uninstall and user-data persistence. Successful
-compilation is not user acceptance.
+Verify all three formats, malformed/private properties, unchanged source bytes, preview/request agreement, cancelled dialogs, wrong accounts, missing assets, late responses and same-request recovery. Core/CLI and synthetic plugin acceptance do not replace a clean Obsidian installation test. Current CLI distribution is a source build; hosted checkout remains closed. See [user guide](USER-GUIDE.md) and [agent contract](agent-cli.md).

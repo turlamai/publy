@@ -3,7 +3,7 @@
 [简体中文](agent-cli.zh-CN.md) · English
 
 Publy CLI is the **editor-independent automation interface** for a saved
-Markdown file. Typora and Obsidian are first-class writing experiences;
+Markdown file. Obsidian is the recommended writing experience;
 other programs or Agents may invoke the same CLI against an ordinary Markdown
 file. **WeChat Official Account drafts are the only delivery destination.**
 No cross-platform publishing, automatic mass-send, or public posting.
@@ -78,7 +78,7 @@ It **never launches the browser**, even without `--no-open`. It writes a
 private self-contained HTML file (which may contain confidential note/image
 bytes). Clean up the preview file/directory after reviewing it.
 
-For `mode: cards`, the generated review contains the actual PNG cards;
+For `--format cards`, the generated review contains the actual PNG cards;
 if a font is unavailable it **fails without fetching fonts**. A preview with
 blocking problems may still be written for human review, but exits with 4
 and has `ok:false` in JSON mode. Neither `check` nor `preview` creates
@@ -86,7 +86,7 @@ a WeChat draft.
 
 ### Publication format
 
-When `capabilities --json` advertises `publicationFormats`, pass the same `--format article|image|cards` to `check`, `preview`, and `publish` to choose one operation without modifying the Markdown. `formatSource` identifies an explicit choice, existing frontmatter, or the article default. Invalid values return `FORMAT_INVALID` before submission. Inspect the preview for the selected format; do not infer it from length or images. The reusable [Publy publishing skill](../skills/publy-publish/SKILL.md) describes the agent workflow.
+When `capabilities --json` advertises `publicationFormats`, pass the same `--format article|image|cards` to `check`, `preview`, and `publish` to choose one operation without modifying the Markdown. `formatSource` is `choice` or `default`; frontmatter never controls publication. `publish` requires an explicit `--format` (`FORMAT_REQUIRED`, exit 2). Common operation options are `--title`, `--cover`, `--theme`, `--author`, `--digest`, `--caption` / `--caption-file`; reuse them for check, preview and publish. Invalid values return `FORMAT_INVALID` before submission. Inspect the preview for the selected format; do not infer it from length or images. The reusable [Publy publishing skill](../skills/publy-publish/SKILL.md) describes the agent workflow.
 
 ## Raw HTML export and bundled theme discovery
 
@@ -110,7 +110,7 @@ article and card theme share a name, the existing card-first rule applies.
 
 ```sh
 # This command CREATES a WeChat draft after explicit user approval.
-publy publish article.md --account "my-wechat-account" --json
+publy publish article.md --format article --account "my-wechat-account" --json
 
 # When a request has unknown outcome, query the SAME id:
 publy publish-result <requestId> --json

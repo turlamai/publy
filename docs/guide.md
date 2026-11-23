@@ -22,9 +22,7 @@ The commands below use `publy` as shorthand for the source-built CLI entry. **Pu
 
 ## Check any saved Markdown before delivery
 
-Use the original file from Typora or an Obsidian vault. Both use the same
-Markdown parser and asset preflight; no additional editor integrations are
-planned. In the development CLI:
+Use the original Markdown file or the recommended Obsidian plugin. CLI and the official skill use the same renderer and explicit operation parameters. In the development CLI:
 
 ```sh
 publy check "/path/to/article.md"
@@ -34,8 +32,7 @@ publy check "/path/to/article.md" --json
 This is an **offline, read-only-source** check: image/cover path validation,
 card-section lint, and a JSON result for agents. Input errors exit 2,
 preflight problems exit 4, success exits 0. It never contacts the server or
-submits a WeChat draft. Typora source-relative image folders and local
-`typora-root-url` are supported. For complete supported/unsupported source
+submits a WeChat draft. Source-relative image folders are supported; note property asset roots are ignored. For complete supported/unsupported source
 types and clean-install goals, see [editor-independent workflows](editor-workflows.md).
 
 **Media gate:** `publy check` and `publy publish` both reject a missing
@@ -48,8 +45,8 @@ signed remote-image URL query parameters in its errors. A missing article
 cover (unless a local body image exists) or an image post with no images
 also blocks draft submission before any network request.
 
-**Image-card preview:** for a Markdown file with `mode: cards`,
-`publy preview post.md --no-open --out cards-review.html` renders actual
+**Image-card preview:** with `--format cards`,
+`publy preview post.md --format cards --no-open --out cards-review.html` renders actual
 PNG cards with the same rasterizer used for a WeChat image-post draft.
 It embeds their bytes into a local HTML preview with the caption, displays
 lint problems, and does **not** contact a server or download fonts. If the
@@ -67,21 +64,17 @@ publy theme ls
 publy theme preview claude
 ```
 
-Keep source Markdown and media. `preview` opens the local result; `render` writes HTML. Themes may be installed packages, so review their provenance before using them with private material.
+Keep source Markdown and media. `preview` opens the local result; `render` writes HTML. Themes are validated content-only bundles; review their provenance before use.
 
-Article frontmatter supports `title`, `cover`, `theme`, `author` and `digest`. A cover can come from frontmatter, `--cover` or the first image; missing required media is an error. Account defaults can be overridden with the documented command flags; `publy --help` and subcommand help remain the exact flag reference.
+Use `--title`, `--cover`, `--theme`, `--author`, `--digest` and `--caption` or `--caption-file` consistently across check, preview and publish. Frontmatter is skipped without interpreting its values. Title defaults to the first body H1 then filename. A cover comes from `--cover` or body images; missing media blocks delivery. `publish` requires `--format` and `--account`. See subcommand help for exact options.
 
 ## Image cards
 
-Use `mode: cards`, a caption, and 3–9 sections containing a cover, content and ending. Preview the resulting deck before delivery:
+Choose `--format cards`, provide a caption, and 3–9 sections containing a cover, content and ending. Preview the resulting deck before delivery:
 
 ```markdown
----
-title: A test deck
-mode: cards
-theme: naive
-caption: A non-sensitive test
----
+A non-sensitive test
+
 ## cover
 A test deck
 ## point
@@ -95,7 +88,7 @@ Thanks for reading
 publy card post.md --preview
 ```
 
-Card validation can refuse an invalid count or caption length. Standard image posts use `type: image`; review the Chinese manual and command help for the full input contract. Rendering does not imply the account can publish every WeChat message type.
+Card validation can refuse an invalid count or caption length. Standard image posts use `--format image`; review the Chinese manual and command help for the full input contract. Rendering does not imply the account can publish every WeChat message type.
 
 ## Configure your server
 
@@ -122,7 +115,7 @@ publy config set server https://your-server.example
 publy config set api_key <random-server-api-key>
 publy account add test --app-id wx... --theme claude
 publy account list
-publy publish article.md --account test
+publy publish article.md --format article --account test
 publy history
 ```
 

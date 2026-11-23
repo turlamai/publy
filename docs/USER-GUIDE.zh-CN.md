@@ -18,21 +18,18 @@ CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公�
 
 ## 使用任意 Markdown 编辑器或 Agent
 
-任何编辑器或 Agent 都可以把 `.md` 原文件交给 Publy；Obsidian 的插件只是可选入口，
-不需要复制整个笔记库。当前开发版可以运行
-`publy check "D:/Notes/article.md" --json` 做**离线**图片、封面和卡片结构
-预检查，再运行 `publy preview` 预览；这两项都不会投递草稿。
-支持 Typora 的本地 `typora-root-url` 和嵌套图片目录，缺图会明确报告，
-也不会改动原文件。**但普通用户的一键安装包尚未通过验收。**
+Obsidian 是唯一推荐编辑器与插件体验；CLI 与官方 Skill 独立接收 Markdown 文件，不依赖编辑器。本地检查与预览不联网、不创建草稿。支持源文件相对图片路径与 Obsidian 嵌入，不迁移笔记库。CLI 当前仍为开发者源码构建，普通用户一键安装包尚未验收。
 
-[Typora 专属使用指南](typora.zh-CN.md) · [跨编辑器工作流与商业级体验标准](editor-workflows.zh-CN.md)
-· [English](editor-workflows.md)
+### 本次操作选择
 
-开发版插件的「复制排版内容」遇到缺失、渲染失败或仍需本地附件的图片和公式时，会停止复制并保留原剪贴板。含附件的内容可使用草稿投递流程。
+插件的投递窗口选择文章、图片配文或文字卡片，核对笔记和公众号后明确确认；取消不会投递。CLI 用 `--format article|image|cards`，`publish` 必须同时指定类型与 `--account`。Skill 在意图不清楚时询问。检查、预览与投递传递相同的 `--title`、`--cover`、`--theme`、`--author`、`--digest`、`--caption` 或 `--caption-file`；两种配文参数不能同时使用。本地预览未选择时默认文章。
 
-### 选择草稿形式
+笔记 frontmatter 直接跳过，不再参与发布配置，也不改写原文。标题回退至正文一级标题、文件名；图片配文可取正文文字，卡片配文可写在首个分节之前。原有 Obsidian 属性继续保留。
 
-每次可选择文章、图片配文或文字卡片。开发版命令行在 `check`、`preview`、`publish` 中使用相同的 `--format article`、`--format image` 或 `--format cards`；Obsidian 预览中也可选择。选择只作用于本次操作或插件会话，优先于可选的文档字段，不改原文。未选择时兼容旧字段，无声明则默认文章。图片消息需要图片，卡片需要符合要求的分节；投递前请检查预览。这些能力仍在验收，不代表安装包已发布。
+[当前工作流与验收边界](editor-workflows.zh-CN.md) · [English](editor-workflows.md)
+
+复制排版内容遇到缺失、渲染失败或仍需本地附件的图片与公式时，会保留原剪贴板；含附件内容使用草稿投递流程。
+
 ## 使用独立文章主题（CLI 开发版）
 
 内置主题可以离线使用。要使用来自可信来源的纯内容主题包，运行 `publy theme add ./theme.json`，再用 `publy theme preview 主题ID` 预览，并在渲染时指定 `--theme 主题ID`。`publy theme ls` 会列出已安装的文章主题；替换时运行 `publy theme update ./new-theme.json`，删除时运行 `publy theme remove 主题ID`。如需回退，请保留旧主题包，先移除当前版本再添加旧文件。同一系统用户运行的 Obsidian 可以选择通过校验的已安装文章主题：安装后重新打开插件设置或预览面板即可。CLI 管理本机共享主题包，插件本身不会下载主题。
@@ -54,7 +51,7 @@ publy theme pack my.css --id my-style --theme-version 1.0.0 --name "我的主题
 ## 我的笔记和草稿在哪里？
 
 Publy 不建立笔记库，也没有用来浏览或编辑笔记的后台。你仍然在
-Typora、Obsidian 或文件管理器中查找、编辑、整理和备份原始 Markdown
+Obsidian 或文件管理器中查找、编辑、整理和备份原始 Markdown
 及图片；Publy 读取你选择的文件进行检查和排版，不会替你迁移笔记。
 
 草稿投递成功后，请登录**微信公众号平台**，在对应公众号的草稿箱中

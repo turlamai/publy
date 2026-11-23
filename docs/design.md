@@ -4,49 +4,17 @@
 
 ## Publication format decision / 发布形式决定 — 2026-11-05
 
-Markdown is the product input; a particular editor or agent is never required. For each operation, an explicit article, image-and-caption, or card choice overrides optional frontmatter; otherwise retain the declared legacy format and default to article. Do not silently switch format based on length or pictures. The CLI, agent skill and Obsidian preview use the same decision; preview and submission must agree. The choice is session/operation scoped and never modifies the source. This is a development candidate, not evidence of a released installer or a public service.
+Markdown is the product input; a particular editor or agent is never required. Explicit operation parameters select article, image-and-caption or cards. Note properties are never read as publication configuration; local preview defaults to article, while publish requires an explicit choice. Do not silently switch format based on length or pictures. The CLI, agent skill and Obsidian preview use the same decision; preview and submission must agree. The choice is session/operation scoped and never modifies the source. This is a development candidate, not evidence of a released installer or a public service.
 
-Markdown 是产品输入，不要求用户依赖特定编辑器或 Agent。本次明确选择文章、图片配文或文字卡片时覆盖可选 frontmatter；否则沿用现有字段，无声明时默认文章。不能根据字数或是否含图悄悄切换。CLI、Agent 技能和 Obsidian 预览共享规则，预览与投递须一致；本次选择不改原文。此决定不代表安装包或公开服务已发布。
+Markdown 是产品输入，不要求用户依赖特定编辑器或 Agent。本次参数选择文章、图片配文或文字卡片，不读取笔记属性；本地预览默认文章，投递必须明确选择。不能根据字数或是否含图悄悄切换。CLI、Agent 技能和 Obsidian 预览共享规则，预览与投递须一致；本次选择不改原文。此决定不代表安装包或公开服务已发布。
 
-## Editor-independent commercial product decision / 跨编辑器商业产品决定 — 2026-10-30
+## Product focus and operation options — owner decision 2026-11-23
 
-**The editor is a source, not the product.** Obsidian is one integration,
-while Typora and Obsidian must enter the same render/check/review/draft
-workflow without requiring users to migrate their source files.
-Source files and image folders stay in place. A future optional small
-cross-platform *publishing companion* can make open/drag-and-drop,
-preflight, accurate preview, formatted-copy and explicit draft delivery
-accessible without a terminal or npm; it must **not** become a second editor
-or library database. A good-looking plugin does not make the overall product
-commercial-grade if first-time installs, local media and recovery are broken.
-Keep source-agnostic rendering, preview, warnings, signed/offline
-distribution, accessibility, crash/retry and real WeChat draft outcomes as
-shared acceptance criteria. This refines rather than replaces the
-2026-10-23 write-in-existing-editor / no-new-editor decision. See
-[English workflows](editor-workflows.md) and
-[中文工作流](editor-workflows.zh-CN.md).
+Obsidian is the recommended editor and plugin surface; the CLI and official skill remain editor-independent. No Typora-specific expansion or standalone publishing companion. WeChat Official Account drafts remain the sole output.
 
-**编辑器是内容来源，不是我们的收费产品。** Obsidian 只是一个接入口；
-Typora 与 Obsidian 应当走同一条检查、预览、复制和
-草稿投递路径；普通 Markdown 文件仍由共用引擎处理。源文件与图片留在原位置。未来可用小型跨平台
-发布伴侣提供打开/拖拽、发布前检查、预览与确认，不再造编辑器或数据库。
-真正商业级的门槛是安装、缺图提示、预览一致性、无障碍、恢复与可验证的
-草稿回执，而不是支持的插件数量或界面截图。
+All publication settings come from explicit operation parameters, using one shared core contract. The plugin provides a format/title/author/summary/caption dialog; agents ask when intent is unclear. Check and preview default to article; draft submission requires an explicit format and account. Preview and submission use the same operation settings and source identity. Note frontmatter is preserved and skipped without YAML evaluation, never a source of publication options or asset roots. Titles fall back to body H1 then filename. See editor-workflows.md and its Chinese counterpart. This supersedes the 2026-10-30 multi-editor and frontmatter-precedence decisions.
 
-## Destination scope decision / 发布目的地范围决定 — 2026-10-30
-
-Publy has **one publishing destination, WeChat Official Account drafts**.
-Typora and Obsidian are its two focus editor experiences. Other Markdown
-files may be readable, but no additional editor plugins are planned.
-**Zhihu, Toutiao, WordPress, Ghost, Xiaohongshu, Douyin and all other
-publishing destinations are explicitly excluded**, not research candidates.
-Do not build a provider framework or mass-posting UI. Normative scope:
-[English](platform-strategy.md) · [中文](platform-strategy.zh-CN.md).
-
-Publy 以**微信公众号草稿为唯一当前正式输出**。兼容 Typora、Obsidian
-等多种 Markdown **输入**，不等于做所有平台的**发布**。
-知乎、今日头条、WordPress、Ghost、小红书、抖音等发布目的地
-全部排除，不保留调研或条件接入计划；不预建平台适配器框架。完整决定见上方中英文文档。
+Obsidian 是唯一推荐编辑器；CLI 与官方 Skill 保持编辑器无关。类型、标题、封面、主题、作者、摘要和配文均由本次参数决定，笔记属性保留并跳过，不再读取为发布配置。不根据字数或图片数量猜测类型；选择类型不等于授权投递。
 
 ## Current scope and interaction decision / 当前范围与交互决定
 
@@ -158,7 +126,7 @@ SQLite 中持久占位；并发重复或结果未知的原请求不会自动再�
 **2026-10-30 新增开发版命令：** `publy check <file> [--json]`，
 离线检查原始 Markdown 的图片、封面、卡片结构和渲染准备情况，不配置服务器
 也能使用，不修改源文件、不创建草稿。标准 Markdown 按源文档目录优先解析
-嵌套资源；Typora 的本地 `typora-root-url` 也适用。退出码
+嵌套资源；笔记属性中的资源根目录不参与解析。退出码
 0=检查通过、2=文件或格式输入错误、3=无法解析/渲染、
 4=图片/封面/卡片预检问题；JSON 中明确标识 `submitted:false`
 和 `networkUsed:false`。这是源码构建 CLI 的新增能力，不表示已有普通用户
@@ -185,9 +153,9 @@ publy render a.md --theme claude -o out.html   # Markdown → 公众号 HTML（�
 publy preview a.md --theme claude              # 本地预览（HTML + 截图，供 agent 自检）
 publy card post.md --theme naive -o cards/     # 图片消息：Markdown → N 张卡片 PNG + caption
 publy card post.md --lint                      # 校验：caption ≤1000 字、图片 3–9 张、比例 3:4
-publy publish a.md                             # 发布文章（经云端或自托管服务）
-publy publish post.md                          # 发布图片消息（图片消息）
-publy publish a.md --at "2026-10-01 09:00"     # 定时（服务端 job）
+publy publish a.md --format article                             # 发布文章（经云端或自托管服务）
+publy publish post.md --format cards                          # 发布图片消息（图片消息）
+publy publish a.md --format article --at "2026-10-01 09:00"     # 定时（服务端 job）
 publy theme add @scope/theme-x | theme ls | theme preview <name>
 publy account add --app-id wx... --secret-env WX_SECRET   # 密钥走环境变量引用，不明文落盘
 publy quota                                    # 群发配额余量
@@ -197,7 +165,7 @@ publy quota                                    # 群发配额余量
 - `publish --json` 输出含 `warnings` 数组（渲染期非致命警告，如资源目录缺图）。警告同时打到 stderr，但 agent 消费 `--json` 时以该字段为准——不允许"发布成功但图片静默丢失"只留在 stderr
 - `config set` 支持键：`server` / `api_key` / `default_account` / `media_dirs`（逗号分隔多个目录）；不支持手编 `~/.publy/config.json`
 - 服务端不可达时 stderr 必须带底层原因（`ECONNREFUSED` / TLS 握手 / 超时分类不同），并给出下一步（检查 `--server` 或 `publy tunnel`）
-- 输入兼容 Obsidian：`![[img.png|650]]`、`[[wikilink|别名]]` 原生解析（`--media-dir` 指定资源目录）；frontmatter 的 `title` / `cover` / `type` / `theme` 直接消费
+- 输入兼容 Obsidian：`![[img.png|650]]`、`[[wikilink|别名]]` 原生解析（`--media-dir` 指定资源目录）；类型、标题、封面与主题等仅从本次参数读取
 - 密钥管理：配置文件只存环境变量名引用（`--secret-env`），与 tlai 技能的 `${VAR}` 约定一致
 
 Core callers that use `renderMarkdown` must read any generated attachment files before calling `result.cleanup()` in a `finally` block. That cleanup removes only renderer-owned intermediate files, never source assets. CLI and plugin paths do this automatically; deliberately created preview HTML remains an output for the user to remove.
@@ -223,13 +191,7 @@ Core callers that use `renderMarkdown` must read any generated attachment files 
 ### 4.1 创作格式：一个 Markdown 文件即一篇图片消息
 
 ```markdown
----
-title: 居家咖啡指南
-mode: cards            # cards 图文卡片 | text 图文分离
-theme: naive           # 卡片主题
-tags: [咖啡, 生活]
-caption: ...           # 帖子配文（≤1000 字；# 标签写在 caption 末尾）
----
+配文通过 --caption 或 --caption-file 指定。
 
 ## cover               # 第一节 = 封面卡（版式原型 Sparse）
 居家咖啡，从磨豆开始

@@ -86,33 +86,22 @@ publy account list
 ## 发布文章
 
 ```bash
-publy publish article.md --account TuringLambdaAI
+publy publish article.md --format article --account TuringLambdaAI
 ```
 
 就这一条。渲染（主题 + 代码高亮 + 链接转脚注 + Obsidian 语法）全部自动完成，产物进公众号草稿箱，**请在后台核对草稿并按账号实际权限发布或群发**；不能根据投递结果推断公开发布成功。
 
-### frontmatter 字段
+### 本次操作参数
 
-| 字段 | 作用 | 默认 |
-|------|------|------|
-| `title` | 文章标题 | 文件名 |
-| `cover` | 封面图片路径 | 正文首图（都没有则报错） |
-| `theme` | 排版主题 | 账号配置的 theme |
-| `author` | 作者署名 | 账号配置的 author |
-| `digest` | 摘要 | 空 |
-| `type: image` | 图片消息（见下节） | 文章 |
-
-命令行可覆盖：`--title`、`--cover`、`--account`、`--theme`、`--custom-theme <css路径>`（任意 CSS 即主题）、`--footer "文末文案"`、`--no-footnote`、`--at "2026-10-01 09:00"`（定时发布）。摘要（digest）不填时自动取正文首段前 120 字。
+`--format article|image|cards` 明确类型；投递必须指定类型与账号。`--title`、`--cover`、`--theme`、`--author`、`--digest`、`--caption` 或 `--caption-file` 在检查、预览与投递中保持一致。标题默认取正文一级标题、文件名；摘要可从正文首段生成。笔记 frontmatter 只跳过，不作为发布设置，也不改写原文。
 
 ### 封面
 
-服务端自动把封面中心裁切为公众号要求的 2.35:1。封面三种来源：frontmatter `cover` 字段、`--cover` 参数、正文首图。
+服务端自动把封面中心裁切为公众号要求的 2.35:1。封面来自 `--cover` 参数或正文图片，不读取笔记属性。
 
-### 从 Typora 或 Obsidian 检查后再发
+### 从 Obsidian 检查后再发
 
-Typora 原始 `.md` 文件和 Obsidian 的 Markdown 笔记都可以交给开发版
-Publy；不必迁移编辑器，也不计划开发其他编辑器插件。嵌套图片目录和 Typora 本地
-`typora-root-url` 均按原文解析；缺图不会静默替换成别的同名文件。
+推荐使用 Obsidian 插件；CLI 与官方 Skill 独立读取选定 Markdown。嵌套图片从源文件目录解析，不读取笔记属性中的资源根目录；缺图不会静默替换成同名文件。
 
 ```bash
 publy check "D:/Notes/article.md"         # 本地检查，不访问服务器
@@ -130,13 +119,13 @@ CSP 阻止页面自动请求远程图片/脚本，内嵌本地图片仍可查看
 正文图片的文章、没有素材的图片消息，都不得创建草稿。失败会以退出码 4
 终止，发生在网络请求前；错误日志不打印带令牌的完整图片 URL。
 
-**图片消息卡片预览：** 当源文件使用 `mode: cards` 时，
-`publy preview post.md` 会调用**和正式投递相同的 PNG 卡片渲染引擎**，
+**图片消息卡片预览：** 使用 `--format cards` 时，
+`publy preview post.md --format cards` 会调用**和正式投递相同的 PNG 卡片渲染引擎**，
 输出包含每张 3:4 卡片和 caption 的本地 HTML，缺少卡片或文案超限
 会在页面上明显提示。预览无须服务器、公众号账号或登录，并且
 **只使用随程序打包的本地字体子集，不联网下载字体**。
 本地子集不支持某个字形时明确报错（退出码 3），不偷偷联网。
-它不会修改原文，也不会自动保存公众号草稿。真实 Typora/Obsidian
+它不会修改原文，也不会自动保存公众号草稿。真实 Obsidian
 和干净安装验收仍未完成。
 
 ### 写作前先看效果
@@ -152,10 +141,6 @@ publy render article.md -o out.html   # 只要 HTML
 **text 模式（图文分离）**——图片即帖子图片，剩余文字即配文：
 
 ```markdown
----
-title: 帖子标题
-type: image
----
 
 ![[图1.png]]
 
@@ -167,13 +152,8 @@ type: image
 **cards 模式（卡片渲染）**——按节写，引擎确定性渲染 3:4 卡片，汉字像素级正确：
 
 ```markdown
----
-title: 居家咖啡指南
-mode: cards
-theme: naive
-caption: 配文（≤1000 字）
-tags: [咖啡, 手冲]
----
+配文（≤1000 字）
+
 
 ## cover        # 封面卡：第一行大标题，其余行副标题
 居家咖啡指南
@@ -192,13 +172,13 @@ tags: [咖啡, 手冲]
 下期讲注水手法
 ```
 
-规则：3–9 张卡（一节一张），cover 和 ending 必备，caption ≤1000 字——lint 不过拒绝发布（退出码 4）。`mode: cards` 本身即隐含 `type: image`，不必重复写。
+规则：3–9 张卡（一节一张），cover 和 ending 必备，caption ≤1000 字——lint 不过拒绝发布（退出码 4）。用 `--format cards` 明确选择卡片；配文通过参数或首个分节前的文字提供。
 
 先出图检查再发：
 
 ```bash
 publy card post.md --preview    # 浏览器打开拼版预览（全部卡片 + 配文）
-publy publish post.md --account TuringLambdaAI  # 核对账号后投递到草稿箱
+publy publish post.md --format cards --account TuringLambdaAI  # 核对账号后投递到草稿箱
 ```
 
 ## 主题
@@ -252,7 +232,7 @@ publy jobs retry <id>    # 仅能重试已证明在投递前失败的任务；�
 历史记录没有完整指纹时，只能核对旧记录中保存的账号、标题与类型；
 新记录会保存完整指纹，仍不意味着微信公众号端到端恰好一次。
 
-**请求身份：** Typora CLI 与 Obsidian 共用同一规则：计算完整草稿内容
+**请求身份：** CLI 与 Obsidian 共用同一规则：计算完整草稿内容
 （包括目标公众号、正文 HTML、每张图片的实际字节、封面、定时参数）
 的哈希。标题相同、长度相同但内容不同，或者文件名不变图片实际已更新，
 不应再误判为同一份草稿。原样重试应保持同一个请求键。但请求键**并不等于**

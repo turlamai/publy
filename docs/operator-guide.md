@@ -4,7 +4,7 @@
 
 This guide is for the person operating their own Publy server. The admin page
 manages a service, not your notebook: keep editing and organising your original
-files in Obsidian, Typora or your file manager. WeChat drafts are reviewed and
+files in Obsidian or your file manager. WeChat drafts are reviewed and
 published in the selected WeChat Official Account's own backend.
 
 The current console is a **development tool**. Public hosted registration and

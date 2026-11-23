@@ -2,7 +2,7 @@
 import crypto from "node:crypto";
 import { Modal, App, TFile, Notice, setIcon } from "obsidian";
 import type PublyPlugin from "./main.js";
-import { generateTitleCover } from "@publy/core";
+import { generateTitleCover, type PublicationOptions, type PublicationFormat } from "@publy/core";
 import { t } from "./i18n.js";
 import { pickLocalImageFiles, fileToBase64, imageContentType } from "./image-input.js";
 
@@ -62,7 +62,7 @@ export class CoverPickerModal extends Modal {
   private chosen: string;
   private picked = false;
 
-  constructor(app: App, plugin: PublyPlugin, file: TFile, candidates: { name: string; data: string; contentType: string }[], current: string, onPick: (choice: string | null) => void) {
+  constructor(app: App, plugin: PublyPlugin, file: TFile, candidates: { name: string; data: string; contentType: string }[], current: string, onPick: (choice: string | null) => void, private title = file.basename) {
     super(app);
     this.plugin = plugin;
     this.file = file;
@@ -113,14 +113,14 @@ export class CoverPickerModal extends Modal {
     // the auto title card, rendered for real with this note's own title — the
     // same card the server would generate (fonts ship with the plugin)
     makeTile("auto", (box) => {
-      const png = generateTitleCover(this.file.basename);
+      const png = generateTitleCover(this.title);
       if (png) {
         const im = box.createEl("img");
         im.src = "data:image/png;base64," + png.toString("base64");
       } else {
         const d = box.createEl("div");
         d.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8f6f0;color:#b75c3d;font-weight:600;font-size:12px;text-align:center;padding:4px;line-height:1.4";
-        d.setText(this.file.basename);
+        d.setText(this.title);
       }
     }, t("coverAutoTile"));
     paint();
@@ -220,4 +220,49 @@ export class ScheduleModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+
+/** An explicit operation choice is separate from authorization to create a draft. */
+export class PublicationOptionsModal extends Modal {
+  private completed = false;
+  constructor(app: App, private note: string, private account: string,
+    private options: PublicationOptions,
+    private onSubmit: (result: {options: PublicationOptions; action: "preview" | "publish"} | null) => void, private scheduledAt?: string) { super(app); }
+  onOpen(): void {
+    this.contentEl.createEl("h3").setText(t("operationTitle"));
+    this.contentEl.createEl("p").setText(t("operationTarget", {note:this.note, account:this.account || t("operationNoAccount")}));
+    this.contentEl.createEl("p").setText(t("operationNote"));
+    if (this.scheduledAt) this.contentEl.createEl("p").setText(t("operationScheduled", {time:this.scheduledAt}));
+    const label = this.contentEl.createEl("label"); label.setText(t("formatLabel"));
+    const format = label.createEl("select"); format.addClass("publy-select");
+    format.setAttribute("aria-label", t("formatLabel"));
+    for (const id of ["article", "image", "cards"] as const) {
+      const option = format.createEl("option"); option.value=id;
+      option.textContent=t(id === "article" ? "formatArticle" : id === "image" ? "formatImage" : "formatCards");
+    }
+    format.value=this.options.format ?? "article";
+    const fields: Partial<Record<keyof PublicationOptions, HTMLInputElement | HTMLTextAreaElement>> = {};
+    for (const [key, name] of [["title","operationName"],["author","operationAuthor"],["digest","operationDigest"],["caption","operationCaption"]] as const) {
+      const row=this.contentEl.createEl("label"); row.addClass("publy-operation-field"); row.setText(t(name));
+      const input=key === "caption" ? row.createEl("textarea") : row.createEl("input");
+      input.setAttribute("aria-label",t(name)); input.value=this.options[key] ?? "";
+      if (key === "title") input.required=true;
+      fields[key]=input;
+    }
+    const buttons=this.contentEl.createEl("div"); buttons.addClass("publy-modal-row");
+    const finish=(action: "preview" | "publish") => {
+      const title=fields.title!.value.trim(); if (!title) { fields.title!.focus(); return; }
+      const options: PublicationOptions={...this.options,format:format.value as PublicationFormat,title};
+      for (const key of ["author","digest","caption"] as const) {
+        options[key]=fields[key]!.value || undefined;
+      }
+      this.completed=true; this.close(); this.onSubmit({options,action});
+    };
+    const cancel=buttons.createEl("button");cancel.setText(t("btnCancel"));cancel.addEventListener("click",()=>this.close());
+    const preview=buttons.createEl("button");preview.setText(t("operationPreview"));preview.addEventListener("click",()=>finish("preview"));
+    const submit=buttons.createEl("button");submit.addClass("mod-cta");submit.setText(t("operationSubmit"));submit.addEventListener("click",()=>finish("publish"));
+    fields.title!.focus();
+  }
+  onClose(): void { this.contentEl.empty(); if (!this.completed) this.onSubmit(null); }
 }

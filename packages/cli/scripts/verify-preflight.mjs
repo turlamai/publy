@@ -46,7 +46,7 @@ try {
   assert.equal(good.code, 0);
   assert.equal(good.report.ok, true);
   assert.equal(good.report.attachmentCount, 1);
-  assert.equal(good.report.title, "User Article");
+  assert.equal(good.report.title, "Hello");
   assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "preflight must not change source");
 
   const imageChoice = run(goodPath, "--format", "image");
@@ -54,7 +54,7 @@ try {
   assert.equal(imageChoice.report.type, "image_post");
   assert.equal(imageChoice.report.format, "image");
   assert.equal(imageChoice.report.formatSource, "choice");
-  const invalidChoice = spawnSync(process.execPath, [entrypoint, "publish", goodPath, "--format", "bogus", "--json"], { encoding: "utf8", timeout: 25000 });
+  const invalidChoice = spawnSync(process.execPath, [entrypoint, "publish", "--format", "article", goodPath, "--format", "bogus", "--json"], { encoding: "utf8", timeout: 25000 });
   assert.equal(invalidChoice.status, 2);
   assert.equal(JSON.parse(invalidChoice.stdout).code, "FORMAT_INVALID");
   const imagePreviewPath = path.join(dir, "image-preview.html");
@@ -259,7 +259,7 @@ try {
   assert.equal(contract.schemaVersion, 1);
   assert.equal(contract.destination, "wechat-official-account-drafts");
   assert.equal(contract.noPublicSend, true);
-  assert.deepEqual(contract.firstClassEditors, ["Typora", "Obsidian"]);
+  assert.deepEqual(contract.firstClassEditors, ["Obsidian"]);
   assert.ok(contract.commands.some((c) => c.name === "preview" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "render" && c.json === true && c.network === false));
   assert.ok(contract.commands.some((c) => c.name === "theme ls" && c.json === true && c.network === false && c.jsonNetwork === false));
@@ -427,7 +427,7 @@ try {
 
   const sendCommand = contract.commands.find((c) => c.name === "publish");
   assert.equal(sendCommand.requiresUserApproval, true);
-  assert.match(sendCommand.usage, /publish <file\.md> --account <name> --json/);
+  assert.match(sendCommand.usage, /publish <file\.md> --format article\|image\|cards --account <name> --json/);
   const checkCommand = contract.commands.find((c) => c.name === "check");
   assert.equal(checkCommand.requiresUserApproval, false);
   assert.equal(checkCommand.usage, "publy check <file.md> --json");
@@ -519,7 +519,7 @@ try {
     assert.ok(!runBadConfig.stderr.includes(privateConfigToken));
   }
   const badCfgPublish = spawnSync(process.execPath,
-    [entrypoint, "publish", goodPath, "--json"],
+    [entrypoint, "publish", "--format", "article", goodPath, "--json"],
     { encoding: "utf8", timeout: 25000,
       env: { ...process.env, PUBLY_CONFIG: malformedConfig } });
   assert.equal(badCfgPublish.status, 1);
@@ -625,7 +625,7 @@ try {
     default_account: "Work", accounts: [{ name: "Work" }],
   }));
   const missingAccount = spawnSync(process.execPath,
-    [entrypoint, "publish", goodPath, "--json"], {
+    [entrypoint, "publish", "--format", "article", goodPath, "--json"], {
       encoding: "utf8", timeout: 25000,
       env: { ...process.env, PUBLY_CONFIG: explicitAccountConfig },
     });
@@ -641,7 +641,7 @@ try {
   assert.ok(!missingAccount.stdout.includes(explicitAccountSecret));
   assert.ok(!missingAccount.stderr.includes(explicitAccountSecret));
   const missingAccountHuman = spawnSync(process.execPath,
-    [entrypoint, "publish", goodPath], {
+    [entrypoint, "publish", "--format", "article", goodPath], {
       encoding: "utf8", timeout: 25000,
       env: { ...process.env, PUBLY_CONFIG: explicitAccountConfig },
     });
@@ -650,7 +650,7 @@ try {
   // Explicitly choosing the account passes this guard; missing input then
   // fails locally before any HTTP request is attempted.
   const explicitAccountMissingSource = spawnSync(process.execPath,
-    [entrypoint, "publish", path.join(project, "missing.md"), "--account", "Work", "--json"], {
+    [entrypoint, "publish", "--format", "article", path.join(project, "missing.md"), "--account", "Work", "--json"], {
       encoding: "utf8", timeout: 25000,
       env: { ...process.env, PUBLY_CONFIG: explicitAccountConfig },
     });
@@ -730,71 +730,17 @@ try {
   assert.equal(fs.readFileSync(goodPath, "utf8"), goodSource, "preview must not alter source");
 
 
-  // Typora can persist Chinese names with legacy %u escapes and local image
-  // roots. No Typora plugin/process or vault copying is needed.
-  const typoraRoot = path.join(project, "Typora project");
-  const typoraMedia = path.join(typoraRoot, "blog", "assets");
-  fs.mkdirSync(typoraMedia, { recursive: true });
-  const typoraPhoto = path.join(typoraMedia, "封面 图片.png");
-  fs.writeFileSync(typoraPhoto, tinyPng);
-  const typoraFile = path.join(project, "这是 Typora 原稿.md");
-  const typoraSource = [
-    "---",
-    "title: 这是 Typora 的原稿",
-    "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
-    "typora-copy-images-to: assets/pasted",
-    "cover: /blog/assets/%u5C01%u9762%20%u56FE%u7247.png",
-    "---",
-    "",
-    "![正文图](/blog/assets/%u5C01%u9762%20%u56FE%u7247.png)",
-  ].join("\n");
-  fs.writeFileSync(typoraFile, typoraSource);
-  const typoraCheck = run(typoraFile);
-  assert.equal(typoraCheck.code, 0);
-  assert.equal(typoraCheck.report.ok, true);
-  assert.equal(typoraCheck.report.attachmentCount, 1);
-  assert.equal(typoraCheck.report.title, "这是 Typora 的原稿");
-  const typoraPreviewPath = path.join(dir, "Typora 预览.html");
-  const typoraPreview = spawnSync(process.execPath,
-    [entrypoint, "preview", typoraFile, "--no-open", "--out", typoraPreviewPath],
-    { encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json") } });
-  assert.equal(typoraPreview.status, 0, typoraPreview.stderr);
-  assert.ok(fs.readFileSync(typoraPreviewPath, "utf8").includes("data:image/png;base64,"));
-  assert.equal(fs.readFileSync(typoraFile, "utf8"), typoraSource, "Typora source must remain exactly unchanged");
-
-  // An encoded slash/backslash must not be promoted into a directory
-  // separator and silently select an existing, unrelated cover. The normal
-  // %uXXXX and %25uXXXX Chinese filename forms must keep working.
-  const doubleEscapedUnicode = path.join(project, "Typora double-escaped Unicode.md");
-  const doubleEscapedSource = [
-    "---",
-    "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
-    "cover: /blog/assets/%25u5C01%25u9762%20%25u56FE%25u7247.png",
-    "---", "", "# Local review",
-  ].join("\n");
-  fs.writeFileSync(doubleEscapedUnicode, doubleEscapedSource);
-  const doubleEscapedCheck = run(doubleEscapedUnicode);
-  assert.equal(doubleEscapedCheck.code, 0, JSON.stringify(doubleEscapedCheck.report));
-  assert.equal(doubleEscapedCheck.report.ok, true);
-  assert.equal(fs.readFileSync(doubleEscapedUnicode, "utf8"), doubleEscapedSource);
-
-  for (const encodedSeparator of ["%2F", "%5C", "%u002F", "%u005C", "%25u002F", "%25u005C"]) {
-    const unsafeFile = path.join(project, "Typora encoded separator " + encodedSeparator + ".md");
-    const unsafeSource = [
-      "---",
-      "typora-root-url: " + JSON.stringify(typoraRoot.split(path.sep).join("/")),
-      "cover: /blog" + encodedSeparator + "assets" + encodedSeparator + "%u5C01%u9762%20%u56FE%u7247.png",
-      "---", "", "# Local review",
-    ].join("\n");
-    fs.writeFileSync(unsafeFile, unsafeSource);
-    const unsafeCheck = run(unsafeFile);
-    assert.equal(unsafeCheck.code, 4, encodedSeparator + ": " + JSON.stringify(unsafeCheck.report));
-    assert.equal(unsafeCheck.report.ok, false);
-    assert.equal(unsafeCheck.report.attachmentCount, 0);
-    assert.ok(unsafeCheck.report.problems.some((p) => p.startsWith("Cover not found:")),
-      "encoded separator must block the draft preflight: " + encodedSeparator);
-    assert.equal(fs.readFileSync(unsafeFile, "utf8"), unsafeSource);
-  }
+  // Unicode files remain editor-independent; property asset roots are ignored.
+  const typoraPhoto = path.join(project, "assets", "封面 图片.png");
+  fs.writeFileSync(typoraPhoto,tinyPng);
+  const typoraFile = path.join(project,"中文 原稿.md");
+  const typoraSource = "---\ntitle: IGNORED_PRIVATE_TITLE\ntypora-root-url: /ignored\n---\n# 正文标题\n\n![正文图](assets/封面%20图片.png)";
+  fs.writeFileSync(typoraFile,typoraSource);
+  const typoraCheck=run(typoraFile);
+  assert.equal(typoraCheck.code,0);
+  assert.equal(typoraCheck.report.title,"正文标题");
+  assert.equal(typoraCheck.report.attachmentCount,1);
+  assert.ok(!JSON.stringify(typoraCheck.report).includes("IGNORED_PRIVATE_TITLE"));
 
   // Typora can also save absolute file:/// image links, including Chinese
   // paths. They must resolve to the exact same local bytes, without exporting
@@ -816,6 +762,10 @@ try {
   assert.ok(fileUriHtml.includes("data:image/png;base64,"));
   assert.ok(!fileUriHtml.includes("file:///"));
   assert.equal(fs.readFileSync(fileUriArticle, "utf8"), fileUriRaw);
+
+  const typoraPreviewPath = path.join(dir,"unicode-preview.html");
+  const unicodePreview=cli("preview",typoraFile,"--no-open","--out",typoraPreviewPath);
+  assert.equal(unicodePreview.status,0,unicodePreview.stderr);
 
   // Customer-specified output must never clobber existing HTML or the .md.
   const overwriteRefused = spawnSync(process.execPath,
@@ -882,8 +832,8 @@ try {
     server: "http://127.0.0.1:9", api_key: "fixture-key",
     default_account: "fixture", accounts: [{ name: "fixture" }],
   }));
-  const publishWith = (source) => spawnSync(process.execPath,
-    [entrypoint, "publish", source, "--account", "fixture"],
+  const publishWith = (source, ...extra) => spawnSync(process.execPath,
+    [entrypoint, "publish", "--format", "article", source, "--account", "fixture", ...extra],
     { encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: fakeConfig } });
   const blocked = publishWith(missingPath);
   assert.equal(blocked.status, 4, blocked.stderr);
@@ -892,8 +842,8 @@ try {
   assert.doesNotMatch(blocked.stderr, /outcome UNKNOWN|publish failed \(/);
   const badCover = path.join(project, "missing-cover.md");
   fs.writeFileSync(badCover, "---\ncover: assets/absent.png\n---\n\n# Missing cover\n\n![valid](assets/photo.png)");
-  const blockedCover = publishWith(badCover);
-  assert.equal(blockedCover.status, 4, blockedCover.stderr);
+  const blockedCover = publishWith(badCover, "--cover", "assets/absent.png");
+  assert.equal(blockedCover.status, 2, blockedCover.stderr);
   assert.match(blockedCover.stderr, /Cover not found/);
 
   const noCoverArticle = path.join(project, "no-cover.md");
@@ -911,7 +861,7 @@ try {
 
   const emptyImagePost = path.join(project, "empty-image-post.md");
   fs.writeFileSync(emptyImagePost, "---\ntype: image\n---\n\nJust some words");
-  const blockedImagePost = publishWith(emptyImagePost);
+  const blockedImagePost = publishWith(emptyImagePost, "--format", "image");
   assert.equal(blockedImagePost.status, 4, blockedImagePost.stderr);
   assert.match(blockedImagePost.stderr, /No local images found/);
 
@@ -928,7 +878,7 @@ try {
   assert.match(brokenHtml, /Preview only, not submitted/);
 
   const blockedJson = spawnSync(process.execPath,
-    [entrypoint, "publish", missingPath, "--json", "--account", "fixture"],
+    [entrypoint, "publish", "--format", "article", missingPath, "--json", "--account", "fixture"],
     { encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: fakeConfig } });
   assert.equal(blockedJson.status, 4, blockedJson.stderr);
   const mediaFailure = JSON.parse(blockedJson.stdout);
@@ -939,7 +889,7 @@ try {
   assert.ok(mediaFailure.problems.some((p) => p.includes("missing/other.jpg")));
 
   const unknownJson = spawnSync(process.execPath,
-    [entrypoint, "publish", goodPath, "--json", "--account", "fixture"],
+    [entrypoint, "publish", "--format", "article", goodPath, "--json", "--account", "fixture"],
     { encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: fakeConfig } });
   assert.equal(unknownJson.status, 5, unknownJson.stderr);
   const uncertain = JSON.parse(unknownJson.stdout);
@@ -1027,7 +977,7 @@ server.listen(0, "127.0.0.1", () => {
       ["failed-response", "unknown", "UPSTREAM_FAILED"],
     ]) {
       const runReply = spawnSync(process.execPath,
-        [entrypoint, "publish", goodPath, "--json", "--account", "fixture",
+        [entrypoint, "publish", "--format", "article", goodPath, "--json", "--account", "fixture",
           "--api-key", key],
         { encoding: "utf8", timeout: 25000,
           env: { ...process.env, PUBLY_CONFIG: responseConfig } });
@@ -1056,7 +1006,7 @@ server.listen(0, "127.0.0.1", () => {
       .split("\n").filter((key) => key === "bad-response").length;
     const beforeTunnel = postCount();
     const ambiguousTunnel = spawnSync(process.execPath,
-      [entrypoint, "publish", goodPath, "--json", "--account", "fixture"],
+      [entrypoint, "publish", "--format", "article", goodPath, "--json", "--account", "fixture"],
       { encoding: "utf8", timeout: 25000,
         env: { ...process.env, PUBLY_CONFIG: tunnelConfig } });
     assert.equal(ambiguousTunnel.status, 5, ambiguousTunnel.stderr);
@@ -1107,7 +1057,7 @@ server.listen(0, "127.0.0.1", () => {
   const cardsPath = path.join(project, "cards.md");
   fs.writeFileSync(cardsPath,
     "---\nmode: cards\ncaption: synthetic test\n---\n\n## cover\nTitle\n\n## point\nDetail\n\n## ending\nThanks");
-  const cards = run(cardsPath);
+  const cards = run(cardsPath,"--format","cards","--caption","synthetic test");
   assert.equal(cards.code, 0);
   assert.equal(cards.report.type, "image_post");
   assert.equal(cards.report.cardCount, 3);
@@ -1117,7 +1067,7 @@ server.listen(0, "127.0.0.1", () => {
   // The image-post preview must show the same rasterized PNG cards as
   // publish, never ordinary Markdown/HTML pretending to be card output.
   const cardAgentOut = path.join(dir, "agent-cards.html");
-  const cardAgentPreview = cli("preview", cardsPath, "--json", "--out", cardAgentOut);
+  const cardAgentPreview = cli("preview", cardsPath,"--format","cards","--caption","synthetic test", "--json", "--out", cardAgentOut);
   assert.equal(cardAgentPreview.status, 0, cardAgentPreview.stderr);
   const cardAgent = JSON.parse(cardAgentPreview.stdout);
   assert.equal(cardAgent.kind, "local-preview");
@@ -1128,7 +1078,7 @@ server.listen(0, "127.0.0.1", () => {
 
   const cardsOut = path.join(dir, "card-review.html");
   const cardPreview = spawnSync(process.execPath,
-    [entrypoint, "preview", cardsPath, "--no-open", "--out", cardsOut],
+    [entrypoint, "preview", cardsPath,"--format","cards","--caption","synthetic test", "--no-open", "--out", cardsOut],
     { encoding: "utf8", timeout: 40000,
       env: { ...process.env, PUBLY_CONFIG: path.join(dir, "no-such-config.json") } });
   assert.equal(cardPreview.status, 0, cardPreview.stderr);
@@ -1143,13 +1093,13 @@ server.listen(0, "127.0.0.1", () => {
   const invalidCards = path.join(project, "invalid-cards.md");
   fs.writeFileSync(invalidCards,
     "---\nmode: cards\ncaption: invalid deck\n---\n\n## cover\nFirst only\n\n## ending\nSecond");
-  const invalidCheck = run(invalidCards);
+  const invalidCheck = run(invalidCards,"--format","cards","--caption","invalid deck");
   assert.equal(invalidCheck.code, 4, "invalid card deck must fail preflight");
   assert.equal(invalidCheck.report.ok, false);
   assert.ok(invalidCheck.report.problems.some((problem) => problem.includes("3")));
   const invalidOut = path.join(dir, "invalid-card-preview.html");
   const invalidPreview = spawnSync(process.execPath,
-    [entrypoint, "preview", invalidCards, "--no-open", "--out", invalidOut],
+    [entrypoint, "preview", invalidCards,"--format","cards","--caption","invalid deck", "--no-open", "--out", invalidOut],
     { encoding: "utf8", timeout: 40000 });
   assert.equal(invalidPreview.status, 0, invalidPreview.stderr);
   const invalidHtml = fs.readFileSync(invalidOut, "utf8");
@@ -1160,9 +1110,9 @@ server.listen(0, "127.0.0.1", () => {
   // preflight response; malformed sources are safely recoverable errors.
   const secret = "synthetic-secret-marker-do-not-print";
   const corrupt = path.join(project, "malformed.md");
-  fs.writeFileSync(corrupt, "---\nprivate_key: " + secret + "\nunsupported: [broken\n---\n# hi");
+  fs.writeFileSync(corrupt, "---\nprivate_key: " + secret + "\nunsupported: [broken\n# hi");
   const corruptPublish = spawnSync(process.execPath,
-    [entrypoint, "publish", corrupt, "--json", "--account", "fixture"],
+    [entrypoint, "publish", "--format", "article", corrupt, "--json", "--account", "fixture"],
     { encoding: "utf8", timeout: 25000, env: { ...process.env, PUBLY_CONFIG: fakeConfig } });
   assert.equal(corruptPublish.status, 3, corruptPublish.stderr);
   const corruptResult = JSON.parse(corruptPublish.stdout);
