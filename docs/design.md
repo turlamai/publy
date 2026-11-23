@@ -1,5 +1,8 @@
 # Publy 产品设计
 
+Current hosted payment slice (2026-11-23, #105): NowPay Direct Personal MONTH at 29 CNY only; explicit manual purchase, no automatic renewal or active-period stacking. The account id is the provider external buyer id. Current request-bound issuer verification, exact platform periods and atomic quota reservations replace Basic Collection assumptions for this optional hosted mode. The production purchase gate remains closed pending native acceptance. See design/DESIGN.md and prototype/hosted-purchase.html before implementation.
+
+
 > 当前决策：2026-10-23 interaction review。本文件负责产品形态与交互，商业权益以 `PRICING.md` / `PRICING.zh-CN.md` 为准，实际可用性以用户指南和发行/运营证据为准。下述当前范围优先于早期设想；旧里程碑勾选不是公开上线证明。
 
 ## Publication format decision / 发布形式决定 — 2026-11-05
