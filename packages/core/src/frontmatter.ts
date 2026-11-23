@@ -1,3 +1,5 @@
+import MarkdownIt from "markdown-it";
+
 // Publication options come from the caller, never from note properties.
 export type PublicationFormat = "article" | "image" | "cards";
 
@@ -39,15 +41,19 @@ export function parseSource(raw: string): ParsedSource {
   return { meta: {}, body: source.slice(end.lastIndex) };
 }
 
+const titleParser = new MarkdownIt({html:false});
+
 /** One shared title fallback for CLI and plugin; no note properties are read. */
 export function publicationTitle(raw: string, explicit?: string, fallback = ""): string {
   if (explicit?.trim()) return explicit.trim();
-  const body = parseSource(raw).body;
-  let fenced = false;
-  for (const line of body.split(/\r?\n/)) {
-    if (/^\s{0,3}(?:`{3,}|~{3,})/.test(line)) { fenced = !fenced; continue; }
-    const heading = !fenced && /^ {0,3}# [ \t]*(.+?)[ \t]*#*[ \t]*$/.exec(line);
-    if (heading) return heading[1].replace(/[*_`]/g, "").trim();
+  const tokens = titleParser.parse(parseSource(raw).body, {});
+  for (let i=0; i<tokens.length; i++) {
+    if (tokens[i].type !== "heading_open" || tokens[i].tag !== "h1") continue;
+    const inline=tokens[i+1];
+    if (inline?.type === "inline") {
+      const text=inline.children?.map(token=>token.type === "softbreak" ? " " : token.content).join("").trim();
+      if (text) return text;
+    }
   }
   return fallback;
 }

@@ -31,3 +31,9 @@ test("private note properties never become publication options or rendered outpu
   assert.equal(JSON.stringify(parsed).includes(secret), false);
   assert.equal(parsed.body.includes("Visible body"), true);
 });
+
+test("title candidates honor Markdown headings, literal hashes and fenced code", () => {
+  assert.equal(publicationTitle("# C#"), "C#");
+  assert.equal(publicationTitle("Setext title\n============"), "Setext title");
+  assert.equal(publicationTitle("```md\n# Example\n```\n\n# **Actual** `title`"), "Actual title");
+});
