@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a separate server release artifact, checksum manifest, isolated installation smoke and persistent hardened deployment unit. Production installation requires no source checkout or package manager. Server package version: 0.2.1; plugin version remains unchanged.
+
 - Focus the recommended writing experience on Obsidian, with an editor-independent CLI and official agent skill.
 - Use explicit operation parameters instead of note frontmatter for every publication option; preserve and skip existing properties without YAML evaluation.
 - Require a format for draft creation, add consistent title/cover/author/summary/caption options to checks and previews, and provide an Obsidian draft options dialog.

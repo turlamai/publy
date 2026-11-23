@@ -28,5 +28,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./math-bundled": "./dist/math-bundled.js"
-  }
+  },
+  "files": [
+    "dist",
+    "themes",
+    "fonts"
+  ]
 }

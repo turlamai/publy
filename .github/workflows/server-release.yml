@@ -1,0 +1,66 @@
+name: Server package
+on:
+  pull_request:
+  push:
+    tags: ['server-v*']
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @publy/server... build
+      - name: Build and inspect the self-contained server artifact
+        run: node scripts/build-server-release.mjs "$RUNNER_TEMP/server-release"
+      - name: Re-extract and verify the shipped archive
+        run: |
+          cd "$RUNNER_TEMP/server-release"
+          sha256sum -c SHA256SUMS
+          mkdir "$RUNNER_TEMP/installed-server"
+          tar -xzf publy-server-*-linux-x64.tar.gz -C "$RUNNER_TEMP/installed-server"
+          cd "$GITHUB_WORKSPACE"
+          node scripts/verify-server-package.mjs "$RUNNER_TEMP/installed-server/publy-server"
+          sudo mkdir -p /opt/nodejs/node-v24.14.0-linux-x64/bin
+          sudo ln -s "$(command -v node)" /opt/nodejs/node-v24.14.0-linux-x64/bin/node
+          expected="$(awk '/publy-server-.*tar.gz$/ {print $1}' "$RUNNER_TEMP/server-release/SHA256SUMS")"
+          sudo bash "$RUNNER_TEMP/installed-server/publy-server/deploy/install-server.sh" "$RUNNER_TEMP/server-release/$(ls "$RUNNER_TEMP/server-release" | grep '\.tar.gz$')" "$expected"
+          version="$(node -p "require(process.env.RUNNER_TEMP + '/server-release/release.json').version")"
+          node scripts/verify-server-package.mjs "/opt/publy/server/releases/$version"
+          systemd-analyze verify "$RUNNER_TEMP/installed-server/publy-server/deploy/publy.service"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publy-server-release
+          path: ${{ runner.temp }}/server-release/*
+  publish:
+    if: startsWith(github.ref, 'refs/tags/server-v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: publy-server-release
+          path: release
+      - name: Require exact version and successful main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF_NAME" = "server-v$(jq -r .version release/release.json)"
+          test "$(jq -r .source_commit release/release.json)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push" --jq '.workflow_runs | any(.head_branch == "main" and .conclusion == "success")' | grep -qx true
+          printf '%s\n' 'Self-contained Linux x64 server package; includes production dependencies, runtime metadata and installation unit. Verify SHA256SUMS. No plugin release or public checkout activation.' > release-notes.md
+      - name: Publish the server release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "Publy server $GITHUB_REF_NAME" --notes-file release-notes.md release/*
