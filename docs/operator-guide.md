@@ -1,5 +1,7 @@
 # Publy self-hosted operator guide
 
+Production installation: [versioned server artifacts, activation and rollback](../deploy/README.md).
+
 **English** · [简体中文](operator-guide.zh-CN.md)
 
 This guide is for the person operating their own Publy server. The admin page

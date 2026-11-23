@@ -1,0 +1,30 @@
+[Unit]
+Description=Publy draft delivery service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=publy
+Group=publy
+WorkingDirectory=/var/lib/publy
+ExecStart=/opt/nodejs/node-v24.14.0-linux-x64/bin/node /opt/publy/server/current/dist/index.js --config /etc/publy/server.json
+Environment=NODE_ENV=production
+Environment=PLTUSERHOME=/var/lib/publy/racket-user
+StateDirectory=publy
+UMask=0077
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/publy
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target
