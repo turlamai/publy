@@ -279,7 +279,8 @@ async function bindAccount() {
 /** Hosted purchase page. It is intentionally usable only when a Commerce
  * checkout is configured; the disabled state is explicit, never a fake pay
  * button. Payment confirmation still happens through Commerce/Permit. */
-export function hostedPurchasePage(available: boolean, publicUrl?: string): string {
+export function hostedPurchasePage(available: boolean, publicUrl?: string, direct = false): string {
+  if (direct) return hostedDirectPurchasePage(available);
   const offers = (Object.entries(HOSTED_OFFERS) as Array<[HostedOfferId, (typeof HOSTED_OFFERS)[HostedOfferId]]>)
     .map(([id, offer], index) => `
       <label class="plan">
@@ -387,4 +388,128 @@ main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:500 30px/1.2 Georgi
 .card{background:#fff;border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:#cfe3cd;background:#eef5ec}
 a{color:#176842}</style></head><body><main><h1>${title}</h1><div class="card ${ok ? "ok" : ""}"><p>${message}</p></div>
 <p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">购买页</a></p></main></body></html>`;
+}
+
+function hostedDirectPurchasePage(available: boolean): string {
+  if (!available) return hostedPurchasePage(false);
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publy 托管投递 · 开通</title>
+<style>
+:root{--ink:#16271e;--muted:#5d6d64;--line:#dce5d9;--green:#176842;--tint:#eef5ec;--amber:#8a5a12}
+*{box-sizing:border-box}body{margin:0;background:#f7f8f4;color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:500 34px/1.2 Georgia,serif;margin:8px 0 10px}
+.lead{color:var(--muted);max-width:600px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
+.notice{border:1px solid #ecd6a6;background:#fdf3e2;color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
+.notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
+.plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
+#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:#a3341f}
+.small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
+@media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+#copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
+.plans{grid-template-columns:1fr}#direct-qr{max-width:100%;height:auto}input{min-height:44px}
+@media(prefers-color-scheme:dark){:root{--ink:#e7eee9;--muted:#b3c1b8;--line:#637568;--green:#9ed7ad;--tint:#23372a;--amber:#f0cf93}body{background:#181e1a}.card,input[type=text],input[type=password]{background:#222b25;color:var(--ink)}button{background:#9ed7ad;color:#16271e}#msg.err{color:#ffb5a0}}
+</style></head><body><div class="wrap">
+<a href="https://publy.jrtx.site/">← Publy</a>
+<h1>托管投递，按需开通。</h1>
+<p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
+<div class="notice ok">Personal 月包 ¥29，不自动续费。支付后重新核验权益，有效期以内不重复购买。</div>
+<form class="card" id="buy" >
+  <div class="plans">
+      <label class="plan">
+        <input type="radio" name="offer" value="publy-personal-monthly" checked>
+        <span class="plan-name">Personal · 1 个月</span>
+        <span class="plan-price">¥29</span>
+        <span class="plan-meta">个人写作与排程 · 一次性支付</span>
+      </label>
+
+
+      </div>
+  <label class="field">联系方式（邮箱或手机号，用于开户与对账）
+    <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
+  </label>
+  <label class="field">已有账户 API Key（用于恢复同一账户）<input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key">复制 API Key 并妥善保存</button></label><button type="submit" id="pay">查看权益与购买入口</button>
+  <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p></section>
+</form>
+<div class="card">
+  <strong>付款前请确认</strong>
+  <ul class="small">
+    <li>Publy 只创建草稿，最终发布仍由你在微信后台完成。</li>
+    <li>托管需要你的公众号 AppID 与 AppSecret，以及把本服务出口 IP 加入微信白名单。</li>
+    <li>每个已购月包包含 30 次成功草稿投递、1 个公众号及 1 GB 活跃附件；周期以平台有效期为准。</li>
+    <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
+  </ul>
+</div>
+<p class="foot">运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/terms.md">服务条款</a></p>
+</div>
+<script>
+var KEY = 'publy_hosted_api_key';
+var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
+var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
+var apiKey = '', timer;
+try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
+function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
+async function post(url, body) {
+  var response = await fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, apiKey ? { 'x-api-key': apiKey } : {}), body: JSON.stringify(body) });
+  var value = await response.json();
+  if (!response.ok) throw new Error(value.code === 'UNAUTHORIZED' ? 'API Key 无效，请检查账户凭据。' : '当前无法确认权益，请稍后刷新。');
+  return value;
+}
+async function refresh() {
+  if (!apiKey) return;
+  clearTimeout(timer); button.disabled = true;
+  try {
+    var result = await post('/v1/hosted/status', {});
+    section.hidden = false; qr.hidden = true;
+    var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
+    if (result.status === 'active') {
+      state.textContent = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。';
+      say('请保存你的 API Key，用于 CLI、插件或换设备恢复账户。');
+    } else {
+      state.textContent = '尚未开通。¥29 / 一个月，不自动续费。';
+      if (result.qrDataUrl) { qr.src = result.qrDataUrl; qr.hidden = false; }
+      if (result.purchaseUrl) {
+        var link = document.createElement('a'); link.id = 'purchase-link'; link.textContent = '打开支付宝购买'; link.href = result.purchaseUrl;
+        link.rel = 'noopener noreferrer'; link.target = '_blank'; section.appendChild(link);
+      }
+      say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额；付款后返回此页刷新权益。' : '暂未开放购买，请稍后再试。');
+      // Poll only a bounded set of visible-page checks, without caching access.
+    }
+  } catch (error) { say(error.message, true); }
+  finally { button.disabled = false; }
+}
+if (form) form.addEventListener('submit', async function (event) {
+  event.preventDefault(); button.disabled = true;
+  try {
+    apiKey = document.getElementById('existingKey').value.trim() || apiKey;
+    if (!apiKey) {
+      var contact = document.getElementById('contact').value.trim();
+      if (!contact) throw new Error('首次开户请填写联系方式；已有账户请填写 API Key。');
+      var response = await fetch('/v1/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contact: contact }) });
+      var account = await response.json();
+      if (!response.ok) throw new Error(response.status === 409 ? '此联系方式已开户，请使用原 API Key 恢复账户。' : '暂时无法开户，请稍后重试。');
+      apiKey = account.apiKey;
+    }
+    await post('/v1/hosted/session', {});
+    try { sessionStorage.setItem(KEY, apiKey); } catch (_) {}
+    document.getElementById('existingKey').value = apiKey;
+    await refresh();
+    var checks = 0;
+    async function poll() {
+      if (document.visibilityState === 'visible') await refresh();
+      if (++checks < 12) timer = setTimeout(poll, 10000);
+    }
+    timer = setTimeout(poll, 10000);
+  } catch (error) { say(error.message, true); }
+  finally { button.disabled = false; }
+});
+var refreshButton = document.getElementById('refresh');
+if (refreshButton) refreshButton.addEventListener('click', refresh);
+
+var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { await navigator.clipboard.writeText(document.getElementById("existingKey").value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
+</script></body></html>`;
 }

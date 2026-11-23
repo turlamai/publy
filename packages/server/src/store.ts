@@ -9,6 +9,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { HostedIdentityBindings } from "./hosted-identity.js";
 import { HostedEntitlementFence } from "./hosted-entitlement-fence.js";
+import { HostedQuotaLedger } from "./hosted-quota.js";
+
+export interface DirectQuotaTicket { subject: string; requestId: string; }
+export interface DirectPeriod { validFrom: number; validUntil: number; }
 
 export type Plan = "free" | "personal" | "studio";
 
@@ -88,6 +92,8 @@ export class Store {
   private db: DatabaseSync;
   private hostedIdentities: HostedIdentityBindings;
   private hostedFences: HostedEntitlementFence;
+  private directQuota: HostedQuotaLedger;
+  private transactionDepth = 0;
   private secretKey: string | null = null;
 
   constructor(dataDir: string) {
@@ -139,6 +145,9 @@ export class Store {
     this.migrateImmediateClaims();
     this.hostedIdentities = new HostedIdentityBindings(this.db);
     this.hostedFences = new HostedEntitlementFence(this.db);
+    this.directQuota = new HostedQuotaLedger(this.db, fn => this.transaction(fn));
+    this.db.exec(`CREATE TABLE IF NOT EXISTS direct_periods (user_id TEXT PRIMARY KEY, valid_from INTEGER NOT NULL, valid_until INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS direct_quota_bindings (user_id TEXT NOT NULL, operation_key TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(user_id,operation_key));`);
     this.db.exec(`CREATE TABLE IF NOT EXISTS hosted_purchases (
       user_id TEXT PRIMARY KEY,
       offer_id TEXT NOT NULL,
@@ -164,6 +173,87 @@ export class Store {
   /** close the sqlite handle (fastify onClose hook) */
   close(): void {
     this.db.close();
+  }
+
+  private transaction<T>(fn: () => T): T {
+    if (this.transactionDepth) return fn();
+    this.db.exec("BEGIN IMMEDIATE");
+    this.transactionDepth++;
+    try { const result = fn(); this.db.exec("COMMIT"); return result; }
+    catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    finally { this.transactionDepth--; }
+  }
+
+  setDirectPeriod(userId: string, validFrom: number, validUntil: number): void {
+    const now = Date.now();
+    if (![validFrom, validUntil].every(Number.isSafeInteger) || validFrom > now || validUntil <= now || validFrom >= validUntil) throw new Error("DIRECT_PERIOD_INVALID");
+    this.transaction(() => {
+      this.setPlanUntil(userId, "personal", validUntil);
+      this.db.prepare("INSERT INTO direct_periods(user_id,valid_from,valid_until) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET valid_from=excluded.valid_from,valid_until=excluded.valid_until").run(userId, validFrom, validUntil);
+    });
+  }
+
+  directPeriod(userId: string): DirectPeriod | null {
+    const row = this.db.prepare("SELECT valid_from,valid_until FROM direct_periods WHERE user_id=?").get(userId) as { valid_from: number; valid_until: number } | undefined;
+    return row ? { validFrom: row.valid_from, validUntil: row.valid_until } : null;
+  }
+
+  directQuotaTicket(userId: string, operationKey: string): DirectQuotaTicket | null {
+    const row = this.db.prepare("SELECT request_id FROM direct_quota_bindings WHERE user_id=? AND operation_key=?").get(userId, operationKey) as { request_id: string } | undefined;
+    return row ? { subject: userId, requestId: row.request_id } : null;
+  }
+
+  reserveDirect(userId: string, operationKey: string, fingerprint: string, period: DirectPeriod, attachmentBytes: number): DirectQuotaTicket {
+    return this.transaction(() => {
+      const requestId = crypto.createHash("sha256").update(String(period.validFrom)).update("\0").update(operationKey).digest("hex");
+      const old = this.directQuotaTicket(userId, operationKey);
+      if (old && old.requestId !== requestId) {
+        const state = this.directQuota.state(old.subject, old.requestId);
+        if (state === "reserved") this.directQuota.cancelBeforeSend(old.subject, old.requestId);
+        else if (state !== "cancelled") throw new Error("DIRECT_PREVIOUS_OUTCOME_UNRESOLVED");
+      }
+      const result = this.directQuota.reserve({ subject: userId, requestId, fingerprint: crypto.createHash("sha256").update(fingerprint).digest("hex"),
+        periodStart: period.validFrom, periodEnd: period.validUntil, limit: 30, now: Date.now(), attachmentBytes, maxActiveBytes: 1_000_000_000 });
+      if (result.status === "exhausted") throw new Error("QUOTA_EXCEEDED");
+      if (result.state !== "reserved") throw new Error("DIRECT_PREVIOUS_OUTCOME_UNRESOLVED");
+      this.db.prepare("INSERT INTO direct_quota_bindings(user_id,operation_key,request_id) VALUES(?,?,?) ON CONFLICT(user_id,operation_key) DO UPDATE SET request_id=excluded.request_id").run(userId, operationKey, requestId);
+      return { subject: userId, requestId };
+    });
+  }
+
+  claimDirectImmediate(key: string, owner: string, fingerprint: string, userId: string, period: DirectPeriod,
+      attachmentBytes: number, context: { account: string; title: string }): { outcome: "claimed" | "existing"; ticket?: DirectQuotaTicket } {
+    return this.transaction(() => {
+      // A confirmed Direct request identity remains the same operation after
+      // a billing boundary; a new draft intent needs a new idempotency key.
+      const outcome = this.claimImmediate(key, owner, fingerprint, Date.now(), Number.MAX_SAFE_INTEGER, context);
+      return outcome === "existing" ? { outcome } : { outcome, ticket: this.reserveDirect(userId, key, fingerprint, period, attachmentBytes) };
+    });
+  }
+
+  beginDirectSend(ticket: DirectQuotaTicket): void { this.directQuota.beginSend(ticket.subject, ticket.requestId, Date.now()); }
+  completeDirect(ticket: DirectQuotaTicket): void { this.directQuota.confirmSuccess(ticket.subject, ticket.requestId); }
+  failDirect(ticket: DirectQuotaTicket, definitive: boolean): void {
+    const state = this.directQuota.state(ticket.subject, ticket.requestId);
+    if (state === "reserved") this.directQuota.cancelBeforeSend(ticket.subject, ticket.requestId);
+    else if (state === "sending") {
+      if (definitive) this.directQuota.confirmRejected(ticket.subject, ticket.requestId);
+      else this.directQuota.markUnknown(ticket.subject, ticket.requestId);
+    }
+  }
+
+  confirmDirectImmediate(ticket: DirectQuotaTicket, key: string, owner: string, fingerprint: string, mediaId: string): void {
+    this.transaction(() => { this.confirmImmediate(key, owner, fingerprint, mediaId, Date.now()); this.completeDirect(ticket); });
+  }
+
+  releaseDirectImmediate(ticket: DirectQuotaTicket, key: string, owner: string, fingerprint: string): void {
+    this.transaction(() => { this.failDirect(ticket, true); this.releaseImmediate(key, owner, fingerprint); });
+  }
+
+  private reconcileDirectClaim(key: string, owner: string, delivered: boolean): void {
+    if (!owner.startsWith("user:")) return;
+    const ticket = this.directQuotaTicket(owner.slice(5), key);
+    if (ticket) this.directQuota.reconcileByOperator(ticket.subject, ticket.requestId, delivered);
   }
 
   private toUser(r: Record<string, unknown>): UserRow {
@@ -280,6 +370,8 @@ export class Store {
 
   /** used publishes in the current calendar month (resets on rollover) */
   getUsage(user: UserRow): number {
+    const direct = this.directPeriod(user.id);
+    if (direct) return this.directQuota.usage(user.id, direct.validFrom).succeeded;
     const fresh = this.findUserById(user.id)!;
     return fresh.monthKey === monthKey() ? fresh.publishCount : 0;
   }
@@ -328,22 +420,16 @@ export class Store {
   }
 
   claimImmediate(key: string, owner: string, fingerprint: string, now: number, ttl: number, context: { account?: string; title?: string } = {}): "claimed" | "existing" {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    return this.transaction(() => {
       const existing = this.getImmediateClaim(key);
       if (existing && !(existing.state === "confirmed" && existing.mediaId && existing.completedAt !== null && now - existing.completedAt >= ttl)) {
-        this.db.exec("COMMIT");
         return "existing";
       }
       if (existing) this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ?").run(key);
       this.db.prepare("INSERT INTO immediate_publish_claims(request_key, owner, fingerprint, state, account, title, created_at) VALUES (?, ?, ?, 'pending', ?, ?, ?)")
         .run(key, owner, fingerprint, context.account ?? null, context.title ?? null, now);
-      this.db.exec("COMMIT");
       return "claimed";
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   releaseImmediate(key: string, owner: string, fingerprint: string): void {
@@ -365,9 +451,13 @@ export class Store {
    * must not retry implicitly.
    */
   reconcileImmediateClaim(key: string, mediaId: string, now: number): boolean {
-    const changed = this.db.prepare("UPDATE immediate_publish_claims SET state = 'confirmed', media_id = ?, completed_at = ? WHERE request_key = ? AND state = 'pending'")
-      .run(mediaId, now, key);
-    return Number(changed.changes) === 1;
+    return this.transaction(() => {
+      const claim = this.getImmediateClaim(key);
+      if (!claim || claim.state !== "pending") return false;
+      this.reconcileDirectClaim(key, claim.owner, true);
+      const changed = this.db.prepare("UPDATE immediate_publish_claims SET state = 'confirmed', media_id = ?, completed_at = ? WHERE request_key = ? AND state = 'pending'").run(mediaId, now, key);
+      return Number(changed.changes) === 1;
+    });
   }
 
   /**
@@ -376,8 +466,13 @@ export class Store {
    * the original requester retry; the caller must record the evidence.
    */
   releaseImmediateClaimByOperator(key: string): boolean {
-    const changed = this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ? AND state = 'pending'").run(key);
-    return Number(changed.changes) === 1;
+    return this.transaction(() => {
+      const claim = this.getImmediateClaim(key);
+      if (!claim || claim.state !== "pending") return false;
+      this.reconcileDirectClaim(key, claim.owner, false);
+      const changed = this.db.prepare("DELETE FROM immediate_publish_claims WHERE request_key = ? AND state = 'pending'").run(key);
+      return Number(changed.changes) === 1;
+    });
   }
 
   // --- accounts ------------------------------------------------------------

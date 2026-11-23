@@ -11,6 +11,7 @@ export interface HostedAdmissionResult {
   revision?: number;
   payloadSha256?: string;
   useExpiresAt?: string;
+  validFrom?: string;
 }
 
 const denied = (): HostedAdmissionResult => ({ allowed: false, status: "denied" });
@@ -25,6 +26,7 @@ export async function verifyHostedAdmission(input: {
   racketExecutable: string;
   verifierScript: string;
   trustStore: string;
+  direct?: { nonce: string; serviceId: string; outProductId: string; issuer: string };
 }): Promise<HostedAdmissionResult> {
   const validPath = (value: unknown): value is string => typeof value === "string" && path.isAbsolute(value) && !value.includes("\0");
   if (!input.credential || typeof input.credential !== "object" || Array.isArray(input.credential) ||
@@ -36,6 +38,8 @@ export async function verifyHostedAdmission(input: {
   let body: string;
   try {
     const payload: Record<string, unknown> = { credential: input.credential, account: input.account, plan: input.plan, at: input.at };
+    if (input.direct) Object.assign(payload, { purpose: "direct", request_nonce: input.direct.nonce,
+      service_id: input.direct.serviceId, provider_product_id: input.direct.outProductId, issuer: input.direct.issuer });
     if (input.entitlementId !== undefined) payload.entitlement_id = input.entitlementId;
     if (input.minimumRevision !== undefined) payload.minimum_revision = input.minimumRevision;
     body = JSON.stringify(payload);
@@ -82,8 +86,22 @@ export async function verifyHostedAdmission(input: {
             typeof r.use_expires_at !== "string" ||
             (input.entitlementId !== undefined && r.entitlement_id !== input.entitlementId) ||
             (input.minimumRevision !== undefined && (r.revision as number) < input.minimumRevision)) { finish(denied()); return; }
+        let validFrom: string | undefined;
+        if (input.direct) {
+          const canonical = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v)) &&
+            new Date(Date.parse(v)).toISOString().replace(/\.\d{3}Z$/, "Z") === v;
+          if (!canonical(input.at) || r.request_nonce !== input.direct.nonce || r.service_id !== input.direct.serviceId ||
+              r.provider_product_id !== input.direct.outProductId || !canonical(r.valid_from) || !canonical(r.valid_until) ||
+              !canonical(r.observed_at) || !canonical(r.fresh_until) || r.valid_until !== r.use_expires_at ||
+              Date.parse(r.fresh_until) - Date.parse(r.observed_at) !== 30_000 ||
+              Date.parse(input.at) < Date.parse(r.observed_at) || Date.parse(input.at) >= Date.parse(r.fresh_until) ||
+              Date.parse(input.at) < Date.parse(r.valid_from) || Date.parse(input.at) >= Date.parse(r.valid_until)) {
+            finish(denied()); return;
+          }
+          validFrom = r.valid_from;
+        }
         finish({ allowed: true, status: "admitted", entitlementId: r.entitlement_id, revision: r.revision as number,
-          payloadSha256: r.payload_sha256, useExpiresAt: r.use_expires_at });
+          payloadSha256: r.payload_sha256, useExpiresAt: r.use_expires_at, ...(validFrom ? { validFrom } : {}) });
       } catch { finish(denied()); }
     });
     stdin.end(body);

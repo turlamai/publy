@@ -86,3 +86,19 @@ test("multiple processes cannot reserve beyond the same account allowance", asyn
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("active attachments are bounded across periods and cancelled work can reserve again", () => {
+  const db = new DatabaseSync(":memory:"); const ledger = new HostedQuotaLedger(db);
+  try {
+    const base = { subject: "synthetic", fingerprint: "a".repeat(64), periodStart: 1000, periodEnd: 2000, limit: 30, now: 1500, maxActiveBytes: 1000 };
+    ledger.reserve({ ...base, requestId: "first", attachmentBytes: 600 });
+    assert.throws(() => ledger.reserve({ ...base, requestId: "second", attachmentBytes: 401 }), /STORAGE_QUOTA_EXCEEDED/);
+    ledger.cancelBeforeSend(base.subject, "first");
+    assert.equal(ledger.reserve({ ...base, requestId: "first", attachmentBytes: 600 }).status, "reserved");
+    ledger.beginSend(base.subject, "first", 1500); ledger.markUnknown(base.subject, "first");
+    assert.throws(() => ledger.reserve({ ...base, requestId: "next", periodStart: 2000, periodEnd: 3000, now: 2500, attachmentBytes: 401 }), /STORAGE_QUOTA_EXCEEDED/);
+    ledger.reconcileByOperator(base.subject, "first", false);
+    assert.equal(ledger.reserve({ ...base, requestId: "next", periodStart: 2000, periodEnd: 3000, now: 2500, attachmentBytes: 401 }).status, "reserved");
+    assert.equal(ledger.usage(base.subject, 2000).held, 1);
+  } finally { db.close(); }
+});

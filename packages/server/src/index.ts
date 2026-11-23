@@ -17,12 +17,14 @@ import Fastify from "fastify";
 import type { FastifyError, FastifyReply } from "fastify";
 import type { JobInfo, JobStatus, PublishRequest, PublishResponse, PublishResultInfo } from "@publy/shared";
 import { draftIdempotencyKey, draftDelete, publishToWechat, MaterialCache, TokenManager, WechatError, PublishError, checkWechatCredential, listDraftSummaries, type AccountCredential, type WechatDraftSummary } from "@publy/core";
-import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow } from "./store.js";
+import { Store, PLAN_LIMITS, PRICES, monthKey, type AccountRow, type ImmediateClaimRow, type Plan, type UserRow, type DirectPeriod, type DirectQuotaTicket } from "./store.js";
 import { createProvider } from "./payments.js";
 import { requestHostedCheckout } from "./commerce-checkout-request.js";
 import { purchasePage, hostedPurchasePage, hostedResultPage } from "./pages.js";
 import { HOSTED_OFFERS, isHostedOfferId } from "./hosted-offers.js";
 import { checkHostedAdmission } from "./hosted-admission-service.js";
+import { consultNowpayDirect, type NowpayDirectConfig } from "./nowpay-direct.js";
+import QRCode from "qrcode";
 import { adminPage } from "./admin-page.js";
 
 export interface ServerAccount {
@@ -70,6 +72,7 @@ export interface ServerConfig {
     offerId: string; racketExecutable: string; verifierScript: string; trustStore: string;
     enroll: boolean; fetcher?: typeof fetch;
   };
+  hostedDirect?: NowpayDirectConfig;
   payments?: {
     /** Old checkout is off by default. This opt-in permits only isolated tests. */
     enableLegacyCheckout?: boolean;
@@ -155,9 +158,28 @@ export function loadServerConfig(configPath?: string): ServerConfig {
     publicIp: raw.publicIp,
     secretKey: raw.secretKey,
     payments: raw.payments,
+    hostedDirect: loadHostedDirect(raw.hostedDirect),
     hostedCheckout: loadHostedCheckout(raw.hostedCheckout, file),
     hostedAdmission: loadHostedAdmission(raw.hostedAdmission, file),
   };
+}
+
+function loadHostedDirect(raw: unknown): NowpayDirectConfig | undefined {
+  if (raw === undefined) return;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("hostedDirect must be an object");
+  const r = raw as Record<string, unknown>;
+  const text = (key: string) => {
+    const v = r[key];
+    if (typeof v !== "string" || !v.trim() || v.includes("\0")) throw new Error(`hostedDirect.${key} is required`);
+    return v;
+  };
+  for (const key of ["socketPath", "racketExecutable", "verifierScript", "trustStore"]) {
+    if (!path.isAbsolute(text(key))) throw new Error(`hostedDirect.${key} must be absolute`);
+    if (key !== "socketPath" && !fs.existsSync(text(key))) throw new Error(`hostedDirect.${key} does not exist`);
+  }
+  if (typeof r.purchasingEnabled !== "boolean") throw new Error("hostedDirect.purchasingEnabled must be boolean");
+  return { socketPath: text("socketPath"), racketExecutable: text("racketExecutable"), verifierScript: text("verifierScript"),
+    trustStore: text("trustStore"), serviceId: text("serviceId"), outProductId: text("outProductId"), issuer: text("issuer"), purchasingEnabled: r.purchasingEnabled };
 }
 
 function loadHostedCheckout(raw: unknown, configFile: string): ServerConfig["hostedCheckout"] {
@@ -249,6 +271,21 @@ export async function detectEgressIp(): Promise<string | null> {
   return null;
 }
 
+function directQuota<T>(fn: () => T): T {
+  try { return fn(); } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (["QUOTA_EXCEEDED", "STORAGE_QUOTA_EXCEEDED"].includes(code))
+      throw Object.assign(new PublishError(code, "Monthly hosted allowance is exhausted."), { statusCode: 429 });
+    if (["DIRECT_PREVIOUS_OUTCOME_UNRESOLVED", "QUOTA_REQUEST_CONFLICT", "QUOTA_POLICY_CONFLICT", "QUOTA_PERIOD_OVERLAP"].includes(code))
+      throw Object.assign(new PublishError("DRAFT_OUTCOME_UNKNOWN", "The prior request or billing period must be reconciled before reuse."), { statusCode: 409 });
+    throw error;
+  }
+}
+
+function attachmentBytes(body: PublishRequest): number {
+  return (body.images ?? []).reduce((n, image) => n + Buffer.from(image.data, "base64").length, 0);
+}
+
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
 const JOB_MAX_ATTEMPTS = 3;
 const JOB_RETRY_DELAY_MS = 5 * 60 * 1000;
@@ -268,6 +305,7 @@ interface StoredJob {
   /** admission idempotency: same key never enqueues two jobs, and a retry of
    *  an interrupted run reconciles against the same record before re-sending */
   idempotencyKey?: string;
+  directQuota?: DirectQuotaTicket;
   result?: PublishResponse;
   error?: string;
 }
@@ -320,6 +358,8 @@ function isPersistedJob(key: string, value: unknown): boolean {
     typeof body.account === "string" && body.account.length > 0 &&
     typeof body.title === "string" && typeof body.type === "string" &&
     (value.idempotencyKey === undefined || typeof value.idempotencyKey === "string") &&
+    (value.directQuota === undefined || (isRecord(value.directQuota) && value.directQuota.subject === value.userId &&
+      typeof value.directQuota.requestId === "string" && /^[a-f0-9]{64}$/.test(value.directQuota.requestId))) &&
     (value.error === undefined || typeof value.error === "string") &&
     (value.result === undefined || isRecord(value.result));
 }
@@ -360,10 +400,13 @@ function readPersistedMap<T>(filePath: string, kind: "JOBS" | "IDEMPOTENCY", val
 export function buildApp(config: ServerConfig) {
   // Validate policy before opening SQLite or any other resources. A rejected
   // configuration must not leave a locked database (especially on Windows).
+  if (config.hostedDirect && (config.hostedAdmission || config.hostedCheckout || config.sandboxCheckout || config.payments?.enableLegacyCheckout)) {
+    throw new Error("hostedDirect requires an exclusive payment and admission configuration");
+  }
   const legacyCheckoutEnabled = config.payments?.enableLegacyCheckout === true;
   // Money must not be taken unless the same deployment can verify and activate
   // the Permit entitlement. Both halves are required for the public flow.
-  const hostedPurchaseEnabled = Boolean(config.hostedCheckout && config.hostedAdmission);
+  const hostedPurchaseEnabled = Boolean(config.hostedDirect || (config.hostedCheckout && config.hostedAdmission));
   if (legacyCheckoutEnabled && config.payments?.provider !== "manual") {
     throw new Error("legacy checkout is restricted to manual synthetic testing; online providers require Commerce/Permit");
   }
@@ -503,14 +546,23 @@ export function buildApp(config: ServerConfig) {
       }
       // Admission is checked again at execution: a scheduled job may outlive
       // the entitlement snapshot that admitted it at enqueue time.
-      await requireHostedAdmission(caller);
+      const period = await requireHostedAdmission(caller);
+      if (period && !caller.admin) {
+        if (!job.idempotencyKey) throw new PublishError("REQUEST_ID_REQUIRED", "Monthly hosted jobs require an idempotency key.");
+        job.directQuota = directQuota(() => store.reserveDirect(caller.user.id, job.idempotencyKey!, draftIdempotencyKey(body), period, attachmentBytes(body)));
+        saveJobs();
+      }
       // Recovering a confirmed draft does not consume a new quota unit.
-      if (!caller.admin) {
+      if (!caller.admin && !job.directQuota) {
         const limit = planLimit(caller.user);
         if (store.getUsage(caller.user) >= limit) throw new PublishError("QUOTA_EXCEEDED", `monthly limit ${limit} reached`);
       }
-      publishAttempted = true;
-      const result = await publishToWechat(body, cred, tokens, materials);
+      if (!job.directQuota) publishAttempted = true;
+      const result = await publishToWechat(body, cred, tokens, materials, () => {
+        if (job.directQuota) store.beginDirectSend(job.directQuota);
+        publishAttempted = true;
+      });
+      if (job.directQuota) store.completeDirect(job.directQuota);
       job.status = "done";
       job.result = result;
       job.error = undefined;
@@ -518,11 +570,15 @@ export function buildApp(config: ServerConfig) {
         idempotency[job.idempotencyKey] = { mediaId: result.mediaId, at: Date.now(), account: body.account, title: body.title, type: body.type, userId: job.userId, requestFingerprint: draftIdempotencyKey(body) };
         saveIdempotency();
       }
-      if (!caller.admin) store.incrementUsage(caller.user.id);
+      if (!caller.admin && !job.directQuota) store.incrementUsage(caller.user.id);
       audit({ event: "scheduled-published", account: body.account, type: body.type, title: body.title, mediaId: result.mediaId, jobId: job.id });
       notifyWebhook(body.account, "publish", { title: body.title, mediaId: result.mediaId, jobId: job.id, scheduled: true });
     } catch (err) {
       job.attempts += 1;
+      if (job.directQuota && !job.result) {
+        store.failDirect(job.directQuota, !publishAttempted || err instanceof WechatError);
+        if (err instanceof WechatError) publishAttempted = false;
+      }
       if (publishAttempted) {
         // The failure could be after draft/add committed remotely (including a
         // failed local state write). A server-side key cannot query an unknown
@@ -617,9 +673,24 @@ export function buildApp(config: ServerConfig) {
 
   /** Paid hosted users must pass current-state proof + Permit admission.
    * Free users stay on the local free allowance; admins are the operator. */
-  async function requireHostedAdmission(caller: Caller): Promise<void> {
+  async function directDecision(user: UserRow) {
+    const result = await consultNowpayDirect(config.hostedDirect!, user.id, store.hostedFence());
+    if (result.status === "allowed") store.setDirectPeriod(user.id, Date.parse(result.validFrom), Date.parse(result.validUntil));
+    return result;
+  }
+
+  async function requireHostedAdmission(caller: Caller): Promise<DirectPeriod | null> {
+    if (caller.admin) return null;
+    if (config.hostedDirect) {
+      const current = store.findUserById(caller.user.id);
+      if (!current || current.disabledAt) throw new PublishError("USER_DISABLED", "Account access is unavailable.");
+      if (store.countAccountsOwnedBy(current.id) > 1) throw new PublishError("ACCOUNT_LIMIT", "Personal supports one bound account; remove extra bindings before submission.");
+      const decision = await directDecision(current);
+      if (decision.status !== "allowed") throw new PublishError("HOSTED_ADMISSION_REQUIRED", "Current monthly entitlement could not be verified.");
+      return { validFrom: Date.parse(decision.validFrom), validUntil: Date.parse(decision.validUntil) };
+    }
     const admission = config.hostedAdmission;
-    if (!admission || caller.admin || caller.user.plan === "free") return;
+    if (!admission || caller.user.plan === "free") return null;
     const plan = caller.user.plan as "personal" | "studio";
     const subject = store.resolveHostedSubject(caller.user.id);
     if (!subject) throw new PublishError("HOSTED_IDENTITY_MISSING", "Paid hosted use requires an enrolled hosted identity.");
@@ -630,6 +701,7 @@ export function buildApp(config: ServerConfig) {
       trustStore: admission.trustStore, fence: store.hostedFence(), enroll: admission.enroll,
       fetcher: admission.fetcher });
     if (!decision.allowed) throw new PublishError("HOSTED_ADMISSION_REQUIRED", `Hosted entitlement is not current (${decision.reason ?? "denied"}).`);
+    return null;
   }
 
   app.addHook("onRequest", async (req, reply) => {
@@ -669,15 +741,21 @@ export function buildApp(config: ServerConfig) {
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
   app.get("/hosted", async (_req, reply) => {
     reply.header("cache-control", "no-store");
-    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl));
+    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl, Boolean(config.hostedDirect)));
   });
   app.get("/hosted/return", async (req, reply) => {
     reply.header("cache-control", "no-store");
     const page = (title: string, message: string, ok = false) => reply.type("text/html").send(hostedResultPage(title, message, ok));
     const session = readHostedSession(req as unknown as { headers: Record<string, string | string[] | undefined> });
-    if (!session) return page("无法确认购买会话", "请使用购买时的同一浏览器打开此页；支付结果以 Commerce/支付宝回调为准。");
+    if (!session) return page("无法确认购买会话", config.hostedDirect ? "请回到购买页，使用原 API Key 恢复相同账户并刷新权益。" : "请使用购买时的同一浏览器打开此页；支付结果以 Commerce/支付宝回调为准。");
     const user = store.findUserById(session.userId);
     if (!user || user.disabledAt) return page("账号不可用", "该账号已停用，请联系运营者。");
+    if (config.hostedDirect) {
+      const decision = await directDecision(user);
+      return decision.status === "allowed"
+        ? page("已开通", `Personal 月包有效期至 ${decision.validUntil}。返回购买页可恢复账户。`, true)
+        : page("尚未确认权益", "请回到原浏览器的购买页刷新状态；返回此页面本身不会开通权益。");
+    }
     if (!session.offerId) return page("尚未创建订单", "没有找到这次购买的套餐，请重新从购买页发起。");
     const offer = isHostedOfferId(session.offerId) ? HOSTED_OFFERS[session.offerId] : null;
     if (!offer) return page("套餐无效", "该订单的套餐无法识别，请联系运营者。");
@@ -815,17 +893,42 @@ export function buildApp(config: ServerConfig) {
     signupAttempts.set(ip, attempts);
     if (store.findUserByContact(contact)) return reply.code(409).send({ code: "CONTACT_TAKEN" });
     const user = store.createUser(contact, "free", 1);
-    const subject = store.enrollHostedSubject(user.id);
+    const subject = config.hostedDirect ? user.id : store.enrollHostedSubject(user.id);
     issueHostedSession(reply, user.id);
     audit({ event: "hosted-signup", userId: user.id });
     reply.header("cache-control", "no-store");
     return { userId: user.id, apiKey: user.apiKey, subject };
   });
 
+  app.post("/v1/hosted/session", async (req, reply) => {
+    const caller = (req as unknown as { caller: Caller }).caller;
+    if (!config.hostedDirect) return checkoutClosed(reply);
+    if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
+    issueHostedSession(reply, caller.user.id);
+    reply.header("cache-control", "no-store");
+    return { userId: caller.user.id };
+  });
+
+  app.post("/v1/hosted/status", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    const caller = (req as unknown as { caller: Caller }).caller;
+    if (!config.hostedDirect) return checkoutClosed(reply);
+    if (caller.admin) return reply.code(403).send({ code: "CUSTOMER_ACCOUNT_REQUIRED" });
+    const decision = await directDecision(caller.user);
+    if (decision.status === "allowed") return { status: "active", plan: "personal", validFrom: decision.validFrom, validUntil: decision.validUntil };
+    if (decision.status === "purchase-required") {
+      const uri = decision.qrUrl ?? decision.purchaseUrl;
+      return { status: "purchase-required", purchaseUrl: decision.purchaseUrl,
+        qrDataUrl: uri ? await QRCode.toDataURL(uri, { width: 256, margin: 2 }) : undefined };
+    }
+    return reply.code(decision.status === "unavailable" ? 503 : 403).send({ code: "HOSTED_ADMISSION_REQUIRED", status: decision.status });
+  });
+
   // Sandbox-only integration seam: no configuration file can enable this
   // route. It prepares a signed order, never confirms payment or grants rights.
   const sandboxCheckoutAttempts = new Map<string, number[]>();
   app.post<{ Body: unknown }>("/v1/hosted/checkout", async (req, reply) => {
+    if (config.hostedDirect) return reply.code(409).send({ code: "USE_CURRENT_ENTITLEMENT", message: "Use the authenticated hosted status endpoint for the current monthly offer." });
     const sandbox = config.sandboxCheckout;
     if (!sandbox && !hostedPurchaseEnabled) return reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE" });
     const caller = (req as unknown as { caller: Caller }).caller;
@@ -885,7 +988,7 @@ export function buildApp(config: ServerConfig) {
     bindAttempts.set(user.id, attempts);
 
     // plan account limit
-    const limit = store.planAllowance(user).accounts;
+    const limit = config.hostedDirect ? 1 : store.planAllowance(user).accounts;
     if (store.countAccountsOwnedBy(user.id) >= limit) {
       return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `account limit is ${limit}; contact your server operator for help` });
     }
@@ -912,7 +1015,7 @@ export function buildApp(config: ServerConfig) {
     if (!currentUser || currentUser.disabledAt || currentUser.apiKey !== user.apiKey) {
       return reply.code(403).send({ code: "USER_DISABLED", message: "account access changed during validation" });
     }
-    const currentLimit = store.planAllowance(currentUser).accounts;
+    const currentLimit = config.hostedDirect ? 1 : store.planAllowance(currentUser).accounts;
     if (!store.insertOwnedAccount({ name, appId, appSecret, ownerUserId: user.id }, currentLimit)) {
       if (store.findAccount(name)) return reply.code(409).send({ code: "ACCOUNT_NAME_TAKEN", message: "This account name is already in use; choose another name." });
       return reply.code(400).send({ code: "ACCOUNT_LIMIT", message: `plan limit is ${currentLimit} account(s)` });
@@ -977,7 +1080,7 @@ export function buildApp(config: ServerConfig) {
         return { mediaId: hit.mediaId, deduped: true, account: hit.account || body.account, title: hit.title || body.title, requestId: key };
       }
       const prior = store.getImmediateClaim(key);
-      if (prior && (prior.state === "pending" || !prior.mediaId || prior.completedAt === null || Date.now() - prior.completedAt < IDEMPOTENCY_TTL_MS)) {
+      if (prior && (prior.state === "pending" || !prior.mediaId || prior.completedAt === null || ((config.hostedDirect && !caller.admin) || Date.now() - prior.completedAt < IDEMPOTENCY_TTL_MS))) {
         if (prior.owner !== owner || prior.fingerprint !== fingerprint) {
           return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
         }
@@ -988,8 +1091,10 @@ export function buildApp(config: ServerConfig) {
       }
     }
 
+    if (config.hostedDirect && !caller.admin && !key) return reply.code(400).send({ code: "REQUEST_ID_REQUIRED", message: "Monthly hosted requests require an idempotency key." });
+    let directPeriod: DirectPeriod | null = null;
     try {
-      await requireHostedAdmission(caller);
+      directPeriod = await requireHostedAdmission(caller);
     } catch (error) {
       if (error instanceof PublishError) return reply.code(403).send({ code: error.code, message: error.message });
       throw error;
@@ -1017,20 +1122,24 @@ export function buildApp(config: ServerConfig) {
           return { jobId: twin.id, runAt: new Date(twin.runAt).toISOString(), scheduled: true, deduped: true };
         }
       }
-      if (quotaExceeded) return quotaReply();
+      if (directPeriod && runAt >= directPeriod.validUntil) return reply.code(400).send({ code: "SCHEDULE_OUTSIDE_ENTITLEMENT" });
+      if (!directPeriod && quotaExceeded) return quotaReply();
+      let ticket: DirectQuotaTicket | undefined;
+      if (directPeriod && !caller.admin) ticket = directQuota(() => store.reserveDirect(caller.user.id, key!, fingerprint, directPeriod!, attachmentBytes(body)));
       const id = crypto.randomUUID();
-      jobs[id] = { id, runAt, body, userId: caller.admin ? null : caller.user.id, status: "pending", attempts: 0, nextAttemptAt: runAt, idempotencyKey: key };
+      jobs[id] = { id, runAt, body, userId: caller.admin ? null : caller.user.id, status: "pending", attempts: 0, nextAttemptAt: runAt, idempotencyKey: key, directQuota: ticket };
       saveJobs();
       audit({ event: "scheduled", account: body.account, type: body.type, title: body.title, runAt: new Date(runAt).toISOString(), jobId: id });
       return { jobId: id, runAt: new Date(runAt).toISOString(), scheduled: true };
     }
 
-    if (quotaExceeded) return quotaReply();
+    if (!directPeriod && quotaExceeded) return quotaReply();
     if (key && Object.values(jobs).some((j) => j.idempotencyKey === key && ["pending", "running", "interrupted"].includes(j.status))) {
       return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key already identifies a scheduled draft." });
     }
 
-    let claimed = false, draftStarted = false;
+    let claimed = false, draftStarted = false, completed = false;
+    let directTicket: DirectQuotaTicket | undefined;
     try {
       const cred = resolveAccount(body.account, caller);
       if (!cred) {
@@ -1038,7 +1147,10 @@ export function buildApp(config: ServerConfig) {
         return reply.code(caller.admin ? 400 : 403).send({ code, message: `Unknown/unowned account "${body.account}"` });
       }
       if (key) {
-        const outcome = store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS, { account: body.account, title: body.title });
+        const directClaim = directPeriod && !caller.admin
+          ? directQuota(() => store.claimDirectImmediate(key, owner, fingerprint, caller.user.id, directPeriod!, attachmentBytes(body), { account: body.account, title: body.title })) : null;
+        const outcome = directClaim?.outcome ?? store.claimImmediate(key, owner, fingerprint, Date.now(), IDEMPOTENCY_TTL_MS, { account: body.account, title: body.title });
+        directTicket = directClaim?.ticket;
         if (outcome !== "claimed") {
           const prior = store.getImmediateClaim(key);
           if (!prior || prior.owner !== owner || prior.fingerprint !== fingerprint) return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT", message: "This request key belongs to a different draft." });
@@ -1047,23 +1159,27 @@ export function buildApp(config: ServerConfig) {
         }
         claimed = true;
       }
-      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials, () => { draftStarted = true; });
+      const result: PublishResponse = await publishToWechat(body, cred, tokens, materials, () => { if (directTicket) store.beginDirectSend(directTicket); draftStarted = true; });
       if (key) {
-        store.confirmImmediate(key, owner, fingerprint, result.mediaId, Date.now());
+        if (directTicket) store.confirmDirectImmediate(directTicket, key, owner, fingerprint, result.mediaId);
+        else store.confirmImmediate(key, owner, fingerprint, result.mediaId, Date.now());
+        completed = true;
         idempotency[key] = { mediaId: result.mediaId, at: Date.now(), account: body.account, title: body.title, type: body.type, userId: caller.admin ? null : caller.user.id, requestFingerprint: draftIdempotencyKey(body) };
         saveIdempotency();
       }
-      if (!caller.admin) store.incrementUsage(caller.user.id);
+      if (!caller.admin && !directTicket) store.incrementUsage(caller.user.id);
       audit({ event: "published", account: body.account, type: body.type, title: body.title, mediaId: result.mediaId, key, user: caller.admin ? "admin" : caller.user.contact });
       notifyWebhook(body.account, "publish", { title: body.title, mediaId: result.mediaId });
       // echo the submitted identity: results name their own destination and
       // request so clients cannot attach them to the wrong preview (#7)
       return { ...result, account: body.account, title: body.title, requestId: key };
     } catch (err) {
-      if (claimed && key && (!draftStarted || err instanceof WechatError)) {
+      if (directTicket && !completed && draftStarted && !(err instanceof WechatError)) store.failDirect(directTicket, false);
+      if (claimed && key && !completed && (!draftStarted || err instanceof WechatError)) {
         // Before draft/add, or on an explicit WeChat rejection, no draft was
         // created. Release the claim so the user can correct and retry.
-        store.releaseImmediate(key, owner, fingerprint);
+        if (directTicket) store.releaseDirectImmediate(directTicket, key, owner, fingerprint);
+        else store.releaseImmediate(key, owner, fingerprint);
         claimed = false;
       }
       if (claimed) {
@@ -1073,7 +1189,7 @@ export function buildApp(config: ServerConfig) {
       audit({ event: "failed", account: body.account, type: body.type, title: body.title, error: (err as Error).message });
       notifyWebhook(body.account, "failed", { title: body.title, error: (err as Error).message });
       if (err instanceof PublishError) {
-        const status = err.code === "HOSTED_ADMISSION_REQUIRED" || err.code === "HOSTED_IDENTITY_MISSING" ? 403 : 400;
+        const status = "statusCode" in err && typeof err.statusCode === "number" ? err.statusCode : err.code === "HOSTED_ADMISSION_REQUIRED" || err.code === "HOSTED_IDENTITY_MISSING" ? 403 : 400;
         return reply.code(status).send({ code: err.code, message: err.message });
       }
       if (err instanceof WechatError) {
@@ -1097,7 +1213,7 @@ export function buildApp(config: ServerConfig) {
     // The SQLite claim survives a lost local JSON write or another process.
     const claim = store.getImmediateClaim(key);
     const owner = caller.admin ? "admin" : `user:${caller.user.id}`;
-    if (!claim || (!caller.admin && claim.owner !== owner) || claim.state !== "confirmed" || !claim.mediaId || claim.completedAt === null || Date.now() - claim.completedAt >= IDEMPOTENCY_TTL_MS) {
+    if (!claim || (!caller.admin && claim.owner !== owner) || claim.state !== "confirmed" || !claim.mediaId || claim.completedAt === null || (!(config.hostedDirect && claim.owner.startsWith("user:")) && Date.now() - claim.completedAt >= IDEMPOTENCY_TTL_MS)) {
       return { status: "unknown" };
     }
     return { status: "confirmed", mediaId: claim.mediaId, requestId: key };
@@ -1216,6 +1332,7 @@ export function buildApp(config: ServerConfig) {
     }
     job.status = "cancelled";
     saveJobs();
+    if (job.directQuota) store.failDirect(job.directQuota, true);
     audit({ event: "cancelled", jobId: job.id, account: job.body.account, title: job.body.title });
     return { ok: true };
   });
