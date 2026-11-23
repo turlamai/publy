@@ -51,6 +51,7 @@ test("Direct uses only authenticated user IDs, restores accounts after restart a
   try {
     await app.ready();
     const signup = (await app.inject({ method: "POST", url: "/v1/signup", payload: { contact: "buyer@example.test" } })).json();
+    assert.equal(signup.subject, signup.userId);
     const headers = { "x-api-key": signup.apiKey };
     const status = () => app.inject({ method: "POST", url: "/v1/hosted/status", headers, payload: { buyer_id: "attacker" } });
     assert.equal((await status()).json().status, "purchase-required");

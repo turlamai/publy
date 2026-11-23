@@ -747,7 +747,7 @@ export function buildApp(config: ServerConfig) {
     reply.header("cache-control", "no-store");
     const page = (title: string, message: string, ok = false) => reply.type("text/html").send(hostedResultPage(title, message, ok));
     const session = readHostedSession(req as unknown as { headers: Record<string, string | string[] | undefined> });
-    if (!session) return page("无法确认购买会话", "请使用购买时的同一浏览器打开此页；支付结果以 Commerce/支付宝回调为准。");
+    if (!session) return page("无法确认购买会话", config.hostedDirect ? "请回到购买页，使用原 API Key 恢复相同账户并刷新权益。" : "请使用购买时的同一浏览器打开此页；支付结果以 Commerce/支付宝回调为准。");
     const user = store.findUserById(session.userId);
     if (!user || user.disabledAt) return page("账号不可用", "该账号已停用，请联系运营者。");
     if (config.hostedDirect) {
@@ -893,7 +893,7 @@ export function buildApp(config: ServerConfig) {
     signupAttempts.set(ip, attempts);
     if (store.findUserByContact(contact)) return reply.code(409).send({ code: "CONTACT_TAKEN" });
     const user = store.createUser(contact, "free", 1);
-    const subject = store.enrollHostedSubject(user.id);
+    const subject = config.hostedDirect ? user.id : store.enrollHostedSubject(user.id);
     issueHostedSession(reply, user.id);
     audit({ event: "hosted-signup", userId: user.id });
     reply.header("cache-control", "no-store");

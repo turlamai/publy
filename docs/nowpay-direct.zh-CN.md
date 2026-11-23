@@ -6,7 +6,7 @@
 
 ## 部署与信任
 
-服务器使用正式版本安装包，签发基线为 Commerce 0.1.2 / Permit 0.2.1，独立安装运行时，不链接开发源码、不借用 Pitboard 包环境。固定系统账户 `commerce-issuer` 独占支付私钥、Permit 签发密钥、0700 状态目录及权益数据库。Publy 只能访问安装包提供的 0660 本地套接字和公开验签信任，不能读这些私钥或写签发库。切换前一致备份并验证两个数据库可恢复。
+服务器使用正式版本安装包，签发基线为 Commerce 0.1.2 / Permit 0.2.1，独立安装运行时，不链接开发源码、不借用 Pitboard 包环境。固定系统账户 `commerce-issuer` 独占支付私钥、Permit 签发密钥、0700 状态目录及权益数据库。Publy 只能访问安装包提供的 0660 本地套接字和公开验签信任，不能读这些私钥或写签发库。切换前一致备份并验证两个数据库可恢复。不能将仍接受客户请求的直连服务回退至不支持直连的旧版：旧版会忽略新配置。此类回退必须先停止客户准入，恢复已核验的启用前配置及状态，不能只改版本链接。
 
 在受保护的 `server.json` 配置 `hostedDirect`，完整字段见英文页的 JSON 示例：`socketPath`、`serviceId`、`outProductId`、`issuer`、`racketExecutable`、`verifierScript`、`trustStore`、`purchasingEnabled`。路径须为绝对路径，后面三个文件必须存在。不得同时启用基础网页支付的 checkout/admission 或合成测试通道。真实商品标识与部署记录不进 Git。
 
