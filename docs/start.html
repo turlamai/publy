@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="publy-web">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Start with Publy · 开始使用</title>
 <meta name="description" content="Install Publy for Obsidian, use the CLI from any Markdown editor, or self-host the draft delivery service.">
-<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
 </head>
 <body>
 <header><nav class="wrap nav" aria-label="Main">
@@ -18,7 +18,7 @@
       <a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a>
       <a href="https://github.com/turlamai/publy">GitHub</a>
     </div>
-    <div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
+    <button class="secondary" type="button" data-theme-switch aria-pressed="false">亮 / 暗</button><div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
   </div>
 </nav></header>
 
@@ -41,7 +41,7 @@
   </aside>
 </section>
 
-<section class="wrap section">
+<section class="wrap section"><div class="pw-note"><strong><span data-lang="en">First time connecting WeChat?</span><span data-lang="zh">第一次连接公众号？</span></strong><p><a href="wechat.html"><span data-lang="en">Open the full guide: official console, whitelist, credentials, Obsidian and first-draft recovery →</span><span data-lang="zh">手把手：从哪个官网打开白名单、填哪个 IP、连接凭据、配置 Obsidian，再检查第一篇草稿 →</span></a></p></div>
   <div class="section-head">
     <div><div class="kicker"><span data-lang="en">Choose your path</span><span data-lang="zh">选择你的路径</span></div><h2><span data-lang="en">Four ways in.</span><span data-lang="zh">四种上手方式。</span></h2></div>
     <p><span data-lang="en">Obsidian is the recommended editor and plugin. The CLI and official agent skill work independently with Markdown files. Self-hosting unlocks draft delivery.</span><span data-lang="zh">推荐使用 Obsidian 插件；CLI 与官方 Skill 可独立处理 Markdown 文件；自托管服务器负责真正的草稿投递。</span></p>
@@ -73,7 +73,7 @@ node packages/cli/dist/index.js preview note.md --json --out /tmp/review.html</c
       <p><span data-lang="en">Every advertised command supports <code>--json</code> with declared prerequisites and approval requirements. Discovery is offline.</span><span data-lang="zh">所有声明命令都支持 <code>--json</code>，并声明前置条件与授权要求；能力发现完全离线。</span></p>
       <pre><code>publy capabilities --json
 publy check article.md --json
-publy publish article.md --account "My Account" --json</code></pre>
+publy publish article.md --format article --account "My Account" --json</code></pre>
       <p><span data-lang="en">Agents must obtain explicit approval before creating a draft, retrying or cancelling a job. Unknown outcomes preserve the request ID.</span><span data-lang="zh">Agent 创建草稿、重试或取消任务前必须获得明确授权；结果未知时保留原请求 ID。</span></p>
       <div class="links"><a href="https://github.com/turlamai/publy/blob/main/skills/publy-publish/SKILL.md"><span data-lang="en">Agent skill</span><span data-lang="zh">Agent 技能</span></a></div>
     </article>
@@ -82,7 +82,7 @@ publy publish article.md --account "My Account" --json</code></pre>
       <h3><span data-lang="en">4 · Self-host the server</span><span data-lang="zh">4 · 自托管服务器</span> <span class="badge amber"><span data-lang="en">for delivery</span><span data-lang="zh">投递所需</span></span></h3>
       <p><span data-lang="en">Linux + Node 22/24. The server stores credentials, creates drafts and never publishes publicly. This is the path behind the Obsidian/CLI "publish" action.</span><span data-lang="zh">Linux + Node 22/24。服务端保管凭据、创建草稿，不做公开发布；Obsidian/CLI 的“投递”就是连它。</span></p>
       <ol>
-        <li><span data-lang="en">Clone and build only the server workspace.</span><span data-lang="zh">克隆并只构建 server 工作区。</span></li>
+        <li><span data-lang="en">Download the official server release and verify its SHA-256; building source is for development.</span><span data-lang="zh">下载官方服务端发布包并校验 SHA-256；源码构建仅用于开发。</span></li>
         <li><span data-lang="en">Write <code>/etc/publy/server.json</code> (admin key, data dir, WeChat accounts).</span><span data-lang="zh">写 <code>/etc/publy/server.json</code>（admin key、数据目录、公众号账号）。</span></li>
         <li><span data-lang="en">Install the systemd unit, open <code>/admin</code>, create a user key and test the account.</span><span data-lang="zh">安装 systemd 单元，打开 <code>/admin</code>，创建用户 key 并测试账号连通。</span></li>
       </ol>
@@ -114,18 +114,8 @@ publy publish article.md --account "My Account" --json</code></pre>
 
 <footer><div class="wrap inner">
   <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">A calmer path from notes to drafts.</span><span data-lang="zh">让笔记到草稿的路更从容。</span></div></div>
-  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md"><span data-lang="en">User guide</span><span data-lang="zh">使用指南</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
+  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="user-guide.html"><span data-lang="en">User guide</span><span data-lang="zh">使用指南</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
 </div></footer>
-<script>
-  const root = document.documentElement;
-  const params = new URLSearchParams(location.search);
-  if (params.get('lang') === 'zh') { root.lang = 'zh-CN'; document.querySelectorAll('[data-switch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.switch === 'zh'))); }
-  document.querySelectorAll('[data-switch]').forEach(button => button.addEventListener('click', () => {
-    const zh = button.dataset.switch === 'zh';
-    root.lang = zh ? 'zh-CN' : 'en';
-    document.querySelectorAll('[data-switch]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-    history.replaceState(null, '', zh ? '?lang=zh' : location.pathname);
-  }));
-</script>
+<script src="site.js"></script>
 </body>
 </html>

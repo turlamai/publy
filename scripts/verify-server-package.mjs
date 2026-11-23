@@ -31,6 +31,11 @@ try {
     const response = await app.inject({ method: 'GET', url: '/health' });
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().service, 'publy-server');
+    const setup = await app.inject({ method: 'GET', url: '/setup' });
+    assert.equal(setup.statusCode, 200);
+    assert.match(setup.body, /127\.0\.0\.1/);
+    assert.match(setup.body, /API IP/);
+    assert.doesNotMatch(setup.body, /__SETUP_JS__|__WEB_CSS__|__PUBLIC_IP__/);
   } finally { await app.close(); }
 } finally { globalThis.fetch = originalFetch; fs.rmSync(data, { recursive: true, force: true }); }
 console.log('PASS — isolated server artifact, assets, dependencies and HTTP health; no payment or publishing');

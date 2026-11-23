@@ -25,6 +25,7 @@ import { HOSTED_OFFERS, isHostedOfferId } from "./hosted-offers.js";
 import { checkHostedAdmission } from "./hosted-admission-service.js";
 import { consultNowpayDirect, type NowpayDirectConfig } from "./nowpay-direct.js";
 import QRCode from "qrcode";
+import { setupPage } from "./setup-page.js";
 import { adminPage } from "./admin-page.js";
 
 export interface ServerAccount {
@@ -705,9 +706,10 @@ export function buildApp(config: ServerConfig) {
   }
 
   app.addHook("onRequest", async (req, reply) => {
+    if (req.url.startsWith("/v1/")) reply.header("cache-control", "no-store");
     // the /admin page SHELL is public (it's just html); its data endpoints
     // (/v1/admin/*) still require the admin key
-    if (req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
+    if (req.url.split("?")[0] === "/setup" || req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
         req.url === "/v1/signup" || req.url.startsWith("/hosted") || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
     const caller = auth(req.headers["x-api-key"] as string | undefined);
     if (!caller) {
@@ -737,7 +739,10 @@ export function buildApp(config: ServerConfig) {
     reply.code(503).send({ code: "CHECKOUT_NOT_AVAILABLE", message: "Public hosted subscriptions are not open" });
   app.get("/", async (_req, reply) => legacyCheckoutEnabled
     ? reply.type("text/html").send(purchasePage(config.publicIp ?? "（探测中，稍后刷新可见）"))
-    : reply.type("text/html").send('<!doctype html><html lang="en"><meta charset="utf-8"><title>Publy</title><body><main><h1>Publy</h1><p>Local preview, CLI and self-hosted publishing are available. Public hosted subscriptions are not open.</p><a href="https://github.com/turlamai/publy">Source and documentation</a></main></body></html>'));
+    : reply.type("text/html").send(hostedResultPage("Publy", "公开托管尚未开放。已有账户可连接公众号，本地预览与自托管仍然免费。Public hosted subscriptions are not open; existing users can connect their account.", false)));
+  app.get("/setup", async (_req, reply) => reply.header("cache-control", "no-store")
+    .header("referrer-policy", "no-referrer").header("x-content-type-options", "nosniff")
+    .type("text/html").send(setupPage(config.publicIp)));
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
   app.get("/hosted", async (_req, reply) => {
     reply.header("cache-control", "no-store");

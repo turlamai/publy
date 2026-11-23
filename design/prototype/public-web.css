@@ -1,7 +1,7 @@
 /* Public web tokens and common controls. Canonical source; generated consumers must not be edited. */
 html.publy-web {
   color-scheme: light; --paper:#f7f8f4; --card:#fff; --ink:#16271e; --muted:#52645b;
-  --line:#9cae9f; --green:#176842; --green-dark:#0d5030; --on-accent:#fff;
+  --line:#819286; --green:#176842; --green-dark:#0d5030; --on-accent:#fff;
   --tint:#e9f2e9; --amber:#80500c; --amber-tint:#fdf3e2; --danger:#a33427;
   --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
   --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace; --serif:var(--sans);
@@ -31,7 +31,7 @@ html.publy-web {
 .publy-web button{cursor:pointer}.publy-web button:disabled{cursor:not-allowed;opacity:.6}
 .publy-web input,.publy-web select{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:10px 12px;max-width:100%;width:100%}
 .publy-web button,.publy-web .btn.primary{background:var(--green);color:var(--on-accent);border:1px solid var(--green);padding:10px 16px}
-.publy-web button.secondary,.publy-web .btn{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.publy-web button.secondary,.publy-web a.btn{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .publy-web .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
 .publy-web header{background:var(--paper);backdrop-filter:none}.publy-web .hosted{background:var(--tint)}
 .publy-web code{background:var(--tint);color:var(--ink);overflow-wrap:anywhere}.publy-web pre code{background:transparent;color:inherit}
@@ -49,3 +49,8 @@ html.publy-web {
 .publy-web [data-lang]{display:none}html.publy-web[lang="en"] [data-lang="en"],html.publy-web[lang="zh-CN"] [data-lang="zh"]{display:revert}
 @media(max-width:600px){.publy-web .pw-wrap{padding:16px 16px 40px}.publy-web .card{padding:16px}.publy-web .pw-nav{margin-bottom:24px}.publy-web h1{font-size:28px}.publy-web .navlinks{flex-wrap:wrap;overflow:visible}.publy-web .nav-right{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.publy-web *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+.publy-web input[type="radio"],.publy-web input[type="checkbox"]{width:20px;min-height:20px;accent-color:var(--green)}
+.publy-web .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+
+.publy-web .small,.publy-web .plan-meta,.publy-web .card p,.publy-web .card ul,.publy-web .card ol{font-size:14px}
