@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import Module from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -488,7 +488,7 @@ try {
     fail("frontmatter-only cover was not included as exact PNG material");
   }
   const pathKey = "samples/format-choice.md";
-  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + coverPath.split(path.sep).join("/") + ")";
+  const source = "---\ntype: article\n---\n\nA short caption.\n\n![image](" + pathToFileURL(coverPath).href + ")";
   app.vaultContentByPath[pathKey] = source;
   app.workspace.activeFile = { path: pathKey, basename: "format-choice", extension: "md", stat: { mtime: Date.now() } };
   inst.chooseFormat(pathKey, "image");
