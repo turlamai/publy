@@ -6,8 +6,8 @@ listeners; neither submits to an Alipay gateway nor creates a WeChat draft.
 
 Build the workspace first. Use clean package checkouts at these exact commits:
 
-- Commerce: `af6494a18109b96f94e53cac96fbb4769af9ccc4`
-- Permit: `a55632bb5e380aebfc114b9069b7abd7218c2386`
+- Commerce: `9ebb962aedcd85687d7206984354181d81d64406`
+- Permit: `bba48fd460de6602d1d62afe7644c0ebd2dd62e6`
 
 Install these as ordinary Racket packages and run:
 

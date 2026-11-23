@@ -14,8 +14,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const commerce = process.env.COMMERCE_ROOT && path.resolve(process.env.COMMERCE_ROOT);
 const permit = process.env.PERMIT_ROOT && path.resolve(process.env.PERMIT_ROOT);
 assert.ok(commerce && permit, "Set COMMERCE_ROOT and PERMIT_ROOT to clean pinned packages");
-for (const [directory, revision] of [[commerce, "af6494a18109b96f94e53cac96fbb4769af9ccc4"],
-                                    [permit, "a55632bb5e380aebfc114b9069b7abd7218c2386"]]) {
+for (const [directory, revision] of [[commerce, "9ebb962aedcd85687d7206984354181d81d64406"],
+                                    [permit, "bba48fd460de6602d1d62afe7644c0ebd2dd62e6"]]) {
   const head = spawnSync("git", ["-C", directory, "rev-parse", "HEAD"], { encoding: "utf8" });
   const dirty = spawnSync("git", ["-C", directory, "status", "--porcelain"], { encoding: "utf8" });
   assert.equal(head.status, 0); assert.equal(head.stdout.trim(), revision);

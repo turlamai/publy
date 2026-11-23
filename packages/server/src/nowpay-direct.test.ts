@@ -9,6 +9,8 @@ import { buildApp, loadServerConfig, type ServerConfig } from "./index.js";
 import { Store } from "./store.js";
 import { consultNowpayDirect } from "./nowpay-direct.js";
 
+const unixIssuerOnly = { skip: process.platform === "win32" ? "The deployed Direct issuer is a Linux systemd Unix socket; Windows named pipes do not support its EOF half-close protocol." : false };
+
 async function fixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-direct-"));
   const socketPath = process.platform === "win32" ? `\\\\.\\pipe\\publy-direct-${process.pid}-${Date.now()}` : path.join(dir, "issuer.sock");
@@ -43,7 +45,7 @@ async function fixture() {
     close: async () => { await new Promise<void>((r, reject) => server.close(e => e ? reject(e) : r())); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } };
 }
 
-test("Direct uses only authenticated user IDs, restores accounts after restart and never repurchases active access", async () => {
+test("Direct uses only authenticated user IDs, restores accounts after restart and never repurchases active access", unixIssuerOnly, async () => {
   const f = await fixture();
   const config: ServerConfig = { port: 0, apiKey: "admin", accounts: [{ name: "operator", appId: "wx_synthetic", appSecret: "synthetic" }],
     dataDir: f.dir, secretKey: "a".repeat(64), hostedDirect: f.direct };
@@ -77,7 +79,7 @@ test("Direct uses only authenticated user IDs, restores accounts after restart a
   } finally { await app.close(); await f.close(); }
 });
 
-test("Direct configuration is exclusive, strict and keeps purchase URLs closed by default", async () => {
+test("Direct configuration is exclusive, strict and keeps purchase URLs closed by default", unixIssuerOnly, async () => {
   const f = await fixture(); const store = new Store(f.dir);
   try {
     const r = await consultNowpayDirect({ ...f.direct, purchasingEnabled: false }, "buyer_synthetic", store.hostedFence());
@@ -118,7 +120,7 @@ test("Direct quota commits claims atomically, holds unknown drafts and isolates 
 });
 
 
-test("Direct publish reserves the period allowance, deduplicates success and blocks use after withdrawal", async () => {
+test("Direct publish reserves the period allowance, deduplicates success and blocks use after withdrawal", unixIssuerOnly, async () => {
   const f = await fixture(); f.setDecision("ALLOW");
   const originalFetch = globalThis.fetch; let drafts = 0;
   globalThis.fetch = async input => {
