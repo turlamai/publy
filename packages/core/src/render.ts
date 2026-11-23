@@ -9,14 +9,14 @@ import hljs from "highlight.js/lib/common";
 import * as cheerio from "cheerio";
 import juice from "juice";
 import { ATTACHMENT_SCHEME } from "@publy/shared";
-import { parseSource, publishType, type SourceMeta } from "./frontmatter.js";
+import { parseSource, publicationTitle, resolvePublication, type SourceMeta, type PublicationOptions } from "./frontmatter.js";
 import { preprocessObsidian } from "./obsidian.js";
 import { resolveEditorAsset } from "./editor-assets.js";
 import { loadTheme, loadThemeFromCss, loadHighlightCss, resolveVars } from "./theme.js";
 import { svgToPng } from "./svg.js";
 import { texToPng } from "./math.js";
 
-export interface RenderOptions {
+export interface RenderOptions extends PublicationOptions {
   theme?: string;
   /** path to a user-supplied CSS file; wins over `theme` */
   customThemePath?: string;
@@ -46,7 +46,7 @@ export interface RenderResult {
   title: string;
   meta: SourceMeta;
   type: "article" | "image_post";
-  /** resolved cover path (from frontmatter), if any */
+  /** resolved cover path (from explicit options), if any */
   cover?: string;
   attachments: Attachment[];
   warnings: string[];
@@ -175,10 +175,11 @@ function renderMarkdownWithCleanup(
   raw: string, opts: RenderOptions, generatedDirs: Set<string>, cleanup: () => void,
 ): RenderResult {
   const warnings: string[] = [];
-  const { meta, body } = parseSource(raw);
+  const { body } = parseSource(raw);
+  const meta: SourceMeta = { title: opts.title, cover: opts.cover, theme: opts.theme, author: opts.author, digest: opts.digest, caption: opts.caption };
   const baseDir = opts.baseDir ?? process.cwd();
   const mediaDirs = [...(opts.mediaDirs ?? []), baseDir];
-  const themeId = opts.theme ?? meta.theme ?? "claude";
+  const themeId = opts.theme ?? "claude";
 
   // 1. Obsidian syntax → standard markdown
   const pre = preprocessObsidian(body, mediaDirs);
@@ -328,7 +329,6 @@ function renderMarkdownWithCleanup(
     let filePath = resolveEditorAsset(src, {
       baseDir,
       mediaDirs: opts.mediaDirs,
-      typoraRootUrl: meta["typora-root-url"],
     });
     if (!filePath) {
       warnings.push(`Image not found: ${src}`);
@@ -378,22 +378,21 @@ function renderMarkdownWithCleanup(
   // WeChat editor pastes this div as-is.
   const html = $out.html("#publy") ?? "";
 
-  // 5. cover resolution (frontmatter only; CLI/plugin may override)
+  // 5. cover resolution from explicit operation options only
   let cover: string | undefined;
   if (meta.cover) {
     cover = resolveEditorAsset(meta.cover, {
       baseDir,
       mediaDirs: opts.mediaDirs,
-      typoraRootUrl: meta["typora-root-url"],
     }) ?? undefined;
     if (!cover) warnings.push(`Cover not found: ${meta.cover}`);
   }
 
   return {
     html,
-    title: meta.title ?? "",
+    title: publicationTitle(raw, opts.title),
     meta,
-    type: publishType(meta),
+    type: resolvePublication(opts.format).type,
     cover,
     attachments: collector.attachments,
     warnings,

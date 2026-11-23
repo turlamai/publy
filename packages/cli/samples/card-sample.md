@@ -1,10 +1,4 @@
----
-title: 卡片主题预览
-mode: cards
-theme: naive
-caption: Publy 卡片主题预览：四种版式原型，一图看全。写作仍是普通的 Markdown，渲染交给确定性引擎。
-tags: [Publy, 主题]
----
+Publy 卡片主题预览：四种版式原型，一图看全。写作仍是普通的 Markdown，渲染交给确定性引擎。
 
 ## cover
 卡片主题预览

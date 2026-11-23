@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
-import { parseSource, type SourceMeta } from "./frontmatter.js";
+import { parseSource, type SourceMeta, type PublicationOptions } from "./frontmatter.js";
 import { NOTO_SANS_SC, loadSatoriFonts, loadSatoriFontsOffline, loadSatoriFontsWithFallback, type FontSpec } from "./fonts.js";
 import { svgToPng } from "./svg.js";
 
@@ -93,8 +93,9 @@ export interface ParsedCards {
 
 const SECTION_RE = /^##\s*(cover|point|list|ending)\s*$/m;
 
-export function parseCardSource(raw: string): ParsedCards {
-  const { meta, body } = parseSource(raw);
+export function parseCardSource(raw: string, opts: PublicationOptions = {}): ParsedCards {
+  const { body } = parseSource(raw);
+  const meta: SourceMeta = { title: opts.title, theme: opts.theme, tags: opts.tags };
   const sections: CardSection[] = [];
   const rest = body;
   let match: RegExpExecArray | null;
@@ -115,7 +116,7 @@ export function parseCardSource(raw: string): ParsedCards {
       .filter((l) => l.length > 0);
     sections.push({ kind: marks[i].kind, lines });
   }
-  const caption = (meta.caption ?? "").trim();
+  const caption = (opts.caption ?? body.slice(0, marks[0].start)).trim();
   return { meta, sections, caption };
 }
 
@@ -239,7 +240,7 @@ export function lintCards(sections: CardSection[], caption: string): LintResult 
     problems.push(`caption 超过微信 1000 字上限（当前 ${caption.length} 字）`);
   }
   if (caption.length === 0) {
-    problems.push("caption 为空：在 frontmatter 添加 caption 字段");
+    problems.push("配文为空：通过 --caption、--caption-file 或本次投递窗口填写配文");
   }
   if (!sections.some((s) => s.kind === "cover")) {
     problems.push("缺少 cover 封面卡");
@@ -252,7 +253,7 @@ export function lintCards(sections: CardSection[], caption: string): LintResult 
 
 export async function renderCards(
   raw: string,
-  opts: {
+  opts: PublicationOptions & {
     theme?: string;
     outDir?: string;
     fontFiles?: string[];
@@ -263,8 +264,8 @@ export async function renderCards(
   } = {},
 ): Promise<RenderCardsResult> {
   const warnings: string[] = [];
-  const { meta, sections, caption } = parseCardSource(raw);
-  const theme = loadCardTheme(opts.theme ?? meta.theme ?? "naive");
+  const { meta, sections, caption } = parseCardSource(raw, opts);
+  const theme = loadCardTheme(opts.theme ?? "naive");
   const outDir = opts.outDir ?? process.cwd();
 
   const fontSpecs: FontSpec[] = opts.fontFiles?.length

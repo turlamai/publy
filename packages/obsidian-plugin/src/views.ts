@@ -1,7 +1,7 @@
 // Preview and history leaves. They receive the plugin instance for commands
 // but own only view construction and rendering.
 import { ItemView, WorkspaceLeaf, setIcon, sanitizeHTMLToDom } from "obsidian";
-import type { PublicationFormat } from "@publy/core";
+import { BUILTIN_CARD_THEMES, type PublicationFormat } from "@publy/core";
 import { t } from "./i18n.js";
 import { availableArticleThemes } from "./article-themes.js";
 import { VIEW_TYPE_PUBLY_PREVIEW, PUBLY_HISTORY_VIEW, type JobEntry, type HistoryEntry } from "./types.js";
@@ -145,13 +145,13 @@ export class PublyPreviewView extends ItemView {
     format.setAttribute("aria-label", t("formatLabel"));
     format.setAttribute("title", t("formatLabel"));
     const label = (id: PublicationFormat) => t(id === "article" ? "formatArticle" : id === "image" ? "formatImage" : "formatCards");
-    for (const [id, labelText] of [["auto", t("formatAuto", { format: label(this.documentFormat) })], ["article", label("article")], ["image", label("image")], ["cards", label("cards")]]) {
+    for (const [id, labelText] of [["article", label("article")], ["image", label("image")], ["cards", label("cards")]]) {
       const option = format.createEl("option"); option.value = id; option.textContent = labelText;
     }
-    format.value = this.plugin.formatForNote(this.notePath) ?? "auto";
+    format.value = this.plugin.formatForNote(this.notePath) ?? "article";
     format.addEventListener("change", () => {
       const value = format.value;
-      if (value === "auto" || value === "article" || value === "image" || value === "cards") {
+      if (value === "article" || value === "image" || value === "cards") {
         this.plugin.chooseFormat(this.notePath, value);
         void this.refresh?.();
       }
@@ -161,14 +161,16 @@ export class PublyPreviewView extends ItemView {
     const sel = bar.createEl("select");
     sel.addClass("publy-select");
     sel.setAttribute("title", t("tipTheme"));
-    for (const [id, label] of Object.entries(availableArticleThemes())) {
+    for (const [id, label] of Object.entries(this.plugin.formatForNote(this.notePath) === "cards"
+      ? Object.fromEntries(Object.keys(BUILTIN_CARD_THEMES).map(id=>[id,id])) : availableArticleThemes())) {
       const opt = sel.createEl("option");
       opt.value = id;
       opt.textContent = label;
     }
-    sel.value = this.plugin.settings.theme || "claude";
+    sel.value = this.plugin.optionsForNote(this.notePath).theme ?? this.plugin.settings.theme ?? "claude";
     sel.addEventListener("change", () => {
       this.plugin.settings.theme = sel.value;
+      this.plugin.chooseTheme(this.notePath, sel.value);
       void this.plugin.saveSettings();
       void this.refresh?.();
     });

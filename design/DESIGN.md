@@ -62,3 +62,12 @@ Tokens 提取自 `packages/obsidian-plugin/styles.css` 现行值；亮暗两套�
 ## Prototype source checkpoint — 2026-11-15
 
 `index.html` opens the primary prototype directly. Screen-directory launchers have been removed. All local scripts, styles and referenced assets needed by this checkpoint are versioned under this directory; OpenDesign metadata is excluded. This is an editable prototype checkpoint, not a claim that the native product or external services implement these interactions.
+
+
+## Operation options — owner decision 2026-11-23
+
+Obsidian is the recommended human workflow; the editor-independent CLI and official skill share one `PublicationOptions` contract. Note properties never select format, title, cover, theme, author, caption, tags or asset roots. A leading properties block is skipped without evaluating YAML; sources remain unchanged.
+
+The toolbar contains exactly article / image-and-caption / cards, with article selected initially. There is no automatic/document mode. Draft and scheduled-draft actions open a keyboard-accessible operation dialog naming the note and account, with format, title, author, digest and caption fields. The user may preview these options without submitting, or explicitly confirm draft delivery. Settings supply theme defaults; the current operation overrides them. A cancelled dialog never renders remotely or submits. The note, account, raw source and selected options are captured for the operation so later note/account changes cannot retarget the draft. Preview and submission use identical parameter normalization; remote recovery preserves the original payload.
+
+Prototype slice: existing preview pages and prototype-flow.js. Acceptance: all three formats, cancellation, explicit confirmation, matching preview/request options, malformed/private properties ignored without leaks, source immutability, and offline rendering. No true draft submission is authorized by testing this slice.

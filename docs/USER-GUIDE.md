@@ -16,25 +16,20 @@ Use the developer CLI or the Obsidian plugin. Published release assets currently
 
 Source builds require Node.js 22+, pnpm and Git; follow the [developer installation and setup](guide.md). Release assets do not constitute a deployed service.
 
-## Use any Markdown editor or agent
+## Obsidian or the official agent skill
 
-Choose the **original Markdown file** from any editor or agent. For Obsidian, use the optional
-plugin or the same underlying Markdown. In the current
-developer CLI, run `publy check "/path/to/your-note.md" --json` to inspect
-images, covers and card structure **locally**, then `publy preview` before
-considering delivery. Neither command sends a draft. Typora's local
-`typora-root-url` and nested image paths are understood; missing attachments
-are reported, and the original source stays untouched. This is developer
-source-build functionality, **not yet a no-setup public installer**.
+Obsidian is the recommended editor and plugin experience. CLI and the official skill accept the original Markdown file independently of the editor. Use `check` and `preview` locally before confirming any draft delivery; neither submits a draft. Standard nested relative images and Obsidian embeds are supported. Original notes and their properties are preserved. The CLI is still a developer source build, not a qualified no-setup installer.
 
-[Typora quick start](typora.md) · [Supported input paths, limitations and commercial user-experience standard](editor-workflows.md)
-· [简体中文](editor-workflows.zh-CN.md)
+### Choose the operation
 
-In the development plugin, **Copy rendered rich text** stops without changing the clipboard if images or formulas are missing, fail to render, or remain as local attachments. Use draft delivery for content with attachments.
+Select article, images with a caption, or text cards in the plugin's draft options dialog. The CLI uses `--format article|image|cards`; `publish` requires it plus `--account`. Skills ask when intent is unclear. Pass the same `--title`, `--cover`, `--theme`, `--author`, `--digest`, `--caption` or `--caption-file` to check, preview and publish. Do not combine both caption options. Local preview defaults to article if no choice is supplied.
 
-### Choose a draft format
+Note frontmatter is skipped, not read as publication settings. No source is rewritten. Titles fall back to the first body H1 then filename. Image captions can come from remaining body text; card captions can precede the first section. Cancelling the plugin dialog does not submit anything. Preview and delivery share the selected options.
 
-Choose article, images with a caption, or text cards for each draft. In the development CLI, use the same `--format article`, `--format image`, or `--format cards` for `check`, `preview`, and `publish`; in the Obsidian preview use the format selector. A choice applies to the current operation or plugin session and takes precedence over optional document metadata; the file is not changed. With no choice, legacy metadata applies and otherwise the default is article. Image posts need images; cards need the supported section structure. Review the resulting preview before delivery. These capabilities are still under acceptance and not a released installer.
+[Current workflow and acceptance boundaries](editor-workflows.md) · [简体中文](editor-workflows.zh-CN.md)
+
+Copy rendered rich text stops without changing the clipboard if media or formulas are missing or remain as local attachments. Use draft delivery for content with attachments.
+
 ## Use a standalone article theme (CLI development build)
 
 Built-in themes work offline. To use a content-only theme bundle from someone you trust, run `publy theme add ./theme.json`, then `publy theme preview THEME_ID` and use `--theme THEME_ID` when rendering. `publy theme ls` lists installed article themes. To replace one, run `publy theme update ./new-theme.json`; to remove it, run `publy theme remove THEME_ID`. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. Obsidian running as the same system user can select validated installed article themes: reopen the plugin settings or preview panel after installation. The CLI manages the shared local bundle; the plugin does not download themes itself.
@@ -57,7 +52,7 @@ Signed bundles are optional. `theme pack --sign-key <pem>` with an Ed25519 priva
 
 Publy does not create a notebook or provide a dashboard for browsing and
 editing notes. Continue to find, edit, organize and back up your original
-Markdown and images in Typora, Obsidian or your file manager. Publy reads the
+Markdown and images in Obsidian or your file manager. Publy reads the
 file you choose for checking and formatting; it does not migrate your notes.
 
 After delivery, sign in to the **WeChat Official Account platform** and open

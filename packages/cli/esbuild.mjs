@@ -31,7 +31,6 @@ await esbuild.build({
     "juice",
     "cheerio",
     "markdown-it",
-    "gray-matter",
     "mathjax-full",
     "mathjax-full/*",
   ],

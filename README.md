@@ -6,7 +6,7 @@ Editor-independent Markdown-to-WeChat draft publishing: local rendering and pref
 
 **English** · [中文](README.zh-CN.md)
 
-- **Keep your Markdown wherever you write.** Typora and Obsidian are optional; an agent or the CLI can use the same source file directly. `publy check a.md` reports missing images before any draft is sent. The current CLI remains a developer source build.
+- **Focus your writing in Obsidian.** The plugin is the recommended interface; an agent or the CLI can use the same source file directly. `publy check a.md` reports missing images before any draft is sent. The current CLI remains a developer source build.
 - **The Obsidian plugin renders and delivers the current note to WeChat drafts in place**: in-app article preview, image-post card deck preview, rich-text copy, publish progress — no browser needed.
 - **Image posts as a first-class citizen.** `publy card post.md` renders themed 3:4 card PNGs deterministically — pixel-perfect Chinese text, seconds per deck, no AI image generation.
 - **Use themes without registry packages.** Built-in themes work offline; the development CLI can also pack, add, preview, update and remove content-only article theme bundles. HTTPS downloads require a user-supplied SHA-256. Obsidian can select validated local bundles; signed theme downloads and an installation catalogue are not available; see the [user guide](docs/USER-GUIDE.md#use-a-standalone-article-theme-cli-development-build).
@@ -16,7 +16,7 @@ Compliance: Publy only uses official WeChat MP APIs. No account simulation, no b
 
 Status: local rendering and delivery components exist; public hosted onboarding and commercial operation are not open. **Obsidian community-directory publication has not been verified**; the 0.8.7 GitHub Release is published, but a Community Directory listing and the directory-install acceptance do not exist yet. See [directory release readiness](docs/obsidian-submission.md) and [official-install blocker](https://github.com/turlamai/publy/issues/12).
 
-**Use any Markdown file:** [Typora quick start](docs/typora.md) · [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). Obsidian is optional; Publy does not require a particular editor. Typora and Obsidian still require real clean-machine acceptance.
+**Use any Markdown file:** [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). Obsidian is optional; Publy does not require a particular editor. Obsidian still requires real clean-machine acceptance.
 
 ## Start here
 
@@ -25,7 +25,7 @@ CLI, default themes, Obsidian and self-hosting remain free under their existing 
 | Path | Time | You need |
 | --- | --- | --- |
 | [Obsidian plugin](https://publy.jrtx.site/start.html) | ~5 min | Obsidian desktop 1.5+; a server only for draft delivery |
-| [Typora / any editor + CLI](https://publy.jrtx.site/start.html) | ~10 min | Node 22+ and pnpm (source build; no signed installer yet) |
+| [CLI + official skill](https://publy.jrtx.site/start.html) | ~10 min | Node 22+ and pnpm (source build; no signed installer yet) |
 | [Self-host the server](https://publy.jrtx.site/start.html) | ~20 min | Linux, Node 22/24, a WeChat Official Account |
 | [Hosted service](https://publy.jrtx.site/hosted.html) | — | Private pilot; not for sale, no checkout |
 
@@ -43,12 +43,12 @@ publy config set api_key "$PUBLY_API_KEY"   # POSIX shell: set the environment v
 publy account add me --app-id wx... --theme claude
 publy check article.md
 publy preview article.md     # review locally; no draft is submitted
-publy publish article.md --account me  # only after approval: create a WeChat draft, not a public post
+publy publish article.md --format article --account me  # only after approval: create a WeChat draft, not a public post
 ```
 
 For PowerShell, replace `"$PUBLY_API_KEY"` with `"$env:PUBLY_API_KEY"`. The CLI receives the key as an argument, which may be visible to local process inspection; do not paste credentials into shared logs.
 
-Image-post: write sections (`## cover` / `## point` / `## list` / `## ending`) with `mode: cards` in frontmatter, run `publy card post.md --preview`, then `publy publish post.md --account me` only after confirming the destination and approving draft creation.
+For text cards, write `## cover` / `## point` / `## list` / `## ending` sections. Supply `--caption` or `--caption-file` (or place the caption before the first section). Use `--format cards` for check, preview and publish; specify `--account` and authorize draft creation. Note properties never select the format.
 
 Full manual: [English manual](docs/guide.md) · [中文手册](docs/guide.zh-CN.md) · Theme gallery: [themes.publy.jrtx.site](https://themes.publy.jrtx.site/)
 

@@ -499,6 +499,7 @@
 }
 .publy-modal-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
   margin-top: 6px;
@@ -543,3 +544,7 @@
   font-size: 14px;
   padding: 6px 8px;
 }
+
+/* Operation fields reuse Obsidian's native controls and theme variables. */
+.publy-operation-field { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.publy-operation-field textarea { min-height: 96px; resize: vertical; }

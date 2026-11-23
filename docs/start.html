@@ -44,7 +44,7 @@
 <section class="wrap section">
   <div class="section-head">
     <div><div class="kicker"><span data-lang="en">Choose your path</span><span data-lang="zh">选择你的路径</span></div><h2><span data-lang="en">Four ways in.</span><span data-lang="zh">四种上手方式。</span></h2></div>
-    <p><span data-lang="en">The Obsidian plugin is the shortest path for writers. The CLI works with Typora or any folder of Markdown. Self-hosting unlocks draft delivery.</span><span data-lang="zh">写作者走 Obsidian 插件最短；Typora 或任意 Markdown 文件夹可用 CLI；自托管服务器负责真正的草稿投递。</span></p>
+    <p><span data-lang="en">Obsidian is the recommended editor and plugin. The CLI and official agent skill work independently with Markdown files. Self-hosting unlocks draft delivery.</span><span data-lang="zh">推荐使用 Obsidian 插件；CLI 与官方 Skill 可独立处理 Markdown 文件；自托管服务器负责真正的草稿投递。</span></p>
   </div>
   <div class="grid">
     <article class="card">
@@ -59,13 +59,13 @@
     </article>
 
     <article class="card">
-      <h3><span data-lang="en">2 · Typora + CLI</span><span data-lang="zh">2 · Typora + CLI</span></h3>
-      <p><span data-lang="en">Keep Typora as the editor; run the CLI on the same file. There is no signed installer yet — build from source with Node 22+ and pnpm.</span><span data-lang="zh">继续用 Typora 写作，CLI 读取同一个文件。目前还没有签名安装包，用 Node 22+ 和 pnpm 从源码构建。</span></p>
+      <h3><span data-lang="en">2 · CLI + Skill</span><span data-lang="zh">2 · CLI + Skill</span></h3>
+      <p><span data-lang="en">Use the CLI or official skill with an original Markdown file and explicit publication options. There is no signed installer yet — build from source with Node 22+ and pnpm.</span><span data-lang="zh">使用 CLI 或官方 Skill，通过明确参数处理选定的 Markdown 原文件。目前还没有签名安装包，用 Node 22+ 和 pnpm 从源码构建。</span></p>
       <pre><code>git clone https://github.com/turlamai/publy.git
 cd publy &amp;&amp; pnpm install --frozen-lockfile &amp;&amp; pnpm -r build
 node packages/cli/dist/index.js check note.md --json
 node packages/cli/dist/index.js preview note.md --json --out /tmp/review.html</code></pre>
-      <div class="links"><a href="https://github.com/turlamai/publy/blob/main/docs/typora.md"><span data-lang="en">Typora guide</span><span data-lang="zh">Typora 指南</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/agent-cli.md"><span data-lang="en">CLI contract</span><span data-lang="zh">CLI 契约</span></a></div>
+      <div class="links"><a href="https://github.com/turlamai/publy/blob/main/docs/editor-workflows.md"><span data-lang="en">Obsidian / CLI workflow</span><span data-lang="zh">Obsidian / CLI 工作流</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/agent-cli.md"><span data-lang="en">CLI contract</span><span data-lang="zh">CLI 契约</span></a></div>
     </article>
 
     <article class="card">

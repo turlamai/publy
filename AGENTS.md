@@ -23,42 +23,13 @@ Decision `2026-10-auth-1`: Online hosted-service entitlement, verified on the se
 - Public user documentation is English with a complete Chinese path; historical internal design notes may remain Chinese. Code comments use English.
 - 退出码与 `--json` 输出是对外契约，变更需同步 design.md 第 3 节和 docs/agent-cli.md / docs/agent-cli.zh-CN.md。使用 `publy capabilities --json` 发现实际支持的命令；不要把目标文档里的“所有命令 JSON”当作当前代码事实。Agent 不可自动创建草稿、取消/重试服务端任务或公开发布，除非用户对该副作用做了明确授权。CLI 不依赖某个编辑器，而发布目标只限公众号草稿箱。
 
-## Editor-independent product contract (2026-10-30)
+## Publication decision (2026-11-23)
 
-**Markdown is the product input; no editor or agent is required.** Typora and Obsidian are supported writing entry points, not prerequisites.
-All Markdown inputs use the same source-neutral render, preflight, preview and
-WeChat-draft protocol. Do not build separate editor integrations without a
-concrete customer need. A future slim publishing companion
-may accept drag/drop or open-with, but must not become a second editor or
-copy/index the user's notebook by default. The original Markdown/assets stay
-in place; local preview/check must not call a hosted service or require an
-account. Keep exact nested media paths and covers; never silently substitute
-same-name images. Capture missing assets in a preflight report. Obsidian's
-special syntax remains an optional adapter, not a dependency of common
-Markdown. See [English](docs/editor-workflows.md) and
-[中文](docs/editor-workflows.zh-CN.md) acceptance criteria, and #25/#26.
-Do not claim tested compatibility with proprietary editors or a native
-installer until real sample/clean-machine evidence exists.
+Owner decision `2026-11-23-operation-options`: Obsidian is the only recommended editor/plugin experience. CLI stays editor-independent; the official skill invokes its explicit parameters and asks when format is unclear. No Typora-specific expansion or publishing companion. WeChat Official Account drafts remain the only destination.
 
-The customer pays, if at all, for **proven hosted delivery, operational
-reliability and recovery**, never for moving content between editors.
-Public checkout stays closed until Commerce/Permit and merchant gates pass.
-Preserve the family authorization decision `2026-10-auth-1`.
+All clients share explicit operation options. Note frontmatter is preserved and skipped, never used for format/title/cover/theme/author/caption/digest/tags or asset roots. Check/preview default to article; publish requires explicit format and account. A format choice is not permission to submit. The plugin previews or confirms in its operation dialog; source and account identity must not drift while a dialog is open. See docs/editor-workflows.md and its Chinese counterpart.
 
-## Scope discipline for an independent developer (2026-10-30)
-
-WeChat Official Account **draft delivery is the only supported publishing
-destination**. Generic Markdown and agent workflows are first-class; Typora
-and Obsidian are supported optional writing entry points. Do not
-add new publishing destinations, including Zhihu, Toutiao, WordPress, Ghost,
-Xiaohongshu, Douyin or others. No provider abstraction, future-platform
-backlog, API research or platform-specific placeholders. Preserve the focused customer journey:
-existing Markdown -> reliable local preflight/preview -> explicit selected
-WeChat draft -> verified/reconciled status. Normative product decision:
-[English](docs/platform-strategy.md) ·
-[中文](docs/platform-strategy.zh-CN.md). Do not change this scope due to
-a passing thought or a technically easy API without a separate user-backed
-decision. Current hosted checkout remains closed.
+Do not enable paid hosting, payment gates or public publication from this decision. Preserve authorization decision `2026-10-auth-1` and existing privacy, recovery and source-immutability guarantees.
 
 ## racket/ — Racket components (2026-10-13)
 

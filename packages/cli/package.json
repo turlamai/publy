@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "tsc --noEmit && node esbuild.mjs",
-    "test": "node scripts/verify-preflight.mjs && node scripts/verify-theme-bundles.mjs"
+    "test": "node scripts/verify-preflight.mjs && node scripts/verify-theme-bundles.mjs && node ../../scripts/verify-operation-options.mjs"
   },
   "keywords": [
     "wechat",
@@ -38,20 +38,19 @@
     "@resvg/resvg-js": "^2.6.2",
     "cheerio": "^1.0.0",
     "commander": "^12.1.0",
-    "gray-matter": "^4.0.3",
     "highlight.js": "^11.10.0",
     "juice": "^11.0.0",
     "markdown-it": "^14.1.0",
-    "satori": "^0.33.5",
-    "mathjax-full": "^3.2.2"
+    "mathjax-full": "^3.2.2",
+    "satori": "^0.33.5"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/markdown-it": "^14.1.2",
-    "esbuild": "^0.24.0",
-    "typescript": "^5.6.0",
     "@publy/core": "workspace:*",
-    "@publy/shared": "workspace:*"
+    "@publy/shared": "workspace:*",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
   },
   "private": true
 }

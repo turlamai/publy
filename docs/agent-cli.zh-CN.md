@@ -2,9 +2,9 @@
 
 English：[agent-cli.md](agent-cli.md) · 简体中文
 
-**CLI 是通用自动化入口，不是 Typora 专用插件。** Typora、Obsidian、
+**CLI 是编辑器无关的自动化入口，推荐使用 Obsidian 插件或官方 Skill。**
 普通 Markdown 文件、Shell、CI、Agent 都能调用同一套源文件检查、
-渲染和公众号草稿服务。Typora、Obsidian 是我们重点验收的写作体验；
+渲染和公众号草稿服务。Obsidian 是我们重点验收的写作体验；
 发布目标**只有微信公众号草稿箱**，不扩展知乎、头条等平台。
 
 > 当前是源码构建的 TypeScript CLI，不能声称 Racket 独立安装程序、
@@ -57,14 +57,14 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 
 **JSON 模式永远不自动打开浏览器**，并返回私有 HTML 的路径。Agent
 可以自主检查生成物、截图等，但不能未经授权上传原文或预览。预览
-包含内嵌的本地图片，使用完应清理临时文件。`mode: cards`
+包含内嵌的本地图片，使用完应清理临时文件。`--format cards`
 预览调用实际 PNG 引擎，且不静默联网下载字体。有缺图等阻塞时
 仍可生成带错误提示的预览，但 JSON 中 `ok:false`、退出码为 4。
 检查和预览都不会创建公众号草稿。
 
 ### 发布形式
 
-当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 区分本次选择、既有 frontmatter 和默认文章。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
+当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 仅为 `choice` 或 `default`，笔记属性不控制发布。`publish` 缺少明确类型返回 `FORMAT_REQUIRED`（退出码2）；检查、预览和投递需复用 `--title`、`--cover`、`--theme`、`--author`、`--digest`、`--caption` 或 `--caption-file`。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
 
 ## HTML 导出与离线主题列表
 
@@ -84,7 +84,7 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 
 ```bash
 # 用户明确同意向指定公众号创建草稿后才能调用：
-publy publish article.md --account "我的公众号" --json
+publy publish article.md --format article --account "我的公众号" --json
 
 # 网络中断时，用同一 requestId 查询，不要盲目创建第二份：
 publy publish-result <requestId> --json

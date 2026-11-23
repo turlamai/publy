@@ -10,7 +10,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import type { Attachment, JobInfo, PublishRequest, PublishResponse } from "@publy/shared";
-import { blockingMediaWarning, captionToHtml, draftIdempotencyKey, imagePostCaption, lintCards, parseCardSource, parseSource, resolvePublication, renderCards, renderMarkdown, stripMarkdown } from "@publy/core";
+import { blockingMediaWarning, captionToHtml, draftIdempotencyKey, imagePostCaption, lintCards, parseCardSource, parseSource, publicationTitle, publicationDigest, resolvePublication, renderCards, renderMarkdown, stripMarkdown } from "@publy/core";
 
 const pkg = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
@@ -135,8 +135,25 @@ function escapeHtml(s: string): string {
 
 // ---------------------------------------------------------------------------
 
+/** Normalize CLI values once; embedded clients use the same core option names. */
+function operationOptions(opts: Record<string, any>) {
+  return { format: opts.format, title: opts.title, cover: opts.cover, theme: opts.theme,
+    author: opts.author, digest: opts.digest, caption: opts.caption };
+}
+
 /** Reject bad operation choices before rendering, writing or networking. */
 function validPublicationChoice(opts: Record<string, any>, kind: string): boolean {
+  if (opts.captionFile !== undefined && !opts.captionFileLoaded) {
+    try {
+      if (opts.caption !== undefined) throw new Error("Conflicting caption options");
+      opts.caption = fs.readFileSync(opts.captionFile, "utf8"); opts.captionFileLoaded = true;
+    } catch {
+      const problem = "Choose either --caption or a readable --caption-file.";
+      if (opts.json) console.log(JSON.stringify({schemaVersion:1,kind,ok:false,code:"CAPTION_INVALID",problems:[problem],submitted:false,networkUsed:false}));
+      else console.error("publy: " + problem);
+      process.exitCode = 2; return false;
+    }
+  }
   if (opts.format === undefined || ["article", "image", "cards"].includes(opts.format)) return true;
   const problem = "Choose --format article, image or cards.";
   if (opts.json) console.log(JSON.stringify({ schemaVersion: 1, kind, ok: false, code: "FORMAT_INVALID", problems: [problem], submitted: false,
@@ -158,7 +175,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
   let title = path.basename(source, path.extname(source));
   let type: "article" | "image_post" = "article";
   let format: "article" | "image" | "cards" = "article";
-  let formatSource: "choice" | "frontmatter" | "default" = "default";
+  let formatSource: "choice" | "default" = "default";
   let attachments = 0;
   let cardCount: number | undefined;
   let inputError = false;
@@ -176,11 +193,11 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
     try {
       const raw = fs.readFileSync(source, "utf8");
       const parsed = parseSource(raw);
-      const selection = resolvePublication(parsed.meta, opts.format);
+      const selection = resolvePublication(opts.format);
       type = selection.type; format = selection.format; formatSource = selection.source;
-      title = parsed.meta.title?.trim() || title;
+      title = publicationTitle(raw, opts.title, title);
       if (selection.format === "cards") {
-        const cards = parseCardSource(raw);
+        const cards = parseCardSource(raw, operationOptions(opts));
         const lint = lintCards(cards.sections, cards.caption);
         cardCount = cards.sections.length;
         problems.push(...lint.problems);
@@ -190,7 +207,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
           // before telling the author it is safe to save a WeChat draft.
           const tempCards = fs.mkdtempSync(path.join(os.tmpdir(), "publy-check-cards-"));
           try {
-            const deck = await renderCards(raw, {
+            const deck = await renderCards(raw, { ...operationOptions(opts),
               theme: opts.theme,
               outDir: tempCards,
               offline: true,
@@ -223,7 +240,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
         let mediaDirs: string[] = [];
         try { mediaDirs = resolveMediaDirs(opts.mediaDir ?? [], loadConfig()); }
         catch { warnings.push("Local config could not be read; checking source-relative images only."); }
-        const rendered = renderMarkdown(raw, {
+        const rendered = renderMarkdown(raw, { ...operationOptions(opts),
           baseDir: path.dirname(source),
           mediaDirs,
           theme: opts.theme,
@@ -241,7 +258,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
             }
           }
           if (type === "article" && !rendered.cover && attachments === 0) {
-            problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+            problems.push("Missing cover: provide --cover or a local body image before submitting a draft.");
           }
           if (type === "image_post" && attachments === 0) {
             problems.push("No local images found for the image post.");
@@ -252,7 +269,7 @@ async function cmdCheck(file: string, opts: Record<string, any>): Promise<void> 
       // Avoid echoing the raw YAML/parser exception: it can include snippets
       // of a private note or an embedded credential.
       renderError = true;
-      problems.push("Cannot inspect this document. Check its Markdown frontmatter and rendering options.");
+      problems.push("Cannot inspect this document. Check its Markdown and operation options.");
     }
   }
 
@@ -300,6 +317,7 @@ function allowHtmlOutput(sourceFile: string, out: string, force: boolean): boole
 }
 
 async function cmdRender(file: string, opts: Record<string, any>): Promise<void> {
+  if (!validPublicationChoice(opts, "html-render")) return;
   const source = path.resolve(file);
   const agentError = (code: string, exit: number, problems: string[]): void => {
     if (opts.json) console.log(JSON.stringify({
@@ -323,7 +341,7 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
   try {
     let config: CliConfig = {};
     try { config = loadConfig(); } catch { /* local render still works without global credentials */ }
-    result = renderMarkdown(raw, {
+    result = renderMarkdown(raw, { ...operationOptions(opts),
       theme: opts.theme,
       customThemePath: opts.customTheme,
       highlight: opts.highlight,
@@ -340,7 +358,7 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
   try {
     const problems = result.warnings.filter(blockingMediaWarning);
     if (result.type === "article" && !result.cover && result.attachments.length === 0) {
-      problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+      problems.push("Missing cover: provide --cover or a local body image before submitting a draft.");
     } else if (result.type === "image_post" && result.attachments.length === 0) {
       problems.push("No local images found for the image post.");
     }
@@ -369,7 +387,7 @@ async function cmdRender(file: string, opts: Record<string, any>): Promise<void>
     if (opts.json) {
       console.log(JSON.stringify({
         schemaVersion: 1, kind: "html-render", ok: problems.length === 0,
-        source, output: out, title: result.title, type: result.type,
+        source, output: out, title: publicationTitle(raw, opts.title, path.basename(source, path.extname(source))), type: result.type,
         contentType: "text/html", attachmentCount: result.attachments.length,
         containsAttachmentReferences: result.html.includes("attachment://"),
         problems, warnings: result.warnings,
@@ -412,7 +430,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     parsed = parseSource(raw);
   } catch {
     const problem = sourceRead
-      ? "Cannot parse Markdown frontmatter; review the document syntax."
+      ? "Cannot inspect Markdown; check the leading properties block is closed."
       : "Choose a readable Markdown (.md or .markdown) file.";
     const code = sourceRead ? "RENDER_FAILED" : "INPUT_INVALID";
     if (opts.json) {
@@ -423,7 +441,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     process.exitCode = sourceRead ? 3 : 2;
     return;
   }
-  const selection = resolvePublication(parsed.meta, opts.format);
+  const selection = resolvePublication(opts.format);
   const cardsMode = selection.format === "cards";
   const out = opts.out
     ? path.resolve(opts.out)
@@ -439,14 +457,14 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
 
   let preview = "";
   let problems: string[] = [];
-  const title = parsed.meta.title || path.basename(source, path.extname(source));
+  const title = publicationTitle(raw, opts.title, path.basename(source, path.extname(source)));
 
   if (cardsMode) {
     // Use the real PNG card engine, not the article HTML renderer. Keep the
     // author's original note unchanged and never ask a CDN for fonts.
     const tempCards = fs.mkdtempSync(path.join(os.tmpdir(), "publy-preview-cards-"));
     try {
-      const cards = await renderCards(raw, {
+      const cards = await renderCards(raw, { ...operationOptions(opts),
         theme: opts.theme,
         outDir: tempCards,
         offline: true,
@@ -476,7 +494,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
       fs.rmSync(tempCards, { recursive: true, force: true });
     }
   } else {
-    const result = renderMarkdown(raw, {
+    const result = renderMarkdown(raw, { ...operationOptions(opts),
       theme: opts.theme,
       customThemePath: opts.customTheme,
       highlight: opts.highlight,
@@ -490,7 +508,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
     try {
       for (const warning of result.warnings) console.error("warn: " + warning);
       if (selection.format === "image") {
-        const payload = textModePayload(result, raw);
+        const payload = textModePayload(result, raw, opts.caption);
         const images = payload.images.map((image, i) => `<figure><img alt="Image ${i + 1}" src="data:${image.contentType};base64,${image.data}" style="width:100%;height:auto"></figure>`).join("");
         preview = `<section aria-label="WeChat image post preview"><h2>公众号图片消息 / Image post</h2>${images}<div>${payload.html}</div></section>`;
       } else {
@@ -501,7 +519,7 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
       // WeChat articles need a cover or a body image; image posts need media.
       if (selection.type === "article" &&
           !result.cover && result.attachments.length === 0) {
-        problems.push("Missing cover: add a local image or a cover: path before submitting a draft.");
+        problems.push("Missing cover: provide --cover or a local body image before submitting a draft.");
       } else if (selection.type === "image_post" && result.attachments.length === 0) {
         problems.push("No local images found for the image post.");
       }
@@ -536,9 +554,16 @@ async function cmdPreview(file: string, opts: Record<string, any>): Promise<void
 }
 
 async function cmdCard(file: string, opts: Record<string, any>): Promise<void> {
-  const raw = fs.readFileSync(file, "utf-8");
+  if (!validPublicationChoice(opts, "card-render")) return;
+  let raw: string;
+  try { raw = fs.readFileSync(file, "utf-8"); parseSource(raw); }
+  catch {
+    if (opts.json) console.log(JSON.stringify({schemaVersion:1,kind:"card-render",ok:false,code:"INPUT_INVALID",submitted:false,networkUsed:false}));
+    else console.error("publy: choose a readable Markdown file with a closed properties block.");
+    process.exitCode=2; return;
+  }
   const outDir = path.resolve(opts.out ?? path.join(path.dirname(path.resolve(file)), "cards"));
-  const result = await renderCards(raw, {
+  const result = await renderCards(raw, { ...operationOptions(opts),
     theme: opts.theme,
     outDir,
     fontFiles: opts.fontFile ?? [],
@@ -805,12 +830,12 @@ async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<
     const output = path.join(outDir, "preview.html");
     let html: string;
     if (card) {
-      const result = await renderCards(raw, { theme: name, outDir, offline: opts.json === true });
+      const result = await renderCards(raw, { ...operationOptions(opts), theme: name, outDir, offline: opts.json === true });
       html = buildPreviewHtml(result);
       // The HTML embeds each PNG; the separate card files are no longer needed.
       for (const card of result.cards) fs.rmSync(card.file, { force: true });
     } else {
-      const rendered = renderMarkdown(raw, { theme: name });
+      const rendered = renderMarkdown(raw, { ...operationOptions(opts), theme: name });
       try { html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"></head><body>${rendered.html}</body></html>`; } finally { rendered.cleanup(); }
     }
     fs.writeFileSync(output, html, { mode: 0o600, flag: "wx" });
@@ -827,8 +852,8 @@ async function cmdThemePreview(name: string, opts: { json?: boolean }): Promise<
 // ---------------------------------------------------------------------------
 
 /** text-mode image post: body images in order, caption = remaining paragraphs. */
-function textModePayload(rendered: ReturnType<typeof renderMarkdown>, raw: string): { html: string; images: Attachment[]; coverName?: string } {
-  const captionText = imagePostCaption(raw);
+function textModePayload(rendered: ReturnType<typeof renderMarkdown>, raw: string, caption?: string): { html: string; images: Attachment[]; coverName?: string } {
+  const captionText = imagePostCaption(raw, caption);
   const images: Attachment[] = rendered.attachments.map((a) => ({
     name: a.name,
     data: fs.readFileSync(a.path).toString("base64"),
@@ -876,6 +901,11 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     return;
   }
 
+  if (opts.format === undefined) {
+    console.error("publy: specify --format article, image or cards before creating a draft.");
+    agentFailure("not_submitted", "FORMAT_REQUIRED", 2); return;
+  }
+
   let raw: string;
   let parsed: ReturnType<typeof parseSource>;
   let sourceRead = false;
@@ -892,7 +922,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     return;
   }
   const baseDir = path.dirname(path.resolve(file));
-  const selection = resolvePublication(parsed.meta, opts.format);
+  const selection = resolvePublication(opts.format);
   const type = selection.type;
 
   let html: string;
@@ -913,7 +943,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     if (selection.format === "cards") {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       try {
-        const cardResult = await renderCards(raw, { theme: opts.theme, outDir });
+        const cardResult = await renderCards(raw, { ...operationOptions(opts), theme: opts.theme, outDir });
         if (!cardResult.lint.ok) {
           for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
           agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
@@ -928,7 +958,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
         coverName = images[0]?.name;
       } finally { fs.rmSync(outDir, { recursive: true, force: true }); }
     } else {
-      const rendered = renderMarkdown(raw, {
+      const rendered = renderMarkdown(raw, { ...operationOptions(opts),
         theme: opts.theme,
         customThemePath: opts.customTheme,
         highlight: opts.highlight,
@@ -939,13 +969,13 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       });
       try {
         emitWarnings(rendered.warnings);
-        ({ html, images, coverName } = textModePayload(rendered, raw));
+        ({ html, images, coverName } = textModePayload(rendered, raw, opts.caption));
       } finally { rendered.cleanup(); }
     }
-    title = opts.title || parsed.meta.title || path.basename(file, path.extname(file));
+    title = publicationTitle(raw, opts.title, path.basename(file, path.extname(file)));
   } else {
-    const rendered = renderMarkdown(raw, {
-      theme: opts.theme ?? parsed.meta.theme,
+    const rendered = renderMarkdown(raw, { ...operationOptions(opts),
+      theme: opts.theme,
       customThemePath: opts.customTheme,
       highlight: opts.highlight,
       mediaDirs: resolveMediaDirs(opts.mediaDir ?? [], config),
@@ -983,22 +1013,17 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       }
       html = rendered.html;
       images = attachments;
-      title = opts.title || rendered.title || path.basename(file, path.extname(file));
+      title = publicationTitle(raw, opts.title, path.basename(file, path.extname(file)));
     } finally { rendered.cleanup(); }
   }
 
-  // Failed image references must stop before any HTTP POST. An explicit
-  // --cover wins over stale source frontmatter, so suppress that one warning
-  // only after the override file has been validated in the article branch.
-  const blockers = warnings.filter((warning) =>
-    blockingMediaWarning(warning) &&
-    !(type === "article" && opts.cover && warning.startsWith("Cover not found:")),
-  );
+  // Failed explicit media references stop before any HTTP POST.
+  const blockers = warnings.filter(blockingMediaWarning);
   // The official WeChat draft requires a usable cover for articles and at
   // least one image for text-mode image posts. The regular preflight already
   // reports these, so publish must enforce the same invariant.
   if (type === "article" && !coverName && images.length === 0) {
-    blockers.push("Missing cover: provide --cover, cover: frontmatter or a local body image.");
+    blockers.push("Missing cover: provide --cover or a local body image.");
   }
   if (type === "image_post" && images.length === 0) {
     blockers.push("No local images found for image-post draft.");
@@ -1014,14 +1039,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
   const accountName = opts.account.trim();
   const account = config.accounts?.find((a) => a.name === accountName);
 
-  // digest: explicit frontmatter, else derived from the first body paragraph
-  let digest = parsed.meta.digest;
-  if (!digest) {
-    const firstParagraph = type === "image_post"
-      ? (parsed.meta.caption ?? "")
-      : parsed.body.split(/\n{2,}/).map((b) => b.trim()).find((b) => b && !b.startsWith("#") && !b.startsWith("!") && !b.startsWith("---")) ?? "";
-    digest = stripMarkdown(firstParagraph).slice(0, 120);
-  }
+  const digest = publicationDigest(raw, operationOptions(opts));
 
   const payload: PublishRequest = {
     account: accountName,
@@ -1030,7 +1048,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     html,
     images,
     cover: coverName,
-    author: opts.author ?? parsed.meta.author ?? account?.author,
+    author: opts.author ?? account?.author,
     digest,
     needOpenComment: true,
   };
@@ -1227,7 +1245,7 @@ const AGENT_USAGE: Record<string, string> = {
   render: "publy render <file.md> --json [--out <review.html>]",
   preview: "publy preview <file.md> --json [--out <review.html>]",
   card: "publy card <file.md> --json --out <directory>",
-  publish: "publy publish <file.md> --account <name> --json",
+  publish: "publy publish <file.md> --format article|image|cards --account <name> --json",
   "publish-result": "publy publish-result <requestId> --json",
   "draft list": "publy draft list --account <name> --json",
   "draft delete": "publy draft delete <mediaId> --account <name> --json",
@@ -1257,7 +1275,7 @@ const AGENT_COMMANDS = [
   { name: "render", json: true, network: false, effect: "write-html-if-out", prerequisites: ["markdown-file"] },
   { name: "preview", json: true, network: false, effect: "write-private-html", prerequisites: ["markdown-file"] },
   { name: "card", json: true, network: "font-fallback-may-download", effect: "write-png", prerequisites: ["markdown-file"] },
-  { name: "publish", json: true, network: true, effect: "create-wechat-draft", prerequisites: ["markdown-file", "configured-server", "api-key", "wechat-account"] },
+  { name: "publish", json: true, network: true, effect: "create-wechat-draft", prerequisites: ["markdown-file", "configured-server", "api-key", "wechat-account", "publication-format"] },
   { name: "publish-result", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key", "request-id"] },
   { name: "jobs list", json: true, network: true, effect: "read", prerequisites: ["configured-server", "api-key"] },
   { name: "jobs cancel", json: true, network: true, effect: "cancel-scheduled-job", prerequisites: ["configured-server", "api-key", "job-id"] },
@@ -1289,8 +1307,8 @@ export function createProgram(): Command {
         destination: "wechat-official-account-drafts",
         inputs: ["markdown-file"],
         editorIndependent: true,
-        publicationFormats: { values: ["article", "image", "cards"], option: "--format", commands: ["check", "preview", "publish"], default: "article", explicitChoiceOverridesFrontmatter: true },
-        firstClassEditors: ["Typora", "Obsidian"],
+        publicationFormats: { values: ["article", "image", "cards"], option: "--format", commands: ["check", "preview", "publish"], default: "article", frontmatterControlsPublication: false, requiredForPublish: true, options: ["title", "cover", "theme", "author", "digest", "caption", "caption-file"] },
+        firstClassEditors: ["Obsidian"],
         noPublicSend: true,
         commands: AGENT_COMMANDS.map((command) => ({
           ...command,
@@ -1320,6 +1338,12 @@ export function createProgram(): Command {
 
   const common = (cmd: Command) =>
     cmd
+      .option("--title <title>", "title for this operation (otherwise first H1 or filename)")
+      .option("--cover <path>", "cover image for this operation")
+      .option("--author <name>", "author for this operation")
+      .option("--digest <text>", "draft summary for this operation")
+      .option("--caption <text>", "image-post or card caption for this operation")
+      .option("--caption-file <path>", "read caption from a UTF-8 file; excludes --caption")
       .option("-t, --theme <id>", "theme id")
       .option("--custom-theme <path>", "path to a custom theme CSS file (overrides --theme)")
       .option("--highlight <id>", "code highlight theme", "github")
@@ -1367,9 +1391,6 @@ export function createProgram(): Command {
     .argument("<file>")
     .option("--format <format>", "article, image or cards for this operation")
     .option("--account <name>", "required target account for draft creation; never inferred")
-    .option("--title <title>", "override article title")
-    .option("--cover <path>", "override cover image path")
-    .option("--author <name>", "override author byline")
     .option("--at <datetime>", "schedule the publish (ISO or \"2026-10-01 09:00\")")
     .option("--server <url>", "publy server base url")
     .option("--api-key <key>", "server api key")

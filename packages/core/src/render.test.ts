@@ -22,7 +22,7 @@ title: 渲染测试
 
 test("renderMarkdown inlines styles and converts links to footnotes", () => {
   const result = renderMarkdown(SAMPLE, { theme: "claude" });
-  assert.equal(result.title, "渲染测试");
+  assert.equal(result.title, "标题");
   assert.ok(result.html.includes('id="publy"'));
   assert.ok(!result.html.includes("var(--"), "unresolved css var");
   assert.match(result.html, /加粗/);
@@ -38,7 +38,9 @@ test("renderMarkdown --no-footnote keeps anchors", () => {
 
 test("a Markdown frontmatter theme cannot select a path-like builtin ID", () => {
   const maliciousAlias = "---\ntheme: ../themes/claude\n---\n\n# Imported note";
-  assert.throws(() => renderMarkdown(maliciousAlias), /Unknown theme id/);
+  const rendered = renderMarkdown(maliciousAlias);
+  assert.ok(!rendered.html.includes("../themes/claude"));
+  assert.throws(() => renderMarkdown(maliciousAlias, {theme:"../themes/claude"}), /Unknown theme id/);
   // An explicit CSS file remains available via customThemePath for trusted
   // operator workflows; a Markdown field is not that permission.
 });
