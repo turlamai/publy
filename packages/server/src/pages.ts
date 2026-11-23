@@ -411,7 +411,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
 
 
       </div>
-  <label class="field">联系方式（邮箱或手机号，用于开户与对账）
+  <label class="field">联系方式（仅首次开户填写；恢复账户无需填写）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
   </label>
   <label class="field" for="existingKey">已有账户 API Key（用于恢复同一账户；首次开户留空）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button><button type="submit" id="pay">开户或恢复账户，查看权益</button>
@@ -432,11 +432,16 @@ ${WEB_CSS}</style></head><body><div class="wrap">
 var KEY = 'publy_hosted_api_key';
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
-var apiKey = '', timer;
+var apiKey = '', timer, revision = 0;
 try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
 document.getElementById('existingKey').value = apiKey;
 document.getElementById('copy-key').disabled = !apiKey;
-document.getElementById('existingKey').addEventListener('input', function () { document.getElementById('copy-key').disabled = !this.value.trim(); });
+document.getElementById('existingKey').addEventListener('input', function () {
+  revision++; clearTimeout(timer); apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
+  var link = document.getElementById('purchase-link'); if (link) link.remove();
+  document.getElementById('copy-key').disabled = !this.value.trim();
+  say('账户凭据已更改，请重新查看权益。');
+});
 function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
 async function post(url, body) {
   var response = await fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, apiKey ? { 'x-api-key': apiKey } : {}), body: JSON.stringify(body) });
@@ -446,9 +451,11 @@ async function post(url, body) {
 }
 async function refresh() {
   if (!apiKey) return;
+  var current = revision;
   clearTimeout(timer); button.disabled = true;
   try {
     var result = await post('/v1/hosted/status', {});
+    if (current !== revision) return;
     section.hidden = false; qr.hidden = true;
     var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
     if (result.status === 'active') {
@@ -464,33 +471,36 @@ async function refresh() {
       say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额；付款后返回此页刷新权益。' : '暂未开放购买，请稍后再试。');
       // Poll only a bounded set of visible-page checks, without caching access.
     }
-  } catch (error) { say(error.message, true); }
+  } catch (error) { if (current === revision) say(error.message, true); }
   finally { button.disabled = false; }
 }
 if (form) form.addEventListener('submit', async function (event) {
-  event.preventDefault(); button.disabled = true;
+  event.preventDefault(); button.disabled = true; var attempt = revision;
   try {
-    apiKey = document.getElementById('existingKey').value.trim() || apiKey;
+    apiKey = document.getElementById('existingKey').value.trim();
     if (!apiKey) {
       var contact = document.getElementById('contact').value.trim();
       if (!contact) throw new Error('首次开户请填写联系方式；已有账户请填写 API Key。');
       var response = await fetch('/v1/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contact: contact }) });
       var account = await response.json();
       if (!response.ok) throw new Error(response.status === 409 ? '此联系方式已开户，请使用原 API Key 恢复账户。' : '暂时无法开户，请稍后重试。');
+      if (attempt !== revision) return;
       apiKey = account.apiKey;
     }
     await post('/v1/hosted/session', {});
+    if (attempt !== revision) return;
     try { sessionStorage.setItem(KEY, apiKey); } catch (_) {}
     document.getElementById('existingKey').value = apiKey;
     document.getElementById('copy-key').disabled = false;
     await refresh();
     var checks = 0;
     async function poll() {
+      if (attempt !== revision) return;
       if (document.visibilityState === 'visible') await refresh();
       if (++checks < 12) timer = setTimeout(poll, 10000);
     }
-    timer = setTimeout(poll, 10000);
-  } catch (error) { say(error.message, true); }
+    if (attempt === revision) timer = setTimeout(poll, 10000);
+  } catch (error) { if (attempt === revision) say(error.message, true); }
   finally { button.disabled = false; }
 });
 var refreshButton = document.getElementById('refresh');
