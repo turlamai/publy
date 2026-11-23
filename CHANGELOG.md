@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Server 0.2.2 adds optional NowPay Direct MONTH access, independently verified request-bound Permit admission, same-account purchase recovery and atomic provider-period quota reservations. Public purchasing stays disabled pending live acceptance. The deployment unit now requires a persistent service account and a private state directory.
+
 - Add a separate server release artifact, checksum manifest, isolated installation smoke and persistent hardened deployment unit. Production installation requires no source checkout or package manager. Server package version: 0.2.1; plugin version remains unchanged.
 
 - Focus the recommended writing experience on Obsidian, with an editor-independent CLI and official agent skill.

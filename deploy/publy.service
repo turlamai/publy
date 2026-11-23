@@ -14,6 +14,7 @@ ExecStart=/opt/nodejs/node-v24.14.0-linux-x64/bin/node /opt/publy/server/current
 Environment=NODE_ENV=production
 Environment=PLTUSERHOME=/var/lib/publy/racket-user
 StateDirectory=publy
+StateDirectoryMode=0700
 UMask=0077
 Restart=on-failure
 RestartSec=5

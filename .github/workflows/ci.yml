@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: turlamai/permit
-          ref: a55632bb5e380aebfc114b9069b7abd7218c2386
+          ref: bba48fd460de6602d1d62afe7644c0ebd2dd62e6
           path: .deps/permit
       - uses: actions/checkout@v4
         with:
@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: turlamai/permit
-          ref: a55632bb5e380aebfc114b9069b7abd7218c2386
+          ref: bba48fd460de6602d1d62afe7644c0ebd2dd62e6
           path: .deps/permit
       - name: Install websocket and Permit test dependencies
         run: |
