@@ -8,7 +8,7 @@
  $$('button[title*="重新渲染"]').forEach(b=>link(b,()=>{const strip=$('.strip');if(strip)strip.textContent='预览已更新 · 本地示例，未投递';status('本地预览已重新渲染')}));
  $$('button[title*="复制排版"]').forEach(b=>link(b,async()=>{const paper=$('.paper')||$('.cardgrid');if(!paper)return;try{if(!window.ClipboardItem)throw Error('unsupported');await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([paper.outerHTML],{type:'text/html'}),'text/plain':new Blob([text(paper)],{type:'text/plain'})})]);status('已复制富文本')}catch{copy(text(paper))}}));
  $$('.segpill button').forEach(b=>link(b,()=>{$$('.segpill button').forEach(x=>x.classList.toggle('on',x===b));const paper=$('.paper');if(paper){paper.style.width=text(b)+'px';paper.style.maxWidth='100%'}}));
- $$('button').filter(b=>text(b).includes('投递')&&!b.disabled).forEach(b=>link(b,()=>go('preflight.html')));
+ $$('button').filter(b=>text(b).includes('投递')&&!b.disabled).forEach(b=>link(b,()=>modal('投递选项','本次选择与 CLI 参数一致；不会读取或修改笔记属性。目标：TuringLambdaAI 草稿箱。',[{label:'类型',name:'format',options:['文章','图片配文','文字卡片']},{label:'标题',name:'title',value:'居家咖啡指南',required:true},{label:'作者',name:'author',value:''},{label:'摘要',name:'digest',value:''},{label:'配文',name:'caption',type:'textarea',value:''}],()=>go('preflight.html'),'检查本次投递')));
  if(file==='preflight.html'){
    let cover=false;const send=$('button.primary');
    match('button',/^选择封面/,()=>modal('选择示例封面','使用内置封面演示通过检查；不读取真实附件。',[{label:'封面',name:'cover',options:['cover-sample.svg']}],()=>{cover=true;const item=$$('div.check,div.citem,div.checkitem,div.issue').find(x=>text(x).includes('封面'));if(item)item.setAttribute('data-demo-fixed','true');status('已选择本地封面样例。请重新检查。')},'使用'));
