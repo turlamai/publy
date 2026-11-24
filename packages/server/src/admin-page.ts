@@ -34,33 +34,33 @@ export function adminPage(): string {
     </div>
     <nav class="nav" id="tabs" aria-label="主导航">
       <div class="nav-label">总览</div>
-      <button class="tab nav-item active" data-tab="overview">
+      <button class="tab nav-item active" data-tab="overview" aria-label="概览" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/></svg>
         <span>概览</span>
       </button>
-      <button class="tab nav-item" data-tab="jobs">
+      <button class="tab nav-item" data-tab="jobs" aria-label="草稿任务">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14l-7-3-7 3V5a2 2 0 0 1 2-2Z"/></svg>
         <span>草稿任务</span><span class="nav-badge" id="nav-jobs-badge"></span>
       </button>
-      <button class="tab nav-item" data-tab="claims">
+      <button class="tab nav-item" data-tab="claims" aria-label="待核对">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/></svg>
         <span>待核对</span><span class="nav-badge" id="nav-claims-badge"></span>
       </button>
       <div class="nav-label">客户</div>
-      <button class="tab nav-item" data-tab="users">
+      <button class="tab nav-item" data-tab="users" aria-label="用户">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3Zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3Zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5c0-2.3-4.7-3.5-7-3.5Zm8 0c-.3 0-.6 0-1 .1 1.2.9 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5Z"/></svg>
         <span>用户</span>
       </button>
-      <button class="tab nav-item" data-tab="orders">
+      <button class="tab nav-item" data-tab="orders" aria-label="订单">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12a2 2 0 0 1 2 2v18l-4-2-4 2-4-2-4 2V4a2 2 0 0 1 2-2Zm2 6h8v2H8V8Zm0 4h8v2H8v-2Z"/></svg>
         <span>订单</span>
       </button>
       <div class="nav-label">配置与运维</div>
-      <button class="tab nav-item" data-tab="accounts">
+      <button class="tab nav-item" data-tab="accounts" aria-label="公众号账号">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3a15 15 0 0 0-1.2-5.1A8 8 0 0 1 18.9 11ZM12 4.2c.8 1 1.6 3 1.9 6.8h-3.8c.3-3.8 1.1-5.8 1.9-6.8ZM5.1 13h3c.2 2.2.6 4 1.2 5.1A8 8 0 0 1 5.1 13Zm3-2h-3a8 8 0 0 1 4.2-5.1A15 15 0 0 0 8.1 11Zm3.9 8.8c-.8-1-1.6-3-1.9-6.8h3.8c-.3 3.8-1.1 5.8-1.9 6.8Zm1.8-1.7c.6-1.1 1-2.9 1.2-5.1h3a8 8 0 0 1-4.2 5.1Z"/></svg>
         <span>公众号账号</span>
       </button>
-      <button class="tab nav-item" data-tab="feed">
+      <button class="tab nav-item" data-tab="feed" aria-label="实时动态">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h3v-3H4v3Zm0-6h3v-3H4v3Zm0-6h3V5H4v3Zm6 12h10v-3H10v3Zm0-6h10v-3H10v3Zm0-9v3h10V5H10Z"/></svg>
         <span>实时动态</span>
       </button>
@@ -366,6 +366,7 @@ function switchTab(name) {
   if (!TAB_META[name]) return;
   document.querySelectorAll('.tab').forEach(function (t) {
     t.classList.toggle('active', t.dataset.tab === name);
+    if (t.dataset.tab === name) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
   });
   document.querySelectorAll('.panel').forEach(function (p) { p.style.display = 'none'; });
   document.getElementById('tab-' + name).style.display = 'block';
