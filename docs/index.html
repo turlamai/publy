@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-kit-id="publy">
+<html lang="zh-CN" data-kit-id="publy" class="publy-web">
 
 <head>
     <meta charset="UTF-8">
@@ -7,7 +7,7 @@
     <title>Publy — 从笔记到公众号草稿</title>
     <meta name="description" content="用你熟悉的编辑器写 Markdown。Publy 本地预览排版、投递前检查拦截问题，并把排版好的文章送到微信公众号草稿箱。">
     <link rel="canonical" href="https://publy.jrtx.site/">
-    <meta name="theme-color" content="#D97757">
+    <meta name="theme-color" content="#176842">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Publy">
     <meta property="og:title" content="Publy — From your notes to a WeChat draft">
@@ -27,7 +27,7 @@
             }
             document.documentElement.dataset.theme = t;
             var l;
-            try { l = localStorage.getItem('publy-lang-override-v2'); } catch (e) {}
+            try { l = new URLSearchParams(location.search).get('lang'); if (l === 'zh' || l === 'en') localStorage.setItem('publy-lang-override-v2', l); else l = localStorage.getItem('publy-lang-override-v2'); } catch (e) {}
             if (l !== 'zh' && l !== 'en') {
                 l = (navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
             }
@@ -35,11 +35,9 @@
         })();
     </script>
 
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23176842%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
     <link rel="stylesheet" href="family.css">
-    <link rel="stylesheet" href="home.css"><!-- per-site sections only (site.css belongs to the subpages) -->
-    <link rel="preload" href="fonts/newsreader-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="home.css"><link rel="stylesheet" href="web.css"><!-- per-site sections only (site.css belongs to the subpages) -->
     <script src="family.js" defer></script>
 </head>
 
@@ -47,13 +45,13 @@
     <header class="kit-nav">
         <div class="kit-container kit-nav-inner">
             <a class="kit-brand" href="/">
-                <svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#D97757"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#176842"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span>Publy</span>
             </a>
             <nav class="kit-nav-links">
                 <a href="#how" data-i18n="nav.how">使用方式</a>
                 <a href="start.html" data-i18n="nav.start">开始使用</a>
-                <a href="api.html">API</a>
+                <a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a>
                 <a href="hosted.html" data-i18n="nav.hosted">托管状态</a>
             </nav>
             <div class="kit-nav-actions">
@@ -249,7 +247,7 @@
             <div class="kit-footer-grid">
                 <div>
                     <a class="kit-brand" href="/">
-                        <svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#D97757"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#176842"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         <span>Publy</span>
                     </a>
                     <p class="kit-footer-tagline" data-i18n="footer.tagline">让笔记到草稿的路更从容。</p>
@@ -260,7 +258,7 @@
                         <li><a href="start.html" data-i18n="nav.start">开始使用</a></li>
                         <li><a href="api.html">API</a></li>
                         <li><a href="hosted.html" data-i18n="nav.hosted">托管状态</a></li>
-                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md" data-en-href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.md" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md" data-i18n="footer.guide">使用指南</a></li>
+                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md" data-en-href="user-guide.html" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/USER-GUIDE.zh-CN.md" data-i18n="footer.guide">使用指南</a></li>
                         <li><a href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.zh-CN.md" data-en-href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.md" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.zh-CN.md" data-i18n="footer.operators">运营者指南</a></li>
                     </ul>
                 </div>
@@ -276,8 +274,8 @@
                     <h4 data-i18n="footer.legal">条款</h4>
                     <ul>
                         <li><a href="https://github.com/turlamai/publy/issues" data-i18n="footer.support">反馈</a></li>
-                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/privacy.zh-CN.md" data-en-href="https://github.com/turlamai/publy/blob/main/docs/privacy.md" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/privacy.zh-CN.md" data-i18n="footer.privacy">隐私</a></li>
-                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/terms.zh-CN.md" data-en-href="https://github.com/turlamai/publy/blob/main/docs/terms.md" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/terms.zh-CN.md" data-i18n="footer.status">服务状态</a></li>
+                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/privacy.zh-CN.md" data-en-href="privacy.html" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/privacy.zh-CN.md" data-i18n="footer.privacy">隐私</a></li>
+                        <li><a href="https://github.com/turlamai/publy/blob/main/docs/terms.zh-CN.md" data-en-href="terms.html" data-zh-href="https://github.com/turlamai/publy/blob/main/docs/terms.zh-CN.md" data-i18n="footer.status">服务状态</a></li>
                         <li><a href="https://github.com/turlamai/publy">GitHub</a></li>
                         <li><a href="https://github.com/turlamai/publy/blob/main/LICENSE">AGPL-3.0</a></li>
                     </ul>

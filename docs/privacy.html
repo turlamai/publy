@@ -1,0 +1,71 @@
+<!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy · 隐私 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="publy-data-and-privacy-status">Publy data and privacy status</h1>
+<p><strong>English</strong> · <a href="privacy.html?lang=zh">简体中文</a></p>
+<p>Public hosting is not open. The old privacy page must not be treated as a promise from a running customer service. This page describes source/self-hosting boundaries, not a guarantee about a third-party deployment.</p>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Actual boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source Markdown/media</td>
+<td>Kept locally; delivery sends rendered content/media through the selected server to WeChat</td>
+</tr>
+<tr>
+<td>Client API key</td>
+<td>Can be stored in ~/.publy/config.json; protect it as a secret</td>
+</tr>
+<tr>
+<td>AppID / AppSecret</td>
+<td>The static server.json example contains plaintext secrets; other binding paths need encryption/master-key review</td>
+</tr>
+<tr>
+<td>Jobs, history and caches</td>
+<td>Queues, history.jsonl, databases and caches can persist data; do not claim that no content is ever stored</td>
+</tr>
+<tr>
+<td>External communication</td>
+<td>Package/theme registries, the selected server, official WeChat APIs and configured webhooks have distinct data recipients</td>
+</tr>
+</tbody>
+</table>
+<p>Self-hosting operators own file permissions, HTTPS/private tunnels, authentication, log redaction, encrypted backups and verified restore. Never publish a WebSocket URL containing a key. Unbinding inside an app does not necessarily revoke a WeChat credential or delete old backup copies; rotate exposed credentials at their issuer.</p>
+<p>Before public hosting launches, identify the actual operator, collected fields/purposes, third-party recipients, separate content/media/log/backup retention, export/deletion paths, support and incident response. Do not claim immediate deletion, a seven-day response or fully encrypted handling has already been delivered. Use <a href="https://github.com/turlamai/publy/issues">Issues</a> for non-sensitive problems only; never post personal data or credentials there.</p>
+</div><div data-lang="zh"><h1 id="publy-数据与隐私状态">Publy 数据与隐私状态</h1>
+<p><a href="privacy.html?lang=en">English</a> · <strong>简体中文</strong></p>
+<p>当前公开托管未开放，不能把旧隐私页面当成已经运行的客户服务承诺。本页描述源码与自托管的数据边界，不保证某个第三方部署按此配置。</p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>实际边界</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Markdown 与媒体原件</td>
+<td>留在本地；投递时渲染内容和媒体会经选择的服务器发往微信</td>
+</tr>
+<tr>
+<td>客户端 API key</td>
+<td>可存于 ~/.publy/config.json，应按秘密保护</td>
+</tr>
+<tr>
+<td>AppID / AppSecret</td>
+<td>静态 server.json 示例含明文秘密；其他绑定路径需核对加密及主密钥管理</td>
+</tr>
+<tr>
+<td>任务、历史和缓存</td>
+<td>可能落盘于队列、history.jsonl、数据库或缓存；不能笼统声称正文不落盘</td>
+</tr>
+<tr>
+<td>对外通信</td>
+<td>包安装、主题、所选服务器、微信官方 API 及配置的 webhook 各有数据接收方</td>
+</tr>
+</tbody>
+</table>
+<p>自托管者负责限制文件权限、HTTPS 或私有隧道、鉴权、日志脱敏、备份加密与恢复验证。不要公开包含 key 的 WebSocket URL。解绑应用内账号不等于微信端凭据自动撤销，也不等于备份中的旧副本已删除；泄露时应在微信或对应服务商处轮换。</p>
+<p>公开托管上线前，还需按实际实现明确经营者、收集字段与用途、第三方接收方、正文/媒体/日志/备份分别的保留期、导出和删除方式、客服与事件响应；不得提前承诺即时删除、7 天处理或全链路加密已经实现。非敏感问题走 <a href="https://github.com/turlamai/publy/issues">Issues</a>，不在公开 issue 提交个人数据或凭据。</p>
+</div></article><footer class="pw-step"><a href="wechat.html">WeChat setup · 公众号连接</a> · <a href="user-guide.html">User guide · 使用指南</a> · <a href="privacy.html">Privacy · 隐私</a> · <a href="terms.html">Terms · 条款</a></footer></main></body></html>

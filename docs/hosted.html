@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="publy-web">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hosted service status · 托管服务状态</title>
 <meta name="description" content="Publy hosted draft delivery is in a private pilot. It is not on sale and there is no checkout.">
-<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
 </head>
 <body>
 <header><nav class="wrap nav" aria-label="Main">
@@ -14,11 +14,11 @@
     <div class="navlinks">
       <a href="index.html"><span data-lang="en">Product</span><span data-lang="zh">产品</span></a>
       <a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a>
-      <a href="api.html">API</a>
+      <a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a>
       <a href="hosted.html" aria-current="page"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a>
       <a href="https://github.com/turlamai/publy">GitHub</a>
     </div>
-    <div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
+    <button class="secondary" type="button" data-theme-switch aria-pressed="false">亮 / 暗</button><div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
   </div>
 </nav></header>
 
@@ -27,20 +27,20 @@
   <div>
     <div class="kicker"><span data-lang="en">Hosted service</span><span data-lang="zh">托管服务</span></div>
     <h1><span data-lang="en">Pilot only.<br>Not for sale yet.</span><span data-lang="zh">仅限内测。<br>暂不开放购买。</span></h1>
-    <p class="lead"><span data-lang="en">The hosted version is the same draft-delivery service, operated for you with a stable egress IP, credential custody and recovery. It is currently exercised through private pilots; registration, payment and public key issuance are closed.</span><span data-lang="zh">托管版就是同一套草稿投递服务，由我们代运营，提供稳定出口 IP、凭据保管与恢复。目前只做私有内测；注册、付款与公开 key 发放均未开放。</span></p>
+    <p class="lead"><span data-lang="en">The hosted version is the same draft-delivery service, operated for you with a stable egress IP, credential custody and recovery. It is currently exercised through private pilots; public registration and sales are closed; invited acceptance has a separate controlled path.</span><span data-lang="zh">托管版就是同一套草稿投递服务，由我们代运营，提供稳定出口 IP、凭据保管与恢复。目前只做私有内测；公开注册与销售未开放；受邀验收使用单独的受控入口。</span></p>
     <div class="buttons">
       <a class="btn primary" href="start.html"><span data-lang="en">Use the free self-hosted path</span><span data-lang="zh">使用免费的自托管路径</span> →</a>
       <a class="btn" href="https://github.com/turlamai/publy/releases"><span data-lang="en">Watch releases</span><span data-lang="zh">关注 Release</span></a>
     </div>
   </div>
   <aside class="note">
-    <strong><span data-lang="en">No checkout exists.</span><span data-lang="zh">本站没有结账入口。</span></strong>
-    <span data-lang="en"> There is no price list, purchase button, trial signup or payment form. Anything claiming to sell Publy hosting is not us.</span>
-    <span data-lang="zh"> 本站没有价格表、购买按钮、试用注册或支付表单。任何声称出售 Publy 托管的渠道都不是官方。</span>
+    <strong><span data-lang="en">Invited acceptance only.</span><span data-lang="zh">仅限受邀验收。</span></strong>
+    <span data-lang="en"> Public sales remain closed. An official account-and-access page exists for invited acceptance; a configured product or checkout is not evidence that the full paid lifecycle has passed.</span>
+    <span data-lang="zh"> 公开销售仍未开放。受邀验收已有官方账户与权益页面；商品已配置、收银台可打开，不代表付款、退款和服务全流程已验收。</span>
   </aside>
 </section>
 
-<section class="wrap section">
+<section class="wrap section"><p><a href="wechat.html"><span data-lang="en">Already invited? Follow the WeChat connection guide.</span><span data-lang="zh">已受邀？先看公众号连接与白名单教程。</span></a></p>
   <div class="section-head"><div><div class="kicker"><span data-lang="en">What it adds</span><span data-lang="zh">托管提供什么</span></div><h2><span data-lang="en">Reliability, not lock-in.</span><span data-lang="zh">可靠投递，不锁定内容。</span></h2></div><p><span data-lang="en">The paid service, when it exists, is for operational reliability and recovery — never for moving content between editors.</span><span data-lang="zh">付费服务（如果开放）卖的是运营可靠性与恢复能力，不是编辑器之间的搬运。</span></p></div>
   <div class="grid">
     <div class="card"><h3><span data-lang="en">Fixed egress + credentials</span><span data-lang="zh">固定出口 + 凭据保管</span></h3><p><span data-lang="en">A stable server IP accepted by WeChat, with the AppSecret kept server-side and never sent to the client.</span><span data-lang="zh">微信白名单认可的稳定 IP；AppSecret 只留在服务端，不下发客户端。</span></p></div>
@@ -54,7 +54,7 @@
   <div class="section-head"><div><div class="kicker"><span data-lang="en">Why closed</span><span data-lang="zh">为什么暂不开放</span></div><h2><span data-lang="en">Gates we won't skip.</span><span data-lang="zh">不会绕过的门禁。</span></h2></div></div>
   <div class="card">
     <ol>
-      <li><span data-lang="en">Merchant and legal admission for online payment in mainland China (business entity, ICP filing where required, payment-provider review).</span><span data-lang="zh">中国大陆线上收款所需的商户与合规准入（企业主体、必要的 ICP 备案、支付渠道审核）。</span></li>
+      <li><span data-lang="en">Merchant and legal admission for online payment in mainland China (approved admission route, ICP filing where required, payment-provider review).</span><span data-lang="zh">中国大陆线上收款所需的商户与合规准入（已获准的主体路径、必要的 ICP 备案、支付渠道审核）。</span></li>
       <li><span data-lang="en">Production entitlement checks through Commerce + Permit, refunds and quota enforcement — not a local “paid” flag.</span><span data-lang="zh">通过 Commerce + Permit 的生产级权益校验、退款与配额执行，而不是本地“已付款”标记。</span></li>
       <li><span data-lang="en">Proven reliability: fixed-egress pilot, backup/restore rehearsal, unknown-outcome recovery and service operations.</span><span data-lang="zh">可靠性验收：固定出口试点、备份恢复演练、未知结果恢复与服务运营。</span></li>
     </ol>
@@ -77,16 +77,6 @@
   <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Free local tools. Hosted delivery in pilot.</span><span data-lang="zh">本地工具免费，托管投递内测中。</span></div></div>
   <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/PRICING.md"><span data-lang="en">Pricing policy</span><span data-lang="zh">定价政策</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
 </div></footer>
-<script>
-  const root = document.documentElement;
-  const params = new URLSearchParams(location.search);
-  if (params.get('lang') === 'zh') { root.lang = 'zh-CN'; document.querySelectorAll('[data-switch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.switch === 'zh'))); }
-  document.querySelectorAll('[data-switch]').forEach(button => button.addEventListener('click', () => {
-    const zh = button.dataset.switch === 'zh';
-    root.lang = zh ? 'zh-CN' : 'en';
-    document.querySelectorAll('[data-switch]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-    history.replaceState(null, '', zh ? '?lang=zh' : location.pathname);
-  }));
-</script>
+<script src="site.js"></script>
 </body>
 </html>

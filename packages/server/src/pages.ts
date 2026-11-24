@@ -1,27 +1,13 @@
+import { WEB_CSS, WEB_JS } from "./web-assets.js";
+import { escapeHtml } from "./setup-page.js";
 // Storefront (purchase) + admin console pages.
 import { HOSTED_OFFERS, formatFen, type HostedOfferId } from "./hosted-offers.js";
 //
-// Design system: matches the publy.jrtx.site family — dark bg, green accent,
-// generous spacing, clean typography. The shared <style> is embedded in both
-// pages so the two always look like the same product.
+// Shared public tokens are generated from the prototype and embedded so
+// installed servers never depend on a remote stylesheet.
 
 const BASE_CSS = `
-  :root {
-    --bg: #0d0d0d;
-    --surface: #171717;
-    --surface-2: #1f1f1f;
-    --border: #2a2a2a;
-    --border-light: #333;
-    --text: #ececec;
-    --text-2: #aaa;
-    --text-3: #777;
-    --accent: #07C160;
-    --accent-hover: #06ad56;
-    --accent-dim: rgba(7,193,96,.08);
-    --danger: #f87171;
-    --radius: 10px;
-    --radius-sm: 6px;
-  }
+  :root { --radius:12px; --radius-sm:8px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -57,7 +43,7 @@ const BASE_CSS = `
   input::placeholder { color: var(--text-3); }
   .btn {
     display: inline-block; padding: 10px 20px;
-    background: var(--accent); color: #fff;
+    background: var(--accent); color: var(--on-accent);
     border: 0; border-radius: var(--radius-sm);
     font-size: 14px; font-weight: 600; cursor: pointer;
     transition: background .2s; text-align: center;
@@ -104,12 +90,12 @@ const BASE_CSS = `
 
 export function shell(title: string, body: string, extraCss = ""): string {
   return `<!DOCTYPE html>
-<html lang="zh"><head>
+<html lang="zh-CN" class="publy-web"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<style>${BASE_CSS}${extraCss}</style>
-</head><body>${body}</body></html>`;
+<style>${BASE_CSS}${extraCss}${WEB_CSS}</style>
+</head><body>${body}<script>${WEB_JS}</script></body></html>`;
 }
 
 export function purchasePage(publicIp = "你的服务器公网 IP"): string {
@@ -233,7 +219,7 @@ document.getElementById('buy').onclick = async function () {
     var d = await r.json();
     if (d.qrDataUrl) {
       var remark = String(d.orderId).slice(-6).toUpperCase();
-      show('msg', '请用支付宝扫码支付 ¥' + PRICE[plan][months] + '，备注编号 ' + remark + '。管理员确认后本页自动开通。\\n\\n<img src="' + d.qrDataUrl + '" style="width:260px;background:#fff;padding:10px;border-radius:10px">');
+      show('msg', '请用支付宝扫码支付 ¥' + PRICE[plan][months] + '，备注编号 ' + remark + '。管理员确认后本页自动开通。\\n\\n<img src="' + d.qrDataUrl + '" style="width:260px;background:var(--card);padding:10px;border-radius:10px">');
       pollKey(d.orderId, b, 3000);
     } else if (d.payUrl) {
       show('msg', '订单已创建，<a href="' + d.payUrl + '" target="_blank">点击完成支付</a>。支付完成后本页自动显示 key。');
@@ -289,24 +275,23 @@ export function hostedPurchasePage(available: boolean, publicUrl?: string, direc
         <span class="plan-price">${formatFen(offer.fen)}</span>
         <span class="plan-meta">${offer.plan === "studio" ? "多账号与更高额度" : "个人写作与排程"} · 一次性支付</span>
       </label>`).join("");
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="zh-CN" class="publy-web"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publy 托管投递 · 开通</title>
 <style>
-:root{--ink:#16271e;--muted:#5d6d64;--line:#dce5d9;--green:#176842;--tint:#eef5ec;--amber:#8a5a12}
-*{box-sizing:border-box}body{margin:0;background:#f7f8f4;color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
-.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:500 34px/1.2 Georgia,serif;margin:8px 0 10px}
-.lead{color:var(--muted);max-width:600px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
-.notice{border:1px solid #ecd6a6;background:#fdf3e2;color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:600 34px/1.2 var(--sans);margin:8px 0 10px}
+.lead{color:var(--muted);max-width:600px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
+.notice{border:1px solid #ecd6a6;background:var(--amber-tint);color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
 .notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
 .plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
 .plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
-label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
-#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:#a3341f}
+#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
-</style></head><body><div class="wrap">
+${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
@@ -324,12 +309,12 @@ ${available ? `<form class="card" id="buy" >
   <strong>付款前请确认</strong>
   <ul class="small">
     <li>Publy 只创建草稿，最终发布仍由你在微信后台完成。</li>
-    <li>托管需要你的公众号 AppID 与 AppSecret，以及把本服务出口 IP 加入微信白名单。</li>
+    <li>先核对公众号的官方草稿接口权限，再<a href="/setup">连接公众号、复制本服务出口 IP</a>。<a href="https://publy.jrtx.site/wechat.html?lang=zh">白名单手把手教程</a>。</li>
     <li>额度按账号、按自然月计算；退款与到期规则以服务条款为准。</li>
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot">运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/terms.md">服务条款</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
@@ -376,82 +361,87 @@ if (form) form.addEventListener('submit', async function (event) {
     say(error.message, true);
   }
 });
-</script></body></html>`;
+</script><script>${WEB_JS}</script></body></html>`;
 }
 
 /** Small result page for the hosted return. It never includes credentials or
  * payment parameters; the server has already re-checked Commerce/Permit. */
 export function hostedResultPage(title: string, message: string, ok: boolean): string {
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · Publy</title><style>body{margin:0;background:#f7f8f4;color:#16271e;font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
-main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:500 30px/1.2 Georgia,serif;margin:0 0 10px}p{color:#5d6d64}
-.card{background:#fff;border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:#cfe3cd;background:#eef5ec}
-a{color:#176842}</style></head><body><main><h1>${title}</h1><div class="card ${ok ? "ok" : ""}"><p>${message}</p></div>
-<p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">购买页</a></p></main></body></html>`;
+  return `<!doctype html><html lang="zh-CN" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)} · Publy</title><style>body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:600 30px/1.2 var(--sans);margin:0 0 10px}p{color:var(--muted)}
+.card{background:var(--card);border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:var(--line);background:var(--tint)}
+a{color:#176842}${WEB_CSS}</style></head><body><main><h1>${escapeHtml(title)}</h1><div class="card ${ok ? "ok" : ""}"><p>${escapeHtml(message)}</p></div>
+<p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">账户与权益</a> · <a href="/setup">连接公众号</a></p></main><script>${WEB_JS}</script></body></html>`;
 }
 
 function hostedDirectPurchasePage(available: boolean): string {
   if (!available) return hostedPurchasePage(false);
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="zh-CN" class="publy-web"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publy 托管投递 · 开通</title>
 <style>
-:root{--ink:#16271e;--muted:#5d6d64;--line:#dce5d9;--green:#176842;--tint:#eef5ec;--amber:#8a5a12}
-*{box-sizing:border-box}body{margin:0;background:#f7f8f4;color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
-.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:500 34px/1.2 Georgia,serif;margin:8px 0 10px}
-.lead{color:var(--muted);max-width:600px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
-.notice{border:1px solid #ecd6a6;background:#fdf3e2;color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:600 34px/1.2 var(--sans);margin:8px 0 10px}
+.lead{color:var(--muted);max-width:600px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
+.notice{border:1px solid #ecd6a6;background:var(--amber-tint);color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
 .notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
 .plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
 .plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
-label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
-#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:#a3341f}
+#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
-.plans{grid-template-columns:1fr}#direct-qr{max-width:100%;height:auto}input{min-height:44px}
-@media(prefers-color-scheme:dark){:root{--ink:#e7eee9;--muted:#b3c1b8;--line:#637568;--green:#9ed7ad;--tint:#23372a;--amber:#f0cf93}body{background:#181e1a}.card,input[type=text],input[type=password]{background:#222b25;color:var(--ink)}button{background:#9ed7ad;color:#16271e}#msg.err{color:#ffb5a0}}
-</style></head><body><div class="wrap">
+.plans{grid-template-columns:1fr}.plan{grid-template-columns:1fr auto}.plan-meta{grid-column:1 / -1}#direct-qr{max-width:100%;height:auto}input{min-height:44px}
+${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
 <div class="notice ok">Personal 月包 ¥29，不自动续费。支付后重新核验权益，有效期以内不重复购买。</div>
 <form class="card" id="buy" >
   <div class="plans">
-      <label class="plan">
-        <input type="radio" name="offer" value="publy-personal-monthly" checked>
+      <div class="plan">
         <span class="plan-name">Personal · 1 个月</span>
         <span class="plan-price">¥29</span>
         <span class="plan-meta">个人写作与排程 · 一次性支付</span>
-      </label>
+      </div>
 
 
       </div>
-  <label class="field">联系方式（邮箱或手机号，用于开户与对账）
+  <label class="field">联系方式（仅首次开户填写；恢复账户无需填写）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
   </label>
-  <label class="field">已有账户 API Key（用于恢复同一账户）<input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key">复制 API Key 并妥善保存</button></label><button type="submit" id="pay">查看权益与购买入口</button>
+  <label class="field" for="existingKey">已有账户 API Key（用于恢复同一账户；首次开户留空）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button><button type="submit" id="pay">开户或恢复账户，查看权益</button>
   <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p></section>
 </form>
 <div class="card">
   <strong>付款前请确认</strong>
   <ul class="small">
     <li>Publy 只创建草稿，最终发布仍由你在微信后台完成。</li>
-    <li>托管需要你的公众号 AppID 与 AppSecret，以及把本服务出口 IP 加入微信白名单。</li>
+    <li>先核对公众号的官方草稿接口权限，再<a href="/setup">连接公众号、复制本服务出口 IP</a>。<a href="https://publy.jrtx.site/wechat.html?lang=zh">白名单手把手教程</a>。</li>
     <li>每个已购月包包含 30 次成功草稿投递、1 个公众号及 1 GB 活跃附件；周期以平台有效期为准。</li>
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot">运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/terms.md">服务条款</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
-var apiKey = '', timer;
+var apiKey = '', timer, revision = 0;
 try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
+document.getElementById('existingKey').value = apiKey;
+document.getElementById('copy-key').disabled = !apiKey;
+document.getElementById('existingKey').addEventListener('input', function () {
+  revision++; clearTimeout(timer); apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
+  var link = document.getElementById('purchase-link'); if (link) link.remove();
+  document.getElementById('copy-key').disabled = !this.value.trim();
+  say('账户凭据已更改，请重新查看权益。');
+});
 function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
 async function post(url, body) {
   var response = await fetch(url, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json' }, apiKey ? { 'x-api-key': apiKey } : {}), body: JSON.stringify(body) });
@@ -461,9 +451,11 @@ async function post(url, body) {
 }
 async function refresh() {
   if (!apiKey) return;
+  var current = revision;
   clearTimeout(timer); button.disabled = true;
   try {
     var result = await post('/v1/hosted/status', {});
+    if (current !== revision) return;
     section.hidden = false; qr.hidden = true;
     var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
     if (result.status === 'active') {
@@ -479,37 +471,41 @@ async function refresh() {
       say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额；付款后返回此页刷新权益。' : '暂未开放购买，请稍后再试。');
       // Poll only a bounded set of visible-page checks, without caching access.
     }
-  } catch (error) { say(error.message, true); }
+  } catch (error) { if (current === revision) say(error.message, true); }
   finally { button.disabled = false; }
 }
 if (form) form.addEventListener('submit', async function (event) {
-  event.preventDefault(); button.disabled = true;
+  event.preventDefault(); button.disabled = true; var attempt = revision;
   try {
-    apiKey = document.getElementById('existingKey').value.trim() || apiKey;
+    apiKey = document.getElementById('existingKey').value.trim();
     if (!apiKey) {
       var contact = document.getElementById('contact').value.trim();
       if (!contact) throw new Error('首次开户请填写联系方式；已有账户请填写 API Key。');
       var response = await fetch('/v1/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contact: contact }) });
       var account = await response.json();
       if (!response.ok) throw new Error(response.status === 409 ? '此联系方式已开户，请使用原 API Key 恢复账户。' : '暂时无法开户，请稍后重试。');
+      if (attempt !== revision) return;
       apiKey = account.apiKey;
     }
     await post('/v1/hosted/session', {});
+    if (attempt !== revision) return;
     try { sessionStorage.setItem(KEY, apiKey); } catch (_) {}
     document.getElementById('existingKey').value = apiKey;
+    document.getElementById('copy-key').disabled = false;
     await refresh();
     var checks = 0;
     async function poll() {
+      if (attempt !== revision) return;
       if (document.visibilityState === 'visible') await refresh();
       if (++checks < 12) timer = setTimeout(poll, 10000);
     }
-    timer = setTimeout(poll, 10000);
-  } catch (error) { say(error.message, true); }
+    if (attempt === revision) timer = setTimeout(poll, 10000);
+  } catch (error) { if (attempt === revision) say(error.message, true); }
   finally { button.disabled = false; }
 });
 var refreshButton = document.getElementById('refresh');
 if (refreshButton) refreshButton.addEventListener('click', refresh);
 
-var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { await navigator.clipboard.writeText(document.getElementById("existingKey").value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
-</script></body></html>`;
+var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { var value = document.getElementById("existingKey").value.trim(); if (!value) { say("还没有 API Key，请先开户或恢复账户。", true); return; } await navigator.clipboard.writeText(value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
+</script><script>${WEB_JS}</script></body></html>`;
 }

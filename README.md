@@ -18,6 +18,8 @@ Status: local rendering and delivery components exist; public hosted onboarding 
 
 **Use any Markdown file:** [English workflow and acceptance criteria](docs/editor-workflows.md) · [中文](docs/editor-workflows.zh-CN.md). Obsidian is optional; Publy does not require a particular editor. Obsidian still requires real clean-machine acceptance.
 
+[Step-by-step WeChat connection and IP whitelist](docs/wechat-setup.md)
+
 ## Start here
 
 CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.

@@ -10,6 +10,13 @@ CLI, default themes, Obsidian and self-hosting remain free under their existing 
 
 The development plugin embeds its rendering assets in `main.js`. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open ([#12](https://github.com/turlamai/publy/issues/12), [#15](https://github.com/turlamai/publy/issues/15)).
 
+## First use without server knowledge
+
+Follow the [step-by-step WeChat connection guide](wechat-setup.md): check official API permissions → open your service’s `/setup` → copy its egress IP → add the **API IP whitelist** in the official WeChat console → check and connect → configure Obsidian with the service root URL and Publy Key → explicitly approve one test draft and inspect it in WeChat.
+
+The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosting is not on sale; invited acceptance users use the provided service and original key. Do not pay just to connect or reset AppSecret merely to follow the guide.
+
+
 ## Platforms and installation
 
 Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions. The development server binds to loopback by default; use a protected HTTPS reverse proxy for remote access. If upgrading a direct network listener, adjust access or explicitly set `host`.
@@ -69,12 +76,6 @@ retention; it does not replace checking the WeChat draft box.
 It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
 open. Access it over HTTPS or a trusted private network and keep the admin key
 private. See the [operator guide](operator-guide.md) for login and page-by-page instructions, and [operations and backups](operations.md) for server details.
-
-## Your first successful session
-
-1. Install from the source instructions and preview a non-sensitive Markdown article locally before configuring delivery.
-2. Configure your own server and account, whitelist its actual outbound IP, and keep AppSecret on that server. Use HTTPS or a private tunnel for access.
-3. Publish one test draft and confirm its result in the WeChat backend. A delivered draft is not a publicly published or mass-sent article.
 
 ## Data, backup and recovery
 

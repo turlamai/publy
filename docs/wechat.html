@@ -1,0 +1,239 @@
+<!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect WeChat · 连接公众号 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="connect-a-wechat-official-account-from-scratch">Connect a WeChat Official Account from scratch</h1>
+<p><strong>English</strong> · <a href="wechat.html?lang=zh">简体中文</a></p>
+<p>Goal: deliver content you explicitly approve to <strong>your own Official Account’s draft box</strong>. Publy does not mass-send or publish publicly. Check platform permissions before paying. Local preview and copying need neither payment nor WeChat credentials.</p>
+<h2 id="1--what-you-need-and-which-website-to-open">1 · What you need and which website to open</h2>
+<p>On your computer, open the official <a href="https://mp.weixin.qq.com/">WeChat Official Accounts Platform</a>, sign in as the account administrator or an authorized developer, and verify the selected account’s name. Do not look for this whitelist in WeChat Pay, a mobile-app console or Alipay.</p>
+<p>You need the account’s <strong>AppID</strong>, its matching <strong>AppSecret</strong>, and the Publy server’s <strong>egress IP</strong>. You also need your own <strong>Publy API Key</strong> to access Publy; it is a different credential from AppSecret.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Where to get it</th>
+<th>Where to enter it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Publy API Key</td>
+<td>Saved at signup, or issued by your self-hosted operator</td>
+<td>Publy connection page and Obsidian settings</td>
+</tr>
+<tr>
+<td>AppID / AppSecret</td>
+<td>Official WeChat developer settings for this account</td>
+<td>A Publy server you trust</td>
+</tr>
+<tr>
+<td>Server egress IP</td>
+<td>Your Publy service’s <code>/setup</code> page</td>
+<td>WeChat’s <strong>API IP whitelist</strong></td>
+</tr>
+</tbody>
+</table>
+<p>In WeChat’s official interface-permission list, first confirm that the selected account has the required <strong>draft and material-upload API permissions</strong>. Actual permissions depend on that account. Publy cannot bypass platform verification or permissions. A successful credential check alone does not prove draft permission. If unavailable, continue with free local preview/copy; do not pay for hosting to “unlock WeChat permissions”.</p>
+<h2 id="2--copy-the-right-server-ip">2 · Copy the right server IP</h2>
+<ol>
+<li>Open <strong>your Publy service address followed by <code>/setup</code></strong>. Invited official-pilot users use the <a href="https://publy-api.jrtx.site/setup">official connection page</a>. Self-hosted users use their own service, not the official service’s IP.</li>
+<li>Enter your saved <strong>Publy API Key</strong> and click “Check my account”. If you do not have a key, use the invited signup path or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.</li>
+<li>Under step 2, click “Copy server IP”. Copy only the IP, such as the documentation example <code>192.0.2.10</code> (not a usable production address).</li>
+<li>If the page says “IP unavailable”, ask the operator to verify actual egress. Do not substitute your computer IP, home broadband IP, a domain, <code>https://</code> or a port. Operators must identify all actual exits for a multi-egress deployment.</li>
+</ol>
+<h2 id="3--add-the-api-ip-whitelist-entry-in-wechat">3 · Add the API IP whitelist entry in WeChat</h2>
+<ol>
+<li>Return to the <a href="https://mp.weixin.qq.com/">Official Accounts Platform</a>, signed in to the <strong>correct account</strong>.</li>
+<li>Look for <strong>developer settings / developer interface management / basic configuration</strong> (开发设置 / 开发接口管理 / 基本配置). WeChat has different console versions. If the console says developer information has moved, follow its official <a href="https://developers.weixin.qq.com/platform/">WeChat developer platform</a> link, select this Official Account business, and look for <strong>API IP whitelist</strong> (API IP 白名单) in its basic information. Labels may vary; ask the account administrator about developer access if missing, rather than editing an unrelated whitelist.</li>
+<li>Select “Modify” or “Configure”, then <strong>add the server IP on a new line</strong>. Keep existing entries so other integrations continue to work. This is not “login security IP”, “business domain” or “JS interface security domain”.</li>
+<li>Complete WeChat’s administrator verification and save. Check that the added IP appears in the saved list, rather than merely in an unsaved field.</li>
+<li>Return to Publy and check the connection. For <code>40164</code> / “IP not whitelisted”, compare the <strong>actual egress IP reported by WeChat</strong> in Publy’s error with the saved list. If it differs from the connection-page IP, ask the operator to investigate changing egress; do not add guessed IPs repeatedly.</li>
+</ol>
+<p>Official consoles can change. These instructions distinguish feature names and old/new entry points. If labels differ, look for the API IP whitelist feature and ask the account administrator to confirm permissions.</p>
+<h2 id="4--check-and-connect">4 · Check and connect</h2>
+<ol>
+<li>Obtain AppID and AppSecret from official WeChat developer settings. Use the existing verified secret; <strong>do not reset it merely to follow this guide</strong>. If lost, the administrator must check other integrations before following WeChat’s reset process, which can interrupt them.</li>
+<li>At your Publy <code>/setup</code> step 3, enter a recognizable nickname, AppID and AppSecret. Verify the browser domain: these credentials are sent to <strong>this server</strong> for validation and storage. Never paste them into chat, issues or an unknown website.</li>
+<li>Click “Check and connect · no draft created”. “Connected: nickname” means that the service validated credentials and egress, and bound this account to your Publy user. <strong>It does not mean payment or draft API permission has been verified.</strong></li>
+<li>If the connection outcome is unknown or interrupted, click “Check my account” to inspect existing bindings before trying again. A connected nickname needs no second binding. AppSecret clears after success and is not written to browser storage.</li>
+</ol>
+<p>On a shared computer, click “Clear this tab”, then close it. Keep your Publy Key in a password manager. Clearing the page does not revoke copies saved elsewhere; contact the operator for revocation or rotation.</p>
+<h2 id="5--configure-obsidian-and-inspect-your-first-draft">5 · Configure Obsidian and inspect your first draft</h2>
+<ol>
+<li>Install the plugin from <a href="https://publy.jrtx.site/start.html">Start</a>. Enable Publy under Obsidian Settings → Community plugins, then open Settings → Publy. Community-directory listing remains unverified; use the GitHub Release attachment.</li>
+<li>For “Server address”, enter the service’s root URL (for example <code>https://publy-api.jrtx.site</code>), <strong>without <code>/setup</code>, <code>/hosted</code> or <code>/v1</code></strong>.</li>
+<li>Enter your <strong>Publy API Key</strong>, not AppSecret. Select the connected nickname and test the connection. This plugin test checks the Publy connection and account information; it does not prove WeChat draft permission.</li>
+<li>Preview a short, non-sensitive Markdown note locally. Check its title, images, formatting and destination. The development plugin selects article/image-and-caption/cards in an operation dialog; released 0.8.7 and development capabilities differ. Do not assume new documented features ship in 0.8.7.</li>
+<li>Only when you explicitly want a draft, confirm the account and content and submit. This sends content and media to your selected service and WeChat. Hosted work requires current access; repeated submission or creating a new account does not bypass this requirement.</li>
+<li>After success, open the <a href="https://mp.weixin.qq.com/">Official Accounts Platform</a>, verify the account, and inspect the title, images and time under “Content management → Drafts” (内容管理 → 草稿箱; older consoles may show 草稿箱 directly). <strong>Inspecting the draft completes this delivery check.</strong> Public publication remains your separate decision in WeChat.</li>
+</ol>
+<h2 id="6--how-to-recover">6 · How to recover</h2>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>Next action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Invalid API Key / account not verified</td>
+<td>Check your service URL and original key; do not enter AppSecret or buy another account</td>
+</tr>
+<tr>
+<td><code>40164</code> / whitelist required</td>
+<td>Repeat step 3 with the actual reported IP, correct Official Account and saved list</td>
+</tr>
+<tr>
+<td>Credential check failed</td>
+<td>Check matching AppID/AppSecret, possible administrator reset and connectivity; do not send the original secret to support</td>
+</tr>
+<tr>
+<td>Connection works but draft permission fails</td>
+<td>Check official draft/material API entitlements; local preview remains available</td>
+</tr>
+<tr>
+<td>Nickname already used</td>
+<td>Choose a different nickname without changing WeChat credentials</td>
+</tr>
+<tr>
+<td>Account limit reached</td>
+<td>Check existing bindings and contact the operator; do not bind repeatedly or buy again</td>
+</tr>
+<tr>
+<td>Unknown result / timeout / disconnection</td>
+<td>Keep the original request identity, query its result and inspect WeChat drafts before any resend</td>
+</tr>
+<tr>
+<td>Paid but not active</td>
+<td>Return to the same service’s <code>/hosted</code>, restore with the <strong>original Publy Key</strong>, and refresh access; do not pay twice</td>
+</tr>
+<tr>
+<td>Buyer and seller are the same</td>
+<td>A receiving Alipay account cannot pay itself. Leave the cashier; an authorized different real buyer must perform any payment test. A new Publy account will not fix this</td>
+</tr>
+<tr>
+<td>New computer</td>
+<td>Use the same server address and original Publy Key to recover the same binding and rights; do not bind or buy again</td>
+</tr>
+</tbody>
+</table>
+<p>For help, provide version, OS, error code and a redacted screenshot through <a href="https://github.com/turlamai/publy/issues">Issues</a>. Do not upload AppSecret, API keys, personal payment details or full logs. Handle paid-order information only through a private support channel verified with the operator.</p>
+<p><a href="user-guide.html?lang=en">Full user guide</a> · <a href="privacy.html?lang=en">Privacy</a> · <a href="terms.html?lang=en">Terms</a></p>
+</div><div data-lang="zh"><h1 id="从零连接微信公众号">从零连接微信公众号</h1>
+<p><a href="wechat.html?lang=en">English</a> · <strong>简体中文</strong></p>
+<p>目标：让 Publy 把你确认的内容送到<strong>自己公众号的草稿箱</strong>。不是群发，也不会自动公开发布。先确认公众号权限，再考虑托管购买；本地预览与复制无需付款、无需公众号密钥。</p>
+<h2 id="1--准备什么去哪个网站">1 · 准备什么，去哪个网站？</h2>
+<p>在电脑浏览器打开官方<a href="https://mp.weixin.qq.com/">微信公众号平台</a>，用该公众号管理员或有开发权限的账号登录，并核对当前公众号名称。不要在微信支付商户平台、微信开放平台的移动应用管理或支付宝后台寻找公众号白名单。</p>
+<p>需要三样东西：公众号 <strong>AppID</strong>、同一个公众号的 <strong>AppSecret</strong>、Publy 服务器的<strong>出口 IP</strong>。另外，你需要自己的 <strong>Publy API Key</strong> 来登录 Publy；它与 AppSecret 完全不同。</p>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>从哪里取得</th>
+<th>填在哪里</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Publy API Key</td>
+<td>开户时保存的 Key；自托管则由运营者创建</td>
+<td>Publy 连接页和 Obsidian 设置</td>
+</tr>
+<tr>
+<td>AppID / AppSecret</td>
+<td>微信官方公众号开发设置</td>
+<td>你信任的 Publy 服务器的连接页</td>
+</tr>
+<tr>
+<td>服务器出口 IP</td>
+<td>当前 Publy 服务的 <code>/setup</code>「服务器出口 IP」</td>
+<td>微信的 <strong>API IP 白名单</strong></td>
+</tr>
+</tbody>
+</table>
+<p>先在微信后台的接口权限列表确认你的公众号具有所需的<strong>草稿接口和素材上传接口</strong>。接口是否可用以该公众号官方后台实际显示为准；Publy 不能绕过认证或权限限制。只通过 AppID/AppSecret 校验，并不能证明草稿接口已获准使用。如果没有权限，可以继续免费本地预览/复制，暂不要购买托管来“解锁微信权限”。</p>
+<h2 id="2--复制正确的服务器-ip">2 · 复制正确的服务器 IP</h2>
+<ol>
+<li>打开<strong>你使用的 Publy 服务器地址后加 <code>/setup</code></strong>。例如，受邀使用官方内测的用户打开<a href="https://publy-api.jrtx.site/setup">官方连接页</a>；自托管用户打开自己的服务地址，不能照抄官方服务 IP。</li>
+<li>填入之前保存的 <strong>Publy API Key</strong>，点击「查看我的账户」。首次还没有 Key 时，由受邀开户入口或你的自托管运营者提供；不要把管理员 Key 填进普通用户设置。</li>
+<li>在第 2 步找到「服务器出口 IP」，点击「复制服务器 IP」。只复制纯 IP，例如示例 <code>192.0.2.10</code>（这是文档示例，不能实际使用）。</li>
+<li>若显示「IP 未确认」，停止这一步，请运营者确认服务真实出口；不要把电脑 IP、家庭宽带 IP、域名、<code>https://</code> 或端口填进去。服务器有多个实际出口时，应由运营者确认完整列表。</li>
+</ol>
+<h2 id="3--在微信添加-api-ip-白名单">3 · 在微信添加 API IP 白名单</h2>
+<ol>
+<li>回到<a href="https://mp.weixin.qq.com/">微信公众号平台</a>，保持登录在<strong>正确的公众号</strong>。</li>
+<li>在后台寻找<strong>开发设置 / 开发接口管理 / 基本配置</strong>。微信后台有新旧版本；若页面提示开发者信息已迁移，点击后台给出的官方<a href="https://developers.weixin.qq.com/platform/">微信开发者平台</a>链接，选中对应公众号业务，再寻找基础信息中的 <strong>API IP 白名单</strong>。不同账号的菜单可能不同；找不到就让该公众号管理员确认开发权限，不要在其他“白名单”里试填。</li>
+<li>在 <strong>API IP 白名单</strong> 点击「修改」或「配置」，将刚复制的服务器 IP <strong>另起一行加入</strong>。保留原有条目，避免让其他正在使用的工具失效。不要填到「登录安全 IP」「业务域名」或「JS 接口安全域名」。</li>
+<li>按微信页面要求，由管理员扫码或完成验证，再保存。回到列表确认新增的 IP 仍在，而不是只停留在编辑框中。</li>
+<li>返回 Publy 连接页，继续检查。若微信返回 <code>40164</code> /「IP 不在白名单」，将 Publy 错误信息中<strong>微信实际报告的出口 IP</strong>与白名单逐字核对，再保存后重试。若它与连接页 IP 不同，请联系运营者排查出口变化，不要不断重复添加猜测的 IP。</li>
+</ol>
+<p>微信官方页面可能调整，以上保留功能名称和新旧入口提示。若实际菜单不同，请按「API IP 白名单」这个功能名称查找，并让公众号管理员确认权限。</p>
+<h2 id="4--检查并连接公众号">4 · 检查并连接公众号</h2>
+<ol>
+<li>在微信官方开发设置取得 AppID 和 AppSecret。使用已有且确认正确的 AppSecret；<strong>不要为跟随教程重置密钥</strong>。若无法找回，请让管理员先核对其他工具的使用情况，再按微信官方流程处理；重置会影响其他接入。</li>
+<li>回到 Publy <code>/setup</code> 第 3 步，填写一个易辨认的昵称、AppID 和 AppSecret。仔细核对浏览器域名；凭据会发送到<strong>当前服务器</strong>用于校验和保存，不要粘贴到聊天、issue 或不明网站。</li>
+<li>点击「检查并连接 · 不创建草稿」。出现「已连接：昵称」后，代表本服务已校验凭据与出口 IP，并将该公众号绑定到此 Publy 账户；<strong>不表示已经付款，也不表示草稿接口权限已验证</strong>。</li>
+<li>如果连接结果未确认或网络中断，先点击「查看我的账户」核对是否已绑定，再决定是否重试。已有连接会显示昵称，不需要重复绑定。页面成功后会清空 AppSecret；它不会写入浏览器存储。</li>
+</ol>
+<p>共享电脑操作完，点击「清除此标签页凭据」，再关闭标签页。Publy Key 只用于此服务的账户访问，请保存在密码管理器中。清除页面凭据不会撤销已复制到其他地方的 Key；需要撤销或轮换时联系运营者。</p>
+<h2 id="5--配置-obsidian检查第一篇草稿">5 · 配置 Obsidian，检查第一篇草稿</h2>
+<ol>
+<li>按<a href="https://publy.jrtx.site/start.html?lang=zh">开始使用</a>安装插件。在 Obsidian「设置 → 第三方插件」启用 Publy，再打开「设置 → Publy」。社区目录上架仍待验证，目前用 GitHub Release 附件安装。</li>
+<li>「服务器地址」填写刚使用的 Publy 服务根地址（例如 <code>https://publy-api.jrtx.site</code>），<strong>不要带 <code>/setup</code>、<code>/hosted</code> 或 <code>/v1</code></strong>。</li>
+<li>「API Key」填写自己的 <strong>Publy API Key</strong>，不是微信 AppSecret；选择刚连接的公众号昵称，再点「测试连接」。插件的连接测试检查 Publy 连接和账户信息，不能代替微信草稿权限检查。</li>
+<li>先选一篇无敏感信息的短 Markdown 笔记，本地预览，核对标题、图片、排版和目标公众号。新开发版通过本次操作窗口选择文章/图片配文/卡片；已发布 0.8.7 与开发版能力不完全一致，不要把文档中的新功能当作该版本已交付。</li>
+<li>只有当你明确希望创建草稿时，确认目标公众号和内容，再执行投递。这会把内容及媒体发送到所选服务和微信。托管需要当前有效权益，未开通时不要通过重复提交或新建账户绕过。</li>
+<li>显示成功后，重新打开<a href="https://mp.weixin.qq.com/">微信公众号平台</a>，确认公众号名称，在「内容管理 → 草稿箱」（旧版可能直接显示「草稿箱」）核对这篇标题、图片和时间。<strong>看见草稿才完成这次内容投递检查</strong>；是否公开发布由你在微信中另行决定。</li>
+</ol>
+<h2 id="6--出错时怎么继续">6 · 出错时怎么继续？</h2>
+<table>
+<thead>
+<tr>
+<th>看到什么</th>
+<th>下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API Key 无效 / 无法确认账户</td>
+<td>核对服务器地址和原 Key；不要填 AppSecret，不要另买一个账户</td>
+</tr>
+<tr>
+<td><code>40164</code> / 需要白名单</td>
+<td>回到第 3 步，核对微信报告的实际 IP、所选公众号和保存结果</td>
+</tr>
+<tr>
+<td>凭据校验失败</td>
+<td>核对同一公众号的 AppID/AppSecret、是否已被管理员重置及网络状态；不要把原密钥发给客服</td>
+</tr>
+<tr>
+<td>连接成功但草稿提示无权限</td>
+<td>在微信官方后台核对该账号的草稿/素材接口权限；本地预览仍可用</td>
+</tr>
+<tr>
+<td>昵称已占用</td>
+<td>换一个昵称，不改公众号密钥</td>
+</tr>
+<tr>
+<td>已达到账号数量上限</td>
+<td>查看已连接列表，联系运营者处理；不要反复绑定或额外购买</td>
+</tr>
+<tr>
+<td>结果未知、超时、连接断开</td>
+<td>保留原请求身份，先用「查询结果」并核对微信草稿箱；不要自动重发</td>
+</tr>
+<tr>
+<td>支付后尚未开通</td>
+<td>回到同一服务器 <code>/hosted</code>，用<strong>原 Publy Key</strong>恢复账户并刷新权益；不要重复付款</td>
+</tr>
+<tr>
+<td>支付提示买卖家账号相同</td>
+<td>收款账号不能给自己付款。退出收银台；需要由获授权的另一真实买家自行验证，不能靠另建 Publy 账户解决</td>
+</tr>
+<tr>
+<td>更换电脑</td>
+<td>使用同一服务地址和原 Publy Key，恢复原有公众号与权益；无需重新绑定或重新购买</td>
+</tr>
+</tbody>
+</table>
+<p>仍无法解决时，在<a href="https://github.com/turlamai/publy/issues">问题反馈</a>提供版本、系统、错误代码和已脱敏截图。不要上传 AppSecret、API Key、二维码付款凭证中的个人资料或完整日志。涉及已付款订单时，通过运营者确认的私密支持渠道处理，不在公开 issue 发支付身份信息。</p>
+<p><a href="user-guide.html?lang=zh">完整使用指南</a> · <a href="privacy.html?lang=zh">隐私</a> · <a href="terms.html?lang=zh">服务条款</a></p>
+</div></article><footer class="pw-step"><a href="wechat.html">WeChat setup · 公众号连接</a> · <a href="user-guide.html">User guide · 使用指南</a> · <a href="privacy.html">Privacy · 隐私</a> · <a href="terms.html">Terms · 条款</a></footer></main></body></html>

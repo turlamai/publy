@@ -1,0 +1,124 @@
+<!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>User guide · 使用指南 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="publy-user-guide">Publy user guide</h1>
+<p><strong>English</strong> · <a href="user-guide.html?lang=zh">简体中文</a></p>
+<p>Turn Markdown into WeChat article drafts and image-post cards, with local preview and a self-hosted delivery server.</p>
+<h2 id="availability">Availability</h2>
+<p>CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.</p>
+<p>The development plugin embeds its rendering assets in <code>main.js</code>. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open (<a href="https://github.com/turlamai/publy/issues/12">#12</a>, <a href="https://github.com/turlamai/publy/issues/15">#15</a>).</p>
+<h2 id="first-use-without-server-knowledge">First use without server knowledge</h2>
+<p>Follow the <a href="wechat.html?lang=en">step-by-step WeChat connection guide</a>: check official API permissions → open your service’s <code>/setup</code> → copy its egress IP → add the <strong>API IP whitelist</strong> in the official WeChat console → check and connect → configure Obsidian with the service root URL and Publy Key → explicitly approve one test draft and inspect it in WeChat.</p>
+<p>The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosting is not on sale; invited acceptance users use the provided service and original key. Do not pay just to connect or reset AppSecret merely to follow the guide.</p>
+<h2 id="platforms-and-installation">Platforms and installation</h2>
+<p>Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions. The development server binds to loopback by default; use a protected HTTPS reverse proxy for remote access. If upgrading a direct network listener, adjust access or explicitly set <code>host</code>.</p>
+<p>Source builds require Node.js 22+, pnpm and Git; follow the <a href="https://github.com/turlamai/publy/blob/main/docs/guide.md">developer installation and setup</a>. Release assets do not constitute a deployed service.</p>
+<h2 id="obsidian-or-the-official-agent-skill">Obsidian or the official agent skill</h2>
+<p>Obsidian is the recommended editor and plugin experience. CLI and the official skill accept the original Markdown file independently of the editor. Use <code>check</code> and <code>preview</code> locally before confirming any draft delivery; neither submits a draft. Standard nested relative images and Obsidian embeds are supported. Original notes and their properties are preserved. The CLI is still a developer source build, not a qualified no-setup installer.</p>
+<h3 id="choose-the-operation">Choose the operation</h3>
+<p>Select article, images with a caption, or text cards in the plugin's draft options dialog. The CLI uses <code>--format article|image|cards</code>; <code>publish</code> requires it plus <code>--account</code>. Skills ask when intent is unclear. Pass the same <code>--title</code>, <code>--cover</code>, <code>--theme</code>, <code>--author</code>, <code>--digest</code>, <code>--caption</code> or <code>--caption-file</code> to check, preview and publish. Do not combine both caption options. Local preview defaults to article if no choice is supplied.</p>
+<p>Note frontmatter is skipped, not read as publication settings. No source is rewritten. Titles fall back to the first body H1 then filename. Image captions can come from remaining body text; card captions can precede the first section. Cancelling the plugin dialog does not submit anything. Preview and delivery share the selected options.</p>
+<p><a href="https://github.com/turlamai/publy/blob/main/docs/editor-workflows.md">Current workflow and acceptance boundaries</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/editor-workflows.zh-CN.md">简体中文</a></p>
+<p>Copy rendered rich text stops without changing the clipboard if media or formulas are missing or remain as local attachments. Use draft delivery for content with attachments.</p>
+<h2 id="use-a-standalone-article-theme-cli-development-build">Use a standalone article theme (CLI development build)</h2>
+<p>Built-in themes work offline. To use a content-only theme bundle from someone you trust, run <code>publy theme add ./theme.json</code>, then <code>publy theme preview THEME_ID</code> and use <code>--theme THEME_ID</code> when rendering. <code>publy theme ls</code> lists installed article themes. To replace one, run <code>publy theme update ./new-theme.json</code>; to remove it, run <code>publy theme remove THEME_ID</code>. Keep the earlier bundle if you may want to roll back: remove the installed version and add the earlier file. Obsidian running as the same system user can select validated installed article themes: reopen the plugin settings or preview panel after installation. The CLI manages the shared local bundle; the plugin does not download themes itself.</p>
+<p>For an HTTPS bundle, obtain its complete-file SHA-256 independently from a trusted source and run <code>publy theme add https://example.com/theme.json --sha256 HASH</code>. A matching hash checks the downloaded bytes against that value; it does not establish who created them. Redirects are refused. These are content-only JSON files, not executable packages; they are limited to scoped <code>#publy</code> article styles and a conservative subset of CSS. Remote assets, CSS imports, scripts, and CSS escapes are rejected. This is not a signed gallery or an automatic updater.</p>
+<p>To create a bundle from your own CSS, save a file containing styles such as <code>#publy p { color: #123456; }</code>, then run:</p>
+<pre><code class="language-sh">publy theme pack my.css --id my-style --theme-version 1.0.0 --name &quot;My style&quot; --license MIT --output my-style.json
+</code></pre>
+<p>The command validates the content, refuses to overwrite an existing output and prints the bundle's SHA-256. Include a suitable licence for styles you share. The original CSS and Markdown files are not modified. Themes are stored in <code>~/.publy/themes</code>; back up any bundles you want to keep.</p>
+<p>To migrate an older local theme, keep a backup of its CSS and licence, then use <code>theme pack</code> on a copy. Adapt unsupported selectors or declarations explicitly; Publy rejects them rather than silently weakening validation. A CSS file you personally trust can still be used for a one-off render with <code>--custom-theme /path/to/theme.css</code>; that older path reads CSS as trusted input and is not the bundle safety boundary. Do not run an old package's install scripts. The bundle flow does not import npm packages automatically.</p>
+<p>Signed bundles are optional. <code>theme pack --sign-key &lt;pem&gt;</code> with an Ed25519 private key emits a <code>publy-theme-v2</code> bundle that carries the matching public key and a detached signature over its metadata and CSS hash. <code>theme add/update --trusted-key &lt;base64&gt;</code> installs only a bundle signed by exactly that key. Pin a key only when you obtained it from the author through a trusted channel: a signature proves possession of that key, not identity, and an unpinned signature is informational. The private key stays in your local process and is never uploaded.</p>
+<h2 id="where-are-my-notes-and-drafts">Where are my notes and drafts?</h2>
+<p>Publy does not create a notebook or provide a dashboard for browsing and
+editing notes. Continue to find, edit, organize and back up your original
+Markdown and images in Obsidian or your file manager. Publy reads the
+file you choose for checking and formatting; it does not migrate your notes.</p>
+<p>After delivery, sign in to the <strong>WeChat Official Account platform</strong> and open
+the selected account's draft box to review, edit and manage the draft. Publy
+does not publish it publicly. If the outcome is unknown, check that draft box
+before deciding whether to submit again: a missing server record does not prove
+that WeChat did not receive the draft.</p>
+<p>A self-hosted server also has an operator page at <code>/admin</code> for service users,
+WeChat accounts, scheduled draft tasks, historical orders and events. The
+<strong>Draft tasks</strong> view shows pending, confirmed and unknown outcomes, plus
+recent delivery events. The event list is limited and may be affected by log
+retention; it does not replace checking the WeChat draft box.
+It is not a note manager. This page is still a development-stage tool; public hosting and checkout are not
+open. Access it over HTTPS or a trusted private network and keep the admin key
+private. See the <a href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.md">operator guide</a> for login and page-by-page instructions, and <a href="https://github.com/turlamai/publy/blob/main/docs/operations.md">operations and backups</a> for server details.</p>
+<h2 id="data-backup-and-recovery">Data, backup and recovery</h2>
+<p>Publy removes generated formula, SVG and card intermediates after they are consumed by the CLI or plugin. A preview HTML file deliberately created for you to open is an output and can contain your content; delete it when finished. Keep source Markdown and media locally. Back up server configuration, databases, job history and encryption material together using restricted, encrypted storage. Before restoration, stop all writers and isolate the server. A job pending in an older backup may already have been delivered; follow the <a href="https://github.com/turlamai/publy/blob/main/docs/operations.md#backup-and-restore-developer-self-hosted-deployments">restore procedure</a> to quarantine jobs and reconcile draft and account changes since the snapshot.</p>
+<p>When a delivery loses its connection, the outcome is &quot;unknown&quot;, not &quot;failed&quot;: query the original request identity (<code>publy publish-result &lt;key&gt;</code>, or the plugin query action), then check the WeChat draft box. The server records a success only after receiving a confirmation; submitting again can create a duplicate even with the same request identity. Check the draft box before taking any action on an interrupted scheduled job too.</p>
+<h2 id="network-keys-and-privacy">Network, keys and privacy</h2>
+<p>Rendering can run locally. Delivery sends content/media and account credentials or derived tokens through your chosen server to official WeChat APIs. Server logs, retry history and storage must be reviewed; “nothing is stored” is not a valid blanket promise. Never share API keys in URLs or screenshots.</p>
+<h2 id="known-limits">Known limits</h2>
+<p>Public hosted registration, payment, tenant isolation, retention/deletion and reliable job recovery are not yet qualified (#7, #8). Do not send AppSecret to an unannounced hosted endpoint or an issue.</p>
+<h2 id="upgrading-and-stopping-use">Upgrading and stopping use</h2>
+<p>Back up configuration/data and identify the source and dependency versions. Validate in isolation before replacing the version in use. Stop the process before removing local data; content and credentials at external services must be managed or revoked there separately.</p>
+<h2 id="get-help">Get help</h2>
+<p>Report problems in <a href="https://github.com/turlamai/publy/issues">GitHub Issues</a>, in English or Chinese. Include the version, OS/architecture, installation channel, steps, expected result and actual result. Reproduce with synthetic input first; do not attach keys, credentials, databases, private source documents or complete logs. Public support has no guaranteed response time.</p>
+<h2 id="further-reading">Further reading</h2>
+<ul>
+<li><a href="https://github.com/turlamai/publy/blob/main/docs/guide.md">CLI and self-hosting manual</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/docs/operations.md">Operations</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/README.md">Project overview and development</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/LICENSE">Current licence</a></li>
+</ul>
+</div><div data-lang="zh"><h1 id="publy-使用指南">Publy 使用指南</h1>
+<p><a href="user-guide.html?lang=en">English</a> · <strong>简体中文</strong></p>
+<p>将 Markdown 转为微信公众号文章草稿与图片卡片，提供本地预览和自托管投递服务。</p>
+<h2 id="当前可用状态">当前可用状态</h2>
+<p>CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。</p>
+<p>开发版插件已将渲染资源嵌入 <code>main.js</code>。离线三文件安装仍在测试；真实干净笔记库的安装与更新验收尚未完成（<a href="https://github.com/turlamai/publy/issues/12">#12</a>、<a href="https://github.com/turlamai/publy/issues/15">#15</a>）。</p>
+<h2 id="第一次使用不用懂服务器">第一次使用：不用懂服务器</h2>
+<p>先按<a href="wechat.html?lang=zh">公众号连接手把手教程</a>完成：核对微信接口权限 → 打开自己服务的 <code>/setup</code> → 复制真实出口 IP → 在微信官方后台添加 <strong>API IP 白名单</strong> → 检查并连接 → 在 Obsidian 填服务根地址与 Publy Key → 明确确认后投递一篇测试草稿并到微信草稿箱检查。</p>
+<p>教程包含官方入口、每个凭据从哪里取得、该点哪里、成功的判断标准，以及白名单、换电脑、未知结果和支付未开通的恢复方法。公开托管尚未开卖；受邀验收用户使用已提供的服务与原 Key。不要为连接公众号提前付款，也不要重置 AppSecret 来跟随教程。</p>
+<h2 id="平台与安装">平台与安装</h2>
+<p>目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。开发版服务默认只监听本机；需要远程访问时请配置经过保护的 HTTPS 反向代理。旧版若直接对外监听，升级时需调整访问方式或明确设置 <code>host</code>。</p>
+<p>源码构建需要 Node.js 22+、pnpm 和 Git；步骤见<a href="https://github.com/turlamai/publy/blob/main/docs/guide.zh-CN.md#%E5%87%86%E5%A4%87%E5%B7%A5%E4%BD%9C">开发版安装与配置</a>。发布附件不等于完整部署服务。</p>
+<h2 id="使用任意-markdown-编辑器或-agent">使用任意 Markdown 编辑器或 Agent</h2>
+<p>Obsidian 是唯一推荐编辑器与插件体验；CLI 与官方 Skill 独立接收 Markdown 文件，不依赖编辑器。本地检查与预览不联网、不创建草稿。支持源文件相对图片路径与 Obsidian 嵌入，不迁移笔记库。CLI 当前仍为开发者源码构建，普通用户一键安装包尚未验收。</p>
+<h3 id="本次操作选择">本次操作选择</h3>
+<p>插件的投递窗口选择文章、图片配文或文字卡片，核对笔记和公众号后明确确认；取消不会投递。CLI 用 <code>--format article|image|cards</code>，<code>publish</code> 必须同时指定类型与 <code>--account</code>。Skill 在意图不清楚时询问。检查、预览与投递传递相同的 <code>--title</code>、<code>--cover</code>、<code>--theme</code>、<code>--author</code>、<code>--digest</code>、<code>--caption</code> 或 <code>--caption-file</code>；两种配文参数不能同时使用。本地预览未选择时默认文章。</p>
+<p>笔记 frontmatter 直接跳过，不再参与发布配置，也不改写原文。标题回退至正文一级标题、文件名；图片配文可取正文文字，卡片配文可写在首个分节之前。原有 Obsidian 属性继续保留。</p>
+<p><a href="https://github.com/turlamai/publy/blob/main/docs/editor-workflows.zh-CN.md">当前工作流与验收边界</a> · <a href="https://github.com/turlamai/publy/blob/main/docs/editor-workflows.md">English</a></p>
+<p>复制排版内容遇到缺失、渲染失败或仍需本地附件的图片与公式时，会保留原剪贴板；含附件内容使用草稿投递流程。</p>
+<h2 id="使用独立文章主题cli-开发版">使用独立文章主题（CLI 开发版）</h2>
+<p>内置主题可以离线使用。要使用来自可信来源的纯内容主题包，运行 <code>publy theme add ./theme.json</code>，再用 <code>publy theme preview 主题ID</code> 预览，并在渲染时指定 <code>--theme 主题ID</code>。<code>publy theme ls</code> 会列出已安装的文章主题；替换时运行 <code>publy theme update ./new-theme.json</code>，删除时运行 <code>publy theme remove 主题ID</code>。如需回退，请保留旧主题包，先移除当前版本再添加旧文件。同一系统用户运行的 Obsidian 可以选择通过校验的已安装文章主题：安装后重新打开插件设置或预览面板即可。CLI 管理本机共享主题包，插件本身不会下载主题。</p>
+<p>通过 HTTPS 获取主题包时，先从可信渠道单独核实完整文件的 SHA-256，再运行 <code>publy theme add https://example.com/theme.json --sha256 校验值</code>。摘要只能核对下载内容与该值是否一致，不能证明作者身份；下载不跟随重定向。主题包是纯内容 JSON，不是可执行软件包，只接受限定在 <code>#publy</code> 下的一小部分文章 CSS；远程资源、CSS 导入、脚本与 CSS 转义会被拒绝。目前没有签名主题广场或自动更新功能。</p>
+<p>要将自己的 CSS 制作为主题包，可先保存类似 <code>#publy p { color: #123456; }</code> 的样式文件，再运行：</p>
+<pre><code class="language-sh">publy theme pack my.css --id my-style --theme-version 1.0.0 --name &quot;我的主题&quot; --license MIT --output my-style.json
+</code></pre>
+<p>命令会校验内容、拒绝覆盖已有输出，并打印主题包的 SHA-256。分享主题时请附上合适的许可证；原 CSS 和 Markdown 文件不会被修改。主题保存在 <code>~/.publy/themes</code>，请自行备份需要保留的主题包。</p>
+<p>迁移旧的本地主题时，请先备份它的 CSS 和许可证，再对副本运行 <code>theme pack</code>。不受支持的选择器或声明需要你明确调整；Publy 会拒绝，而不会悄悄降低校验要求。你本人信任的 CSS 文件仍可通过 <code>--custom-theme /path/to/theme.css</code> 临时用于一次渲染；这是旧的可信输入路径，不具备主题包的安全边界。不要运行旧包的安装脚本；主题包流程不会自动导入 npm 包。</p>
+<p>签名主题包是可选项。用 Ed25519 私钥运行 <code>theme pack --sign-key &lt;pem&gt;</code> 会生成 <code>publy-theme-v2</code> 包，其中携带对应公钥，以及对元数据和 CSS 哈希的分离签名。<code>theme add/update --trusted-key &lt;base64&gt;</code> 只安装由该公钥签名的包。只有在通过可信渠道从作者处拿到公钥时才应固定它：签名证明持有该密钥，不证明身份；未固定公钥时签名仅作参考。私钥只在本地进程中读取，不会上传。</p>
+<h2 id="我的笔记和草稿在哪里">我的笔记和草稿在哪里？</h2>
+<p>Publy 不建立笔记库，也没有用来浏览或编辑笔记的后台。你仍然在
+Obsidian 或文件管理器中查找、编辑、整理和备份原始 Markdown
+及图片；Publy 读取你选择的文件进行检查和排版，不会替你迁移笔记。</p>
+<p>草稿投递成功后，请登录<strong>微信公众号平台</strong>，在对应公众号的草稿箱中
+查看、编辑和管理草稿。Publy 不会替你公开发布。若结果显示未知，先在
+微信草稿箱核对，再决定是否重新提交：没有查到服务端记录，并不能证明
+微信没有收到草稿。</p>
+<p>自托管服务另有供运营者使用的 <code>/admin</code> 管理页面，它管理的是服务用户、
+公众号账号、排程草稿任务、历史订单和事件，不是笔记管理器。「草稿任务」
+可以查看等待、已确认与结果未知的状态，以及最近的投递记录；记录数量
+有限且受日志保留影响，不能代替检查微信草稿箱。这个页面目前仍是开发期工具，公开托管和收款尚未开放；请通过 HTTPS 或可信的私有网络访问，
+不要把管理员密钥分享给其他人。<a href="https://github.com/turlamai/publy/blob/main/docs/operator-guide.zh-CN.md">运营者指南</a>介绍后台登录和各页面操作，<a href="https://github.com/turlamai/publy/blob/main/docs/operations.md">服务端操作与备份</a>提供更多运维细节。</p>
+<h2 id="数据备份与恢复">数据、备份与恢复</h2>
+<p>CLI 和插件在读取完公式、SVG 与卡片渲染中间文件后会清理这些文件，不会删除原始图片。供你打开的预览 HTML 是输出文件，可能包含文章内容，请在用完后删除。本地保留 Markdown 与媒体原件。服务配置、数据库、任务历史与加密材料应一起备份到受限、加密存储中；恢复前先停止所有服务并隔离网络；旧备份中的等待任务可能已经投递过，须按<a href="https://github.com/turlamai/publy/blob/main/docs/operations.md#backup-and-restore-developer-self-hosted-deployments">恢复步骤</a>隔离并核对备份之后的草稿和账号变更。</p>
+<p>投递连接中断时，结果是「未知」而不是「失败」：先按原请求身份查询（<code>publy publish-result &lt;key&gt;</code>，或插件里的「查询结果」），再检查公众号草稿箱。服务端只有收到成功回执才会记录结果；即使请求身份相同，重新提交仍可能创建重复草稿。定时任务中断后也应先核对草稿，不要盲目重试。</p>
+<h2 id="联网密钥与隐私">联网、密钥与隐私</h2>
+<p>渲染可在本地完成。投递会经你选择的服务器把内容、媒体及账号凭据或派生令牌用于微信官方 API。应检查服务日志、重试历史和存储；不能笼统承诺“正文与密钥绝不落盘”。不要在 URL 或截图中分享 API key。</p>
+<h2 id="已知限制">已知限制</h2>
+<p>公开托管注册、支付、租户隔离、留存删除与可靠任务恢复尚未通过验收（#7、#8）。不要将 AppSecret 发往未公告的托管端点或 issue。</p>
+<h2 id="升级与停止使用">升级与停止使用</h2>
+<p>升级前备份配置与数据，核对源码版本和依赖。先在隔离环境验证，再替换正在使用的版本。停止服务或程序后再清理本机数据；外部平台上的内容与凭据需在相应平台单独管理或撤销。</p>
+<h2 id="获得帮助">获得帮助</h2>
+<p>在 <a href="https://github.com/turlamai/publy/issues">GitHub Issues</a> 反馈，中文或英文均可。提供版本、系统与架构、安装渠道、复现步骤、预期和实际结果。先用合成样本复现；不要附上密钥、授权文件、数据库、原始私密文档或完整日志。公开支持不承诺响应时限。</p>
+<h2 id="深入阅读">深入阅读</h2>
+<ul>
+<li><a href="https://github.com/turlamai/publy/blob/main/docs/guide.zh-CN.md">CLI 与自托管手册</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/docs/operations.md">运维</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/README.zh-CN.md">项目说明与开发入口</a></li>
+<li><a href="https://github.com/turlamai/publy/blob/main/LICENSE">现行许可证</a></li>
+</ul>
+</div></article><footer class="pw-step"><a href="wechat.html">WeChat setup · 公众号连接</a> · <a href="user-guide.html">User guide · 使用指南</a> · <a href="privacy.html">Privacy · 隐私</a> · <a href="terms.html">Terms · 条款</a></footer></main></body></html>

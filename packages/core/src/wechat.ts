@@ -224,15 +224,15 @@ export async function checkWechatCredential(appId: string, appSecret: string): P
       errcode,
       ip,
       message: ip
-        ? `IP 未加白名单：请在公众号后台「设置与开发 → 基本配置 → IP白名单」中添加 ${ip}，保存后重试`
+        ? `IP 未加白名单：请在公众号官方开发设置的「API IP 白名单」（入口与步骤：https://publy.jrtx.site/wechat.html?lang=zh）中添加 ${ip}，保存后重试`
         : `IP 未加白名单：${errmsg}`,
     };
   }
   if (errcode === 40125 || errcode === 40001) {
-    return { ok: false, errcode, message: "AppSecret 无效：请确认已复制最新重置后的 secret（注意前后无空格）" };
+    return { ok: false, errcode, message: "AppSecret 无效：请核对同一公众号现有的 AppID / AppSecret 和前后空格；不要为排错盲目重置密钥" };
   }
   if (errcode === 40013) {
-    return { ok: false, errcode, message: "AppID 无效：请核对公众号后台「设置与开发 → 基本配置」中的 AppID" };
+    return { ok: false, errcode, message: "AppID 无效：请核对公众号官方开发设置中当前所选账号的 AppID" };
   }
   return { ok: false, errcode, message: `微信返回 ${errcode}: ${errmsg}` };
 }

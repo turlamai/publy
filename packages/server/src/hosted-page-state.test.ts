@@ -1,0 +1,46 @@
+// A stale response must never leave another customer's checkout visible.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { hostedPurchasePage } from './pages.js';
+
+function browserFixture(fetcher: (url:string, init:any)=>Promise<any>) {
+  const elements=new Map<string,any>();
+  const element=(id:string):any=>{
+    if(!elements.has(id))elements.set(id,{id,value:'',textContent:'',className:'',hidden:true,disabled:false,handlers:{},
+      addEventListener(name:string,fn:any){this.handlers[name]=fn;},
+      removeAttribute(name:string){delete this[name];},remove(){elements.delete(id);},appendChild(child:any){elements.set(child.id,child);}});
+    return elements.get(id);
+  };
+  const document={getElementById:(id:string)=>id==='purchase-link'?(elements.get(id)||null):element(id),createElement:()=>({}),visibilityState:'visible'};
+  const saved=new Map([['publy_hosted_api_key','fixture-old']]);
+  const context=vm.createContext({document,fetch:fetcher,sessionStorage:{getItem:(k:string)=>saved.get(k),setItem:(k:string,v:string)=>saved.set(k,v)},setTimeout:()=>1,clearTimeout:()=>{},navigator:{clipboard:{writeText:async()=>{}}}});
+  const script=hostedPurchasePage(true,undefined,true).match(/<script>([\s\S]*?)<\/script>/)![1];
+  vm.runInContext(script,context);
+  return {element,saved,submit:()=>element('buy').handlers.submit({preventDefault(){}})};
+}
+const response=(value:unknown)=>({ok:true,json:async()=>value});
+
+test('changing the key during an access check hides stale checkout and prevents cross-account rendering', async()=>{
+  let resolveStatus!:(value:any)=>void,started!:()=>void;
+  const waiting=new Promise<void>(r=>{started=r});
+  const ui=browserFixture(async(url)=>url==='/v1/hosted/session'?response({}):new Promise(r=>{resolveStatus=r;started();}));
+  const pending=ui.submit();await waiting;
+  const input=ui.element('existingKey');input.value='fixture-other';input.handlers.input.call(input);
+  resolveStatus(response({status:'purchase_required',purchaseUrl:'https://example.test/stale-checkout'}));await pending;
+  assert.equal(ui.element('direct-result').hidden,true);
+  assert.equal(ui.element('direct-qr').src,undefined);
+  assert.doesNotMatch(ui.element('msg').textContent,/请在支付宝确认/);
+  assert.equal(ui.saved.get('publy_hosted_api_key'),'fixture-old');
+});
+
+test('clearing a saved key uses explicit signup rather than silently reusing the hidden previous key', async()=>{
+  const requests:Array<{url:string,key?:string}>=[];
+  const ui=browserFixture(async(url,init)=>{requests.push({url,key:init.headers['x-api-key']});return response(url==='/v1/signup'?{apiKey:'fixture-new'}:url==='/v1/hosted/status'?{status:'purchase_required'}:{});});
+  const input=ui.element('existingKey');input.value='';input.handlers.input.call(input);ui.element('contact').value='new@example.test';
+  assert.equal(ui.element('copy-key').disabled,true);
+  await ui.submit();
+  assert.equal(requests[0].url,'/v1/signup');assert.equal(requests[0].key,undefined);
+  assert.deepEqual(requests.slice(1).map(r=>r.key),['fixture-new','fixture-new']);
+  assert.equal(ui.saved.get('publy_hosted_api_key'),'fixture-new');
+});

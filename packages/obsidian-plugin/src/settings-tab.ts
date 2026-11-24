@@ -50,7 +50,7 @@ export class PublySettingTab extends PluginSettingTab {
       a.href = url;
       a.target = "_blank";
     };
-    mkLink(t("guideLink"), "https://publy.jrtx.site");
+    mkLink(t("guideLink"), "https://publy.jrtx.site/wechat.html");
     links.style.marginTop = "4px";
 
     new Setting(containerEl).setName(t("setServer")).setDesc(t("setServerDesc")).addText((text) =>

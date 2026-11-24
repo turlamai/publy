@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="publy-web">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publy HTTP API · API 指南</title>
 <meta name="description" content="Publy Protocol v1: authenticated draft creation, result reconciliation, jobs and quota.">
-<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
 </head>
 <body>
 <header><nav class="wrap nav" aria-label="Main">
@@ -18,7 +18,7 @@
       <a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a>
       <a href="https://github.com/turlamai/publy">GitHub</a>
     </div>
-    <div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
+    <button class="secondary" type="button" data-theme-switch aria-pressed="false">亮 / 暗</button><div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
   </div>
 </nav></header>
 
@@ -124,18 +124,8 @@ content-type: application/json
 
 <footer><div class="wrap inner">
   <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Draft delivery, not public posting.</span><span data-lang="zh">只投递草稿，不做公开发布。</span></div></div>
-  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Protocol</span><span data-lang="zh">协议</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
+  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Protocol</span><span data-lang="zh">协议</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
 </div></footer>
-<script>
-  const root = document.documentElement;
-  const params = new URLSearchParams(location.search);
-  if (params.get('lang') === 'zh') { root.lang = 'zh-CN'; document.querySelectorAll('[data-switch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.switch === 'zh'))); }
-  document.querySelectorAll('[data-switch]').forEach(button => button.addEventListener('click', () => {
-    const zh = button.dataset.switch === 'zh';
-    root.lang = zh ? 'zh-CN' : 'en';
-    document.querySelectorAll('[data-switch]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-    history.replaceState(null, '', zh ? '?lang=zh' : location.pathname);
-  }));
-</script>
+<script src="site.js"></script>
 </body>
 </html>

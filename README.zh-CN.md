@@ -17,6 +17,8 @@
 
 **使用任意 Markdown 文件：** [跨编辑器使用与商业级验收](docs/editor-workflows.zh-CN.md) · [English](docs/editor-workflows.md)。Obsidian 是可选入口，Publy 不依赖特定编辑器；还需真实干净电脑验收。
 
+[公众号连接与 IP 白名单手把手教程](docs/wechat-setup.zh-CN.md)
+
 ## 开始使用
 
 CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公开托管订阅尚未开放，不销售无限量套餐。
@@ -26,7 +28,7 @@ CLI、默认主题、Obsidian 和自托管按现行许可证保持免费。公�
 | [Obsidian 插件](https://publy.jrtx.site/start.html?lang=zh) | 约 5 分钟 | Obsidian 桌面版 1.5+；仅草稿投递时需要服务器 |
 | [CLI + 官方 Skill](https://publy.jrtx.site/start.html?lang=zh) | 约 10 分钟 | Node 22+ 与 pnpm（源码构建，暂无签名安装包） |
 | [自托管服务器](https://publy.jrtx.site/start.html?lang=zh) | 约 20 分钟 | Linux、Node 22/24、一个公众号 |
-| [托管服务](https://publy.jrtx.site/hosted.html?lang=zh) | — | 私有内测；暂不出售，没有结账入口 |
+| [托管服务](https://publy.jrtx.site/hosted.html?lang=zh) | — | 私有内测；暂不公开销售，受邀验收使用受控入口 |
 
 [API 指南](https://publy.jrtx.site/api.html?lang=zh)覆盖鉴权、创建草稿、未知结果对账与排程任务。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。
 
