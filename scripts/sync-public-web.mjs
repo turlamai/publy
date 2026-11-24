@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n');
 const css=read('design/prototype/public-web.css');
 const js=read('design/prototype/public-web.js');
 const template=read('design/prototype/setup.html').replace('<link rel="stylesheet" href="public-web.css">','<style>__WEB_CSS__</style>').replace('<script src="public-web.js"></script>','<script>__WEB_JS__</script>').replace(/<script>\n\/\/ Prototype only:[\s\S]*?<\/script>/,'<script>__SETUP_JS__</script>');
