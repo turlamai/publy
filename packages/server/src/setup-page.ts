@@ -10,7 +10,7 @@ const SETUP_JS = String.raw`
   var $=function(id){return document.getElementById(id)}, generation=0, key='', accounts=[];
   function t(zh,en){return document.documentElement.lang==='zh-CN'?zh:en}
   function say(id,zh,en,bad){$(id).textContent=t(zh,en);$(id).className='pw-feedback'+(bad?' error':'')}
-  function forget(){generation++;key='';accounts=[];try{sessionStorage.removeItem('publy_hosted_api_key')}catch(_){}$('api-key').value='';$('app-secret').value='';$('app-id').value='';$('account-name').value='';$('account-list').textContent='';$('bind-state').textContent='';$('bind-button').disabled=true; say('session-state','已清除此标签页凭据。关闭此标签页也会清除会话存储；已复制到其他地方的 Key 不受影响。','Credentials cleared from this tab. Copies saved elsewhere are unchanged.');}
+  function forget(){generation++;key='';accounts=[];try{sessionStorage.removeItem('publy_hosted_api_key')}catch(_){}$('api-key').value='';$('app-secret').value='';$('app-id').value='';$('account-name').value='';$('account-list').textContent='';$('bind-state').textContent='';$('bind-button').disabled=true; say('session-state','已清除此标签页凭据。已复制或保存到其他位置的 Key 不受影响；需要撤销请联系运营者。','Credentials cleared from this tab. Copies saved elsewhere are unchanged.');}
   try{$('api-key').value=sessionStorage.getItem('publy_hosted_api_key')||''}catch(_){}
   $('server-url').textContent=location.origin;
   $('forget').addEventListener('click',forget);

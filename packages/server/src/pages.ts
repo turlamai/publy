@@ -314,7 +314,7 @@ ${available ? `<form class="card" id="buy" >
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
@@ -426,7 +426,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
