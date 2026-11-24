@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import type { Attachment, JobInfo, PublishRequest, PublishResponse } from "@publy/shared";
 import { blockingMediaWarning, captionToHtml, draftIdempotencyKey, imagePostCaption, lintCards, parseCardSource, parseSource, publicationTitle, publicationDigest, resolvePublication, renderCards, renderMarkdown, stripMarkdown } from "@publy/core";
+import { BUILTIN_CARD_THEMES, loadTheme } from "@publy/core";
 
 const pkg = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
@@ -862,6 +863,28 @@ function textModePayload(rendered: ReturnType<typeof renderMarkdown>, raw: strin
   return { html: captionToHtml(captionText), images, coverName: images[0]?.name };
 }
 
+/** Theme of a publish operation. An explicit --theme always wins. Without
+ *  one the selected account's saved theme applies when it is usable for the
+ *  format (an article theme for article and image, a card theme for cards);
+ *  otherwise it is reported so the caller can warn and use the default. */
+function publishTheme(
+  opts: Record<string, any>,
+  account: CliAccount | undefined,
+  format: string
+): { theme?: string; warning?: string } {
+  if (opts.theme !== undefined) return { theme: opts.theme };
+  const saved = account?.theme;
+  if (saved === undefined) return {};
+  let usable: boolean;
+  try {
+    if (format === "cards") usable = Object.hasOwn(BUILTIN_CARD_THEMES, saved);
+    else { loadTheme(saved); usable = true; }
+  } catch { usable = false; }
+  return usable
+    ? { theme: saved }
+    : { warning: `Account theme "${saved}" is not available for ${format}; the default theme is used` };
+}
+
 async function cmdPublish(file: string, opts: Record<string, any>): Promise<void> {
   if (!validPublicationChoice(opts, "publish-result")) return;
   const agentFailure = (
@@ -906,6 +929,9 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     agentFailure("not_submitted", "FORMAT_REQUIRED", 2); return;
   }
 
+  const accountName = opts.account.trim();
+  const account = config.accounts?.find((a) => a.name === accountName);
+
   let raw: string;
   let parsed: ReturnType<typeof parseSource>;
   let sourceRead = false;
@@ -939,11 +965,15 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     }
   };
 
+  const chosenTheme = publishTheme(opts, account, selection.format);
+  const theme = chosenTheme.theme;
+  if (chosenTheme.warning) emitWarnings([chosenTheme.warning]);
+
   if (type === "image_post") {
     if (selection.format === "cards") {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "publy-cards-"));
       try {
-        const cardResult = await renderCards(raw, { ...operationOptions(opts), theme: opts.theme, outDir });
+        const cardResult = await renderCards(raw, { ...operationOptions(opts), theme, outDir });
         if (!cardResult.lint.ok) {
           for (const p of cardResult.lint.problems) console.error(`lint: ${p}`);
           agentFailure("not_submitted", "CARD_LINT_FAILED", 4, undefined, cardResult.lint.problems);
@@ -959,7 +989,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
       } finally { fs.rmSync(outDir, { recursive: true, force: true }); }
     } else {
       const rendered = renderMarkdown(raw, { ...operationOptions(opts),
-        theme: opts.theme,
+        theme,
         customThemePath: opts.customTheme,
         highlight: opts.highlight,
         mediaDirs: resolveMediaDirs(opts.mediaDir ?? [], config),
@@ -975,7 +1005,7 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     title = publicationTitle(raw, opts.title, path.basename(file, path.extname(file)));
   } else {
     const rendered = renderMarkdown(raw, { ...operationOptions(opts),
-      theme: opts.theme,
+      theme,
       customThemePath: opts.customTheme,
       highlight: opts.highlight,
       mediaDirs: resolveMediaDirs(opts.mediaDir ?? [], config),
@@ -1035,9 +1065,6 @@ async function cmdPublish(file: string, opts: Record<string, any>): Promise<void
     agentFailure("not_submitted", "MEDIA_NOT_READY", 4, undefined, blockers);
     return;
   }
-
-  const accountName = opts.account.trim();
-  const account = config.accounts?.find((a) => a.name === accountName);
 
   const digest = publicationDigest(raw, operationOptions(opts));
 
@@ -1344,7 +1371,7 @@ export function createProgram(): Command {
       .option("--digest <text>", "draft summary for this operation")
       .option("--caption <text>", "image-post or card caption for this operation")
       .option("--caption-file <path>", "read caption from a UTF-8 file; excludes --caption")
-      .option("-t, --theme <id>", "theme id")
+      .option("-t, --theme <id>", "theme id (publish falls back to the account's saved theme)")
       .option("--custom-theme <path>", "path to a custom theme CSS file (overrides --theme)")
       .option("--highlight <id>", "code highlight theme", "github")
       .option("--media-dir <dir>", "asset dir for Obsidian-style references (repeatable)", (v: string, prev: string[]) => [...prev, v], [] as string[])

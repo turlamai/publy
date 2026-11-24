@@ -19,7 +19,7 @@ const server=http.createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const config=path.join(dir,'config.json');
-fs.writeFileSync(config,JSON.stringify({server:`http://127.0.0.1:${server.address().port}`,api_key:'synthetic-key',accounts:[{name:'fixture'}]}));
+fs.writeFileSync(config,JSON.stringify({server:`http://127.0.0.1:${server.address().port}`,api_key:'synthetic-key',accounts:[{name:'fixture'},{name:'themed',theme:'medium'},{name:'stale',theme:'no-such-theme'},{name:'cardthemed',theme:'wechat'}]}));
 const run=(...args)=>new Promise((resolve,reject)=>{
   const child=spawn(process.execPath,[entry,...args],{env:{...process.env,PUBLY_CONFIG:config}});
   let stdout='',stderr='';child.stdout.on('data',d=>stdout+=d);child.stderr.on('data',d=>stderr+=d);
@@ -53,6 +53,28 @@ try {
   const repeated=await run('publish',note,...options,'--account','fixture','--json');assert.equal(repeated.code,0,repeated.stderr);
   assert.deepEqual(requests.at(-1),withProperties,'ignored properties must not change rendered bytes or request identity');
  }
+ // An omitted --theme uses the account's saved theme, an explicit --theme wins, and a
+ // saved theme that does not fit the format warns and leaves the default in place.
+ const article=async(...args)=>{const result=await run('publish',note,'--format','article',...args,'--json');assert.equal(result.code,0,result.stderr);return {report:JSON.parse(result.stdout),html:requests.at(-1).html};};
+ fs.writeFileSync(note,'# Body title\n\nBody paragraph\n\n![image](cover.png)');
+ const plain=await article('--account','fixture');
+ const saved=await article('--account','themed');
+ const explicit=await article('--account','themed','--theme','claude');
+ assert.notEqual(saved.html,plain.html,'a saved account theme must change the rendered article');
+ assert.equal(explicit.html,plain.html,'an explicit --theme must win over the saved one');
+ const stale=await article('--account','stale');
+ assert.equal(stale.report.status,'confirmed');assert.equal(stale.html,plain.html);
+ assert.ok(stale.report.warnings.some(w=>w.includes('Account theme "no-such-theme"')),JSON.stringify(stale.report.warnings));
+ const cards=async(...args)=>{const result=await run('publish',note,'--format','cards','--caption-file',caption,...args,'--json');assert.equal(result.code,0,result.stderr);return {report:JSON.parse(result.stdout),images:requests.at(-1).images.map(i=>i.data)};};
+ fs.writeFileSync(note,'## cover\nTitle\n\n## point\nDetail\n\n## ending\nThanks');
+ const defaultCards=await cards('--account','fixture');
+ const savedCards=await cards('--account','cardthemed');
+ const explicitCards=await cards('--account','fixture','--theme','wechat');
+ assert.deepEqual(savedCards.images,explicitCards.images,'a saved card theme must apply to cards');
+ assert.notDeepEqual(savedCards.images,defaultCards.images);
+ const unfit=await cards('--account','themed');
+ assert.deepEqual(unfit.images,defaultCards.images,'an article-only saved theme must not change cards');
+ assert.ok(unfit.report.warnings.some(w=>w.includes('Account theme "medium"')),JSON.stringify(unfit.report.warnings));
  const count=requests.length;
  const missing=await run('publish',note,'--account','fixture','--json');
  assert.equal(missing.code,2);assert.equal(JSON.parse(missing.stdout).code,'FORMAT_REQUIRED');
@@ -64,5 +86,5 @@ try {
   scan(result);assert.notEqual(result.code,0);
  }
  assert.equal(requests.length,count,'invalid options must never submit');
- console.log('PASS — article/image/cards: explicit parameters, private-property output scans, identical request bytes, caption files, missing format and no-submit errors');
+ console.log('PASS — article/image/cards: explicit parameters, private-property output scans, identical request bytes, caption files, missing format and no-submit errors; saved account theme fallback, explicit override and unfit-theme warnings');
 } finally {await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true});}

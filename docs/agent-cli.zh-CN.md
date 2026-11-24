@@ -64,7 +64,7 @@ HTTP 409 `DRAFT_OUTCOME_UNKNOWN` / `IDEMPOTENCY_CONFLICT` 需要另行检查远�
 
 ### 发布形式
 
-当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 仅为 `choice` 或 `default`，笔记属性不控制发布。`publish` 缺少明确类型返回 `FORMAT_REQUIRED`（退出码2）；检查、预览和投递需复用 `--title`、`--cover`、`--theme`、`--author`、`--digest`、`--caption` 或 `--caption-file`。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
+当 `capabilities --json` 声明 `publicationFormats` 时，对 `check`、`preview`、`publish` 使用相同的 `--format article|image|cards`，即可只为本次操作选择形式，不修改 Markdown。`formatSource` 仅为 `choice` 或 `default`，笔记属性不控制发布。`publish` 缺少明确类型返回 `FORMAT_REQUIRED`（退出码2）；检查、预览和投递需复用 `--title`、`--cover`、`--theme`、`--author`、`--digest`、`--caption` 或 `--caption-file`。无效值在投递前返回 `FORMAT_INVALID`。预览需与选择的形式一致；不要根据字数或图片静默推断。未传 `--theme` 时，`publish` 使用所选账号保存的主题（`account add --theme`），前提是该主题适用于当前格式；不适用的保存主题写入 `warnings` 并改用默认主题。`check`、`preview`、`render`、`card` 不读取账号，要让草稿与预览一致，请对这些命令显式传 `--theme`。[通用 Publy 发布技能](../skills/publy-publish/SKILL.md)记录了 Agent 工作流。
 
 ## HTML 导出与离线主题列表
 
