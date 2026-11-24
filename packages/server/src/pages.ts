@@ -43,7 +43,7 @@ const BASE_CSS = `
   input::placeholder { color: var(--text-3); }
   .btn {
     display: inline-block; padding: 10px 20px;
-    background: var(--accent); color: #fff;
+    background: var(--accent); color: var(--on-accent);
     border: 0; border-radius: var(--radius-sm);
     font-size: 14px; font-weight: 600; cursor: pointer;
     transition: background .2s; text-align: center;
