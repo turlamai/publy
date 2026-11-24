@@ -20,7 +20,7 @@ In WeChat’s official interface-permission list, first confirm that the selecte
 
 ## 2 · Copy the right server IP
 
-1. Open **your Publy service address followed by `/setup`**. Invited official-pilot users use the [official connection page](https://publy-api.jrtx.site/setup). Self-hosted users use their own service, not the official service’s IP.
+1. Open **your Publy service address followed by `/setup`**. Invited official-pilot users use the [official connection page](https://publy-api.jrtx.site/setup?lang=en). Self-hosted users use their own service, not the official service’s IP.
 2. Enter your saved **Publy API Key** and click “Check my account”. If you do not have a key, use the invited signup path or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.
 3. Under step 2, click “Copy server IP”. Copy only the IP, such as the documentation example `192.0.2.10` (not a usable production address).
 4. If the page says “IP unavailable”, ask the operator to verify actual egress. Do not substitute your computer IP, home broadband IP, a domain, `https://` or a port. Operators must identify all actual exits for a multi-egress deployment.
@@ -28,12 +28,14 @@ In WeChat’s official interface-permission list, first confirm that the selecte
 ## 3 · Add the API IP whitelist entry in WeChat
 
 1. Return to the [Official Accounts Platform](https://mp.weixin.qq.com/), signed in to the **correct account**.
-2. Look for **developer settings / developer interface management / basic configuration** (开发设置 / 开发接口管理 / 基本配置). WeChat has different console versions. If the console says developer information has moved, follow its official [WeChat developer platform](https://developers.weixin.qq.com/platform/) link, select this Official Account business, and look for **API IP whitelist** (API IP 白名单) in its basic information. Labels may vary; ask the account administrator about developer access if missing, rather than editing an unrelated whitelist.
-3. Select “Modify” or “Configure”, then **add the server IP on a new line**. Keep existing entries so other integrations continue to work. This is not “login security IP”, “business domain” or “JS interface security domain”.
-4. Complete WeChat’s administrator verification and save. Check that the added IP appears in the saved list, rather than merely in an unsaved field.
-5. Return to Publy and check the connection. For `40164` / “IP not whitelisted”, compare the **actual egress IP reported by WeChat** in Publy’s error with the saved list. If it differs from the connection-page IP, ask the operator to investigate changing egress; do not add guessed IPs repeatedly.
+2. In the left sidebar, expand **Settings and development (设置与开发) → Developer interface management (开发接口管理)**. Do not modify an identically named IP setting in Security Center (安全中心) without confirming its purpose.
+3. The current console displays **Developer management module migration notice (开发管理模块迁移通知)**. It states that interface management moves to the WeChat developer platform from **1 December 2025**. Click the blue **WeChat developer platform (微信开发者平台)** link in that notice to open the [official platform](https://developers.weixin.qq.com/platform/). Continue there instead of searching for configuration fields on the old notice page.
+4. Confirm the selected Official Account name at the upper right; use its dropdown if you need to switch. Open **Basic information (基础信息)** and scroll to **Developer keys (开发密钥)**. This section shows both **AppSecret** and **API IP whitelist (API IP 白名单)**, with **Edit (编辑)** beside the whitelist. This is the setting used here.
+5. First check whether **API IP whitelist** already contains the server IP displayed by Publy. If present, keep it without adding a duplicate. Otherwise select **Edit**, then **add the server IP on a new line**. Keep existing entries so other integrations continue to work. This step changes only the API IP whitelist; leave AppSecret Reset/Freeze and the domain/message-push settings below unchanged.
+6. Complete WeChat’s administrator verification and save. Check that the added IP appears in the saved list, rather than merely in an unsaved field.
+7. Return to Publy and check the connection. For `40164` / “IP not whitelisted”, compare the **actual egress IP reported by WeChat** in Publy’s error with the saved list. If it differs from the connection-page IP, ask the operator to investigate changing egress; do not add guessed IPs repeatedly.
 
-Official consoles can change. These instructions distinguish feature names and old/new entry points. If labels differ, look for the API IP whitelist feature and ask the account administrator to confirm permissions.
+The old-console entry, migration notice and new-platform Basic information → Developer keys → API IP whitelist → Edit path were checked against official-console screenshots dated 24 November 2026. Menus may change later; interface permissions still depend on the selected account.
 
 ## 4 · Check and connect
 
