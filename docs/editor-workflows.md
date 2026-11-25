@@ -6,7 +6,7 @@ Owner decision `2026-11-23-operation-options`: Obsidian is the only recommended 
 
 ## One operation contract
 
-Use explicit `--format article`, `--format image` or `--format cards`. Pass the same format, title, cover, theme, author, summary and caption to check, preview and delivery. `publish` requires an explicit format and account. Local check/preview default to article when no format is supplied; they never infer it from note properties or picture count. A skill asks when intent is unclear.
+Use explicit `--format article`, `--format image` or `--format cards`. Pass the same format, title, cover, theme, author, summary and caption to check, preview and delivery. `publish` requires an explicit format and account. Local check/preview default to article when no format is supplied; they never infer it from note properties or picture count. Without `--theme`, `publish` applies the selected account's saved theme when it fits the format; check and preview read no account, so pass `--theme` to all three when the preview must match. A skill asks when intent is unclear.
 
 The plugin provides a three-choice format selector and a draft options dialog. Preview does not submit; confirm delivery explicitly after reviewing the selected note, target account and options. Cancel creates no draft. The plugin uses the same core parameter contract without spawning an external CLI binary.
 

@@ -147,6 +147,13 @@ admin 键可见全部账号。delete 的丢失响应对齐 job-cancel 语义：�
 `unknown` 而非干净失败，先 `draft list` 核对再决定下一步。退出码沿用
 本节既有约定：配置/账号缺失为 1，服务端与网络问题为 5。
 
+**2026-11-25 开发版行为：** `publish` 未传 `--theme` 时，使用所选账号
+保存的主题（`account add --theme`，即 3.1 的账号与主题绑定）；该主题不适用于
+当前格式时（文章主题用于 article 与 image，卡片主题用于 cards），在
+`warnings` 中说明并使用默认主题，显式 `--theme` 始终优先。`check`、`preview`、
+`render`、`card` 不读取账号，预览需与投递一致时应显式传 `--theme`。
+退出码与 `--json` 字段不变。
+
 
 
 设计原则：CLI 是编辑器无关的通用接口；Agent 通过版本化能力发现、结构化 JSON、稳定退出码与明确的副作用分类调用，不必模拟 GUI。**这是目标和逐步验收的契约，不代表所有历史命令都已经做到。** 当前所有已声明命令均支持 `--json`，包括 `capabilities`、`check`、`render`、`preview`、`card`、`publish`、`publish-result`、`draft list/delete`、`account list/add`、`config set`、`jobs list/cancel/retry`、`history`、`quota`、`theme ls/pack/add/update/remove/preview` 与 `tunnel`；每个入口同时声明 `usage`、`prerequisites` 与 `requiresUserApproval`，以 `capabilities --json` 为唯一事实来源。发布/取消/重试应由 Agent 在用户明确授权后调用。完整实例和风险边界见 [Agent CLI 契约](agent-cli.zh-CN.md)。
