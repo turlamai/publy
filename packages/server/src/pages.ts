@@ -389,23 +389,27 @@ label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}inpu
 button{border:0;border-radius:8px;background:var(--green);color:var(--on-accent);font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:14px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
-#direct-qr{max-width:100%;height:auto}input{min-height:44px}
+#direct-qr{max-width:100%;height:auto;background:#fff;padding:10px;border-radius:8px;margin:12px auto;display:block}input{min-height:44px;color:var(--ink)}
+.order-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}.order-summary .small{margin-top:4px}.amount{font-size:32px;font-weight:650;white-space:nowrap;line-height:1.2}.amount small{display:block;font-size:12px;font-weight:400;color:var(--muted);text-align:right}#pay{width:100%;min-height:48px}#direct-result{border-top:1px solid var(--line);margin-top:20px;padding-top:12px;text-align:center}#purchase-link{display:block;padding:12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600}#refresh{margin-top:0}
+@media(max-width:480px){.wrap{padding:24px 16px 48px}.card{padding:18px}.order-summary{gap:8px}.amount{font-size:28px}}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
 [hidden]{display:none!important}
 ${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
-<h1>托管版 Personal · ¥29 / 月</h1>
-<p class="lead">在 Obsidian 里写完，草稿一键直达公众号草稿箱：排版、图片上传、白名单、凭据保管、失败恢复全部由托管服务处理。每月含 30 次成功投递，只创建草稿，不群发。</p>
+<h1>开通 Publy Personal</h1>
+<p class="lead">完成支付宝付款，开始使用公众号草稿托管服务。</p>
 <form class="card" id="buy">
-  <label class="field" for="contact">联系方式（仅首次开户填写，用于找回账户）
+  <div class="order-summary"><div><strong>Personal</strong><div class="small">30 次成功草稿投递 · 1 个公众号 · 草稿排程</div></div><div class="amount">¥29<small> / 自然月</small></div></div>
+  <p class="small">本次购买一个自然月，当前需手动续费。有效期以开通结果为准。</p>
+  <label class="field" for="contact">账户联系方式（首次开户填写）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
   </label>
   <div id="restore-block" hidden>
     <label class="field" for="existingKey" id="restore-label">已有账户 API Key（用于恢复同一账户）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button>
   </div>
-  <button type="submit" id="pay">扫码支付 ¥29</button>
-  <p class="small">付款后自动开通，退款即撤销权益。<a href="#" id="restore-toggle">已有账户？用 API Key 恢复</a></p>
+  <button type="submit" id="pay">支付宝付款 · ¥29</button>
+  <p class="small">付款确认后自动开通。<a href="#" id="restore-toggle">已有账户？用 API Key 恢复</a></p>
   <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p></section>
 </form>
 <div class="card">
@@ -422,7 +426,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
 var KEY = 'publy_hosted_api_key';
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
-var apiKey = '', timer, revision = 0;
+var apiKey = '', timer, revision = 0, active = false;
 try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
 document.getElementById('existingKey').value = apiKey;
 document.getElementById('copy-key').disabled = !apiKey;
@@ -455,17 +459,18 @@ async function refresh() {
     if (current !== revision) return;
     section.hidden = false; qr.hidden = true;
     var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
-    if (result.status === 'active') {
+    active = result.status === 'active';
+    if (active) {
       state.textContent = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。';
       say('请保存你的 API Key，用于 CLI、插件或换设备恢复账户。');
     } else {
-      state.textContent = '尚未开通。¥29 / 一个月，不自动续费。';
+      state.textContent = '等待付款 · ¥29';
       if (result.qrDataUrl) { qr.src = result.qrDataUrl; qr.hidden = false; }
       if (result.purchaseUrl) {
         var link = document.createElement('a'); link.id = 'purchase-link'; link.textContent = '打开支付宝购买'; link.href = result.purchaseUrl;
         link.rel = 'noopener noreferrer'; link.target = '_blank'; section.appendChild(link);
       }
-      say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额；付款后返回此页刷新权益。' : '暂未开放购买，请稍后再试。');
+      say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额。付款后返回此页，系统将自动查询开通结果。' : '暂未开放购买，请稍后再试。');
     }
   } catch (error) { if (current === revision) say(error.message, true); }
   finally { button.disabled = false; }
@@ -495,7 +500,7 @@ if (form) form.addEventListener('submit', async function (event) {
     async function poll() {
       if (attempt !== revision) return;
       if (document.visibilityState === 'visible') await refresh();
-      if (++checks < 12) timer = setTimeout(poll, 10000);
+      if (++checks < 60 && !active) timer = setTimeout(poll, 10000);
     }
     if (attempt === revision) timer = setTimeout(poll, 10000);
   } catch (error) { if (attempt === revision) say(error.message, true); }
@@ -503,6 +508,8 @@ if (form) form.addEventListener('submit', async function (event) {
 });
 var refreshButton = document.getElementById('refresh');
 if (refreshButton) refreshButton.addEventListener('click', refresh);
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && apiKey && !button.disabled) refresh(); });
+if (apiKey) refresh();
 
 var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { var value = document.getElementById("existingKey").value.trim(); if (!value) { say("还没有 API Key，请先开户或恢复账户。", true); return; } await navigator.clipboard.writeText(value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
 </script><script>${WEB_JS}</script></body></html>`;
