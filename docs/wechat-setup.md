@@ -16,7 +16,7 @@ You need the account’s **AppID**, its matching **AppSecret**, and the Publy se
 | AppID / AppSecret | Official WeChat developer settings for this account | A Publy server you trust |
 | Server egress IP | Your Publy service’s `/setup` page | WeChat’s **API IP whitelist** |
 
-In WeChat’s official interface-permission list, first confirm that the selected account has the required **draft and material-upload API permissions**. Actual permissions depend on that account. Publy cannot bypass platform verification or permissions. A successful credential check alone does not prove draft permission. If unavailable, continue with free local preview/copy; do not pay for hosting to “unlock WeChat permissions”.
+In WeChat’s official interface-permission list, first confirm that the selected account has the required **draft and material-upload API permissions**. Actual permissions depend on that account. Publy cannot bypass platform verification or permissions. A successful credential check alone does not prove draft permission. If unavailable, continue with free local preview/copy; hosting adds a fixed egress IP and credential custody; it does not unlock permissions the account itself lacks.
 
 ## 2 · Copy the right server IP
 
