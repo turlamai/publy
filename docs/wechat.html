@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect WeChat · 连接公众号 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted status</span><span data-lang="zh">托管状态</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="connect-a-wechat-official-account-from-scratch">Connect a WeChat Official Account from scratch</h1>
+<!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect WeChat · 连接公众号 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted & pricing</span><span data-lang="zh">托管与购买</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="connect-a-wechat-official-account-from-scratch">Connect a WeChat Official Account from scratch</h1>
 <p><strong>English</strong> · <a href="wechat.html?lang=zh">简体中文</a></p>
 <p>Goal: deliver content you explicitly approve to <strong>your own Official Account’s draft box</strong>. Publy does not mass-send or publish publicly. Check platform permissions before paying. Local preview and copying need neither payment nor WeChat credentials.</p>
 <h2 id="1--what-you-need-and-which-website-to-open">1 · What you need and which website to open</h2>
@@ -33,8 +33,8 @@
 <p>In WeChat’s official interface-permission list, first confirm that the selected account has the required <strong>draft and material-upload API permissions</strong>. Actual permissions depend on that account. Publy cannot bypass platform verification or permissions. A successful credential check alone does not prove draft permission. If unavailable, continue with free local preview/copy; do not pay for hosting to “unlock WeChat permissions”.</p>
 <h2 id="2--copy-the-right-server-ip">2 · Copy the right server IP</h2>
 <ol>
-<li>Open <strong>your Publy service address followed by <code>/setup</code></strong>. Invited official-pilot users use the <a href="https://publy-api.jrtx.site/setup?lang=en">official connection page</a>. Self-hosted users use their own service, not the official service’s IP.</li>
-<li>Enter your saved <strong>Publy API Key</strong> and click “Check my account”. If you do not have a key, use the invited signup path or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.</li>
+<li>Open <strong>your Publy service address followed by <code>/setup</code></strong>. Official hosted users use the <a href="https://publy-api.jrtx.site/setup?lang=en">official connection page</a> (sign up there first if you have no account). Self-hosted users use their own service, not the official service’s IP.</li>
+<li>Enter your saved <strong>Publy API Key</strong> and click “Check my account”. If you do not have a key, sign up on the official connection page first, or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.</li>
 <li>Under step 2, click “Copy server IP”. Copy only the IP, such as the documentation example <code>192.0.2.10</code> (not a usable production address).</li>
 <li>If the page says “IP unavailable”, ask the operator to verify actual egress. Do not substitute your computer IP, home broadband IP, a domain, <code>https://</code> or a port. Operators must identify all actual exits for a multi-egress deployment.</li>
 </ol>
@@ -151,11 +151,11 @@
 </tr>
 </tbody>
 </table>
-<p>先在微信后台的接口权限列表确认你的公众号具有所需的<strong>草稿接口和素材上传接口</strong>。接口是否可用以该公众号官方后台实际显示为准；Publy 不能绕过认证或权限限制。只通过 AppID/AppSecret 校验，并不能证明草稿接口已获准使用。如果没有权限，可以继续免费本地预览/复制，暂不要购买托管来“解锁微信权限”。</p>
+<p>先在微信后台的接口权限列表确认你的公众号具有所需的<strong>草稿接口和素材上传接口</strong>。接口是否可用以该公众号官方后台实际显示为准；Publy 不能绕过认证或权限限制。只通过 AppID/AppSecret 校验，并不能证明草稿接口已获准使用。如果没有权限，可以继续免费本地预览/复制；托管版提供固定出口与凭据保管，但不会解锁账号本身没有的接口权限。</p>
 <h2 id="2--复制正确的服务器-ip">2 · 复制正确的服务器 IP</h2>
 <ol>
-<li>打开<strong>你使用的 Publy 服务器地址后加 <code>/setup</code></strong>。例如，受邀使用官方内测的用户打开<a href="https://publy-api.jrtx.site/setup?lang=zh">官方连接页</a>；自托管用户打开自己的服务地址，不能照抄官方服务 IP。</li>
-<li>填入之前保存的 <strong>Publy API Key</strong>，点击「查看我的账户」。首次还没有 Key 时，由受邀开户入口或你的自托管运营者提供；不要把管理员 Key 填进普通用户设置。</li>
+<li>打开<strong>你使用的 Publy 服务器地址后加 <code>/setup</code></strong>。例如，使用官方托管版的用户打开<a href="https://publy-api.jrtx.site/setup?lang=zh">官方连接页</a>（还没有账号时先在该页注册）；自托管用户打开自己的服务地址，不能照抄官方服务 IP。</li>
+<li>填入之前保存的 <strong>Publy API Key</strong>，点击「查看我的账户」。首次还没有 Key 时，先在官方连接页注册获取，或由你的自托管运营者提供；不要把管理员 Key 填进普通用户设置。</li>
 <li>在第 2 步找到「服务器出口 IP」，点击「复制服务器 IP」。只复制纯 IP，例如示例 <code>192.0.2.10</code>（这是文档示例，不能实际使用）。</li>
 <li>若显示「IP 未确认」，停止这一步，请运营者确认服务真实出口；不要把电脑 IP、家庭宽带 IP、域名、<code>https://</code> 或端口填进去。服务器有多个实际出口时，应由运营者确认完整列表。</li>
 </ol>

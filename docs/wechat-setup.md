@@ -20,8 +20,8 @@ In WeChat’s official interface-permission list, first confirm that the selecte
 
 ## 2 · Copy the right server IP
 
-1. Open **your Publy service address followed by `/setup`**. Invited official-pilot users use the [official connection page](https://publy-api.jrtx.site/setup?lang=en). Self-hosted users use their own service, not the official service’s IP.
-2. Enter your saved **Publy API Key** and click “Check my account”. If you do not have a key, use the invited signup path or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.
+1. Open **your Publy service address followed by `/setup`**. Official hosted users use the [official connection page](https://publy-api.jrtx.site/setup?lang=en). Self-hosted users use their own service, not the official service’s IP.
+2. Enter your saved **Publy API Key** and click “Check my account”. If you do not have a key, sign up on the official connection page first, or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.
 3. Under step 2, click “Copy server IP”. Copy only the IP, such as the documentation example `192.0.2.10` (not a usable production address).
 4. If the page says “IP unavailable”, ask the operator to verify actual egress. Do not substitute your computer IP, home broadband IP, a domain, `https://` or a port. Operators must identify all actual exits for a multi-egress deployment.
 
