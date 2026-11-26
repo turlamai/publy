@@ -15,10 +15,10 @@
   }
   .paper .title { margin: 0 0 12px; font-size: 21px; font-weight: 600; line-height: 1.4; letter-spacing: .01em; color: var(--paper-ink); }
   .paper .meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .paper .avatar { width: 20px; height: 20px; border-radius: 50%; background: rgba(183,92,61,.12); color: var(--wx-avatar); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .paper .avatar { width: 20px; height: 20px; border-radius: 50%; background: rgba(183,92,61,.12); color: var(--wx-avatar); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .paper .acct { font-size: 13px; color: var(--wx-link); }
   .paper .author { font-size: 13px; color: #999999; }
-  .paper .pill { margin-left: auto; font-size: 11px; color: #b0b0b0; background: #f6f6f6; border-radius: 999px; padding: 2px 9px; flex: none; }
+  .paper .pill { margin-left: auto; font-size: 12px; color: #b0b0b0; background: #f6f6f6; border-radius: 999px; padding: 2px 9px; flex: none; }
   .paper .hairline { height: 1px; background: var(--paper-line); margin: 14px 0 18px; }
   .paper .body { font-size: 15px; line-height: 1.6; }
   .paper .body p { margin: 0 0 14px; }
@@ -27,11 +27,11 @@
   .paper .body li { margin: 4px 0; }
   .paper .body blockquote { border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--paper-ink); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 0 0 14px; font-size: 14px; }
   .paper .body code { font-size: 13px; background: #f6f6f6; border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .paper .body sup { color: var(--wx-link); font-size: 11px; }
+  .paper .body sup { color: var(--wx-link); font-size: 12px; }
   .imgph {
     height: 150px; border-radius: 8px; margin: 0 0 4px;
     background: linear-gradient(135deg, #3d3126, #6b5335 60%, #8a6a3e);
-    display: flex; align-items: flex-end; justify-content: flex-start; color: rgba(255,255,255,.85); font-size: 11px; padding: 8px 10px;
+    display: flex; align-items: flex-end; justify-content: flex-start; color: rgba(255,255,255,.85); font-size: 12px; padding: 8px 10px;
   }
   .figcap { font-size: 12px; color: #999999; margin: 0 0 14px; }
   .fnotes { border-top: 1px solid var(--paper-line); margin-top: 20px; padding-top: 10px; font-size: 13px; color: #888888; line-height: 1.7; }
@@ -47,7 +47,7 @@
         <div class="tab active">居家咖啡指南.md</div>
       </div>
       <div class="sp"></div>
-      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+      <button class="iconbtn quiet" id="themeBtn" title="切换深色主题" aria-label="切换深色主题"><svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"></path></svg><svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.2 8.2 0 0 1 8.8 4a8.4 8.4 0 1 0 11.2 11.2Z"></path></svg></button>
     </div>
     <div class="split">
       <section class="editor">
@@ -74,11 +74,11 @@
         <div class="leafhead">
           <span class="vt">➤ Publy 预览</span>
           <span class="sp"></span>
-          <button class="iconbtn" title="打开发布历史与待发任务">≡</button>
+          <button class="iconbtn" title="打开发布历史与待发任务" aria-label="打开发布历史与待发任务">≡</button>
         </div>
         <div class="toolbar">
-          <button class="tbtn" title="重新渲染预览">↻</button>
-          <button class="tbtn" title="复制排版 rich text">⧉</button>
+          <button class="tbtn" title="重新渲染预览" aria-label="重新渲染预览">↻</button>
+          <button class="tbtn" title="复制排版 rich text" aria-label="复制排版 rich text">⧉</button>
           <div class="segpill" title="手机宽（390px）——公众号读者大多在手机">
             <button class="seg on">390</button>
             <button class="seg">700</button>
@@ -86,7 +86,7 @@
           <select class="tsel" title="本次发布形式"><option value="article">文章</option><option value="image">图片配文</option><option value="cards">文字卡片</option></select>
           <select class="tsel" title="文章主题（切换即时重渲染）"><option>Claude</option></select>
           <span class="sp"></span>
-          <button class="tbtn primary"><span>➤</span><span>投递「TuringLambdaAI」草稿箱</span></button>
+          <button class="tbtn primary"><span aria-hidden="true">➤</span><span>投递「TuringLambdaAI」草稿箱</span></button>
         </div>
         <div class="body">
           <div class="strip is-ok" role="status">

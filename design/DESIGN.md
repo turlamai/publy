@@ -91,3 +91,30 @@ Flow: restore Publy key → display service-configured egress IP → official We
 Exit evidence required: shared stylesheet generation check; authenticated owned-account flow and wrong-key isolation; failed whitelist correction; empty-key copy prevention; closed/active purchase navigation; light/dark, narrow viewport and keyboard review; paired English/Chinese direct official links, permission prerequisites and unknown-result recovery. Official WeChat platform navigation is not yet observed in this environment (site access blocked), so distinguish current/legacy entry labels and document that labels may vary. No fabricated platform screenshots or claim of real-payment/refund completion.
 
 Operator follow-up within #107: `prototype/operator-web.html` records the shared-theme login surface, quiet navigation, readable error badges and narrow feed controls. In the actual operator page, shared styles must not promote every navigation item to a primary action. Narrow navigation retains visible names and an accessible current-page marker; logout remains available. The login panel and table hover/error states must use paired semantic surfaces, and feed headings/controls stack instead of compressing into vertical text. No operator data mutation or billing scope is added.
+
+## 原型对齐家族基线（2026-11-26）
+
+家族规范修订 `2026-11-20-minimal-family`；起始 SHA `45d449af55f1489b654bf1953562d8f8fad3f018`。只改 `design/prototype/`，不改信息架构、强调色、token 值、布局结构、示例数据与文案含义。`public-web.css` / `public-web.js` / `setup.html` 未动，生成产物无漂移。渲染证据：无头 Chromium 1280×800，9 页 × 亮/暗，基线 → 本轮。
+
+| 检查 | 结果 | 证据 / 限制 |
+|---|---|---|
+| R1 主题切换 | 通过 | 6 个插件页 `#themeBtn`：`◐` → 线性 SVG（16px、stroke 1.7、`aria-hidden`），浅色显太阳、深色显月亮；按钮 28px，静息无底无框，悬停借 `bg` 作底色。`aria-label` 与 `title` 指向点击后的主题（切换浅色 / 深色主题），由 `prototype-runtime.js` 随 `#app` 的 `.dark` 同步。`operator-web.html` 同款，命中区保持 44px。7 个控件各真实点击一次：图标与名称在两个方向都翻转。`setup.html` 的文字按钮未动，见「仍开放」。 |
+| R2 12px 下限 | 通过（1 项登记例外） | 源扫描 14 → 5 处声明，渲染 `small` 64 → 34，余下全部落在下述例外。角色层级不变：辅助 12 / 标签 13 / 正文 14。 |
+| R3 减弱动效与焦点 | 通过 | `shared.css` 补 `prefers-reduced-motion` 与全局 `:focus-visible`（2px `--accent`、offset 2px）；公开网页三件套原本已有。焦点环在浅色下对白底 2.38:1，受强调色取值所限。 |
+| R4 原型完整性 | 通过（一处与家族清单不同，保留现状） | 零远程依赖，本地 `href` / `src` 全部可解析（`/hosted` 是产品路由）。`index.html` 仍按 2026-11-15 的决定直接进入主界面、不设目录页；家族清单的「导航页」不覆盖该契约，要改需另行决策。 |
+| R5 可访问名称 | 通过 | 仅图标的按钮补 `aria-label`（历史、刷新、重新检查、关闭、重新渲染、复制），主按钮的装饰 `➤` 标 `aria-hidden`；`nameless` 2 → 0。设置页开关是 `role="switch"` + `aria-labelledby`——原型脚本原先把它覆盖成了 `button`。 |
+| R6 版式缺陷 | 通过 | 1280 以下窗口不再横向溢出（1024 宽 240 → 0，800 宽 464 → 0）；`preview-cards` 的画布底色铺满面板；`operator-web` 的「重连」不再竖排，网关地址完整可见。 |
+| R7 契约同步 | 通过 | 本节；token 值未变，token 表无需改行。 |
+| R8 仓库门禁 | 通过 | `node scripts/sync-public-web.mjs --check`、`node --test scripts/public-web-generation.test.mjs`。 |
+| 对比度（未要求，仅记录） | 未变 | `low` 188 → 188，见「仍开放」②。 |
+
+**登记例外（R2）**：`preview-cards.html` 的 `.card` 内文字——`.wm` 9px、`.pg` 9.5px、`.cover .k` 9.5px、`.cover .sub` 11px、`.ending .cta` 11px。
+- 场景：预览面板里缩小的卡片图片示意（150×200）。
+- 偏离项：12px 下限。
+- 用户收益：实物由 `packages/core/src/cards.ts` 渲染成图片，水印与页码画在图内，本来就小于正文；放大到 12px 会让水印与正文描述等大，示意失真。
+- 替代方案：这些字代表输出画面的像素，不承担界面职责；承载信息的界面文字（渲染计数、配文）在卡片之外，已是 12–14px。
+- 验收证据：渲染 `small` 的 34 个节点全部是 `.card` 内文字；源扫描剩余 5 条均在此处。
+
+**偏离登记**：主题切换图标用家族线性 SVG，与上文「图标」一行的 unicode 优先不同。其余 unicode 符号（↻ ⧉ ➤ ≡ ✕ ▾）本轮未换，留待下一切片与实现（`views.ts` 已用 `setIcon`）一并对齐。
+
+**仍开放（需产品决策）**：① `setup.html` 导航栏的主题切换是带文字的 `.secondary` 按钮，与同栏 EN / 中文 一致，线上另 7 个公开页共用同类写法（文案在 `design/` 之外）；换成家族图标要连同 `docs/*.html` 与 `scripts/build-user-pages.mjs` 一起改。② 浅色主题对比度均来自 token 值：`--mute` 4.29:1（`bg-alt` 上 3.87:1）、绿色文字 2.15:1、主按钮白字 2.38:1、`--amber` 3.25:1、`--danger` 3.91:1。③ 结果条与历史行里的小号 `.tbtn` 高约 25px，低于紧凑控件的 28px。④ `settings.html` 的主题按钮被弹窗遮罩盖住，深浅色靠其他页面记住的偏好。
