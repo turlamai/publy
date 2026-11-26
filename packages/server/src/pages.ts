@@ -438,7 +438,7 @@ document.getElementById('restore-toggle').addEventListener('click', function (e)
   if (!block.hidden) document.getElementById('existingKey').focus();
 });
 document.getElementById('existingKey').addEventListener('input', function () {
-  revision++; clearTimeout(timer); apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
+  revision++; clearTimeout(timer); active = false; button.disabled = false; apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
   var link = document.getElementById('purchase-link'); if (link) link.remove();
   document.getElementById('copy-key').disabled = !this.value.trim();
   say('账户凭据已更改，请重新查看权益。');
@@ -453,7 +453,7 @@ async function post(url, body) {
 async function refresh() {
   if (!apiKey) return;
   var current = revision;
-  clearTimeout(timer); button.disabled = true;
+  button.disabled = true;
   try {
     var result = await post('/v1/hosted/status', {});
     if (current !== revision) return;
@@ -473,7 +473,7 @@ async function refresh() {
       say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额。付款后返回此页，系统将自动查询开通结果。' : '暂未开放购买，请稍后再试。');
     }
   } catch (error) { if (current === revision) say(error.message, true); }
-  finally { button.disabled = false; }
+  finally { if (current === revision) button.disabled = false; }
 }
 if (form) form.addEventListener('submit', async function (event) {
   event.preventDefault(); button.disabled = true; var attempt = revision;
@@ -509,7 +509,7 @@ if (form) form.addEventListener('submit', async function (event) {
 var refreshButton = document.getElementById('refresh');
 if (refreshButton) refreshButton.addEventListener('click', refresh);
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && apiKey && !button.disabled) refresh(); });
-if (apiKey) refresh();
+// Saved credentials are restored explicitly through the form; do not create a session silently.
 
 var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { var value = document.getElementById("existingKey").value.trim(); if (!value) { say("还没有 API Key，请先开户或恢复账户。", true); return; } await navigator.clipboard.writeText(value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
 </script><script>${WEB_JS}</script></body></html>`;
