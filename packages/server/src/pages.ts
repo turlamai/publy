@@ -289,12 +289,13 @@ export function hostedPurchasePage(available: boolean, publicUrl?: string, direc
 label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
-.small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
+.small{font-size:12px;color:var(--muted);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--green)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
 ${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
+<ol class="steps"><li>填写联系方式，点下方按钮开户</li><li>支付宝扫码支付 ¥29，当月自动生效</li><li>按教程把 API Key 填进插件、绑定公众号，发出第一篇草稿</li></ol>
 ${available ? `<div class="notice ok">支付通道已配置。付款成功后，服务权益由 Commerce/Permit 确认；支付返回页本身不代表已开通。</div>` :
   `<div class="notice">支付通道正在接入，暂不可购买。当前可以先使用免费的自托管路径：<a href="https://publy.jrtx.site/start.html">开始使用</a>。</div>`}
 ${available ? `<form class="card" id="buy" >
@@ -314,7 +315,7 @@ ${available ? `<form class="card" id="buy" >
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
@@ -391,7 +392,7 @@ function hostedDirectPurchasePage(available: boolean): string {
 label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
-.small{font-size:12px;color:var(--muted);margin-top:16px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
+.small{font-size:12px;color:var(--muted);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--green)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
@@ -400,6 +401,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
+<ol class="steps"><li>填写联系方式，点下方按钮开户</li><li>支付宝扫码支付 ¥29，当月自动生效</li><li>按教程把 API Key 填进插件、绑定公众号，发出第一篇草稿</li></ol>
 <div class="notice ok">Personal 月包 ¥29，不自动续费。支付后重新核验权益，有效期以内不重复购买。</div>
 <form class="card" id="buy" >
   <div class="plans">
@@ -414,7 +416,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
   <label class="field">联系方式（仅首次开户填写；恢复账户无需填写）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
   </label>
-  <label class="field" for="existingKey">已有账户 API Key（用于恢复同一账户；首次开户留空）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button><button type="submit" id="pay">开户或恢复账户，查看权益</button>
+  <label class="field" for="existingKey">已有账户 API Key（用于恢复同一账户；首次开户留空）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button><button type="submit" id="pay">开户并扫码支付 ¥29</button>
   <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p></section>
 </form>
 <div class="card">
@@ -426,7 +428,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
-<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy 自托管项目 · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
+<p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
 var KEY = 'publy_hosted_api_key';
@@ -459,7 +461,7 @@ async function refresh() {
     section.hidden = false; qr.hidden = true;
     var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
     if (result.status === 'active') {
-      state.textContent = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。';
+      state.innerHTML = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。<br>下一步：把上方 API Key 填进 <a href=\"https://publy.jrtx.site/start.html?lang=zh\">Obsidian 插件或 CLI</a>，再按<a href=\"/setup\">连接教程</a>绑定公众号并加白名单（<a href=\"https://publy.jrtx.site/wechat.html?lang=zh\">手把手教程</a>），即可发出第一篇草稿。';
       say('请保存你的 API Key，用于 CLI、插件或换设备恢复账户。');
     } else {
       state.textContent = '尚未开通。¥29 / 一个月，不自动续费。';

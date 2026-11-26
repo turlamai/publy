@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Server 0.2.4: the hosted checkout page states the whole journey up front (open account → scan & pay ¥29 → connect via tutorial), labels the primary button honestly ("开户并扫码支付 ¥29"), and — once a month is active — links the next steps (paste the API key into the plugin/CLI, connect the Official Account via /setup with the whitelist walkthrough) instead of stopping at the entitlement confirmation.
 - Public hosted purchasing opened on production (2026-11-26, owner decision): the issuer's `purchasing_enabled` gate, the Publy `hostedDirect.purchasingEnabled` gate and the empty `purchase_buyer_allowlist` restriction (an empty list allows nobody) were resolved together and verified end-to-end by a no-payment signup smoke that received a live Alipay purchase URL and QR. Real-money purchase, restart recovery and refund-to-withdrawal acceptance remain open in issue #17. Server packages are tagged and released separately (`server-v*`).
 
 
