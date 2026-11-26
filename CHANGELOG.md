@@ -2,13 +2,7 @@
 
 ## Unreleased
 
-- Server 0.2.2 adds optional NowPay Direct MONTH access, independently verified request-bound Permit admission, same-account purchase recovery and atomic provider-period quota reservations. Public purchasing stays disabled pending live acceptance. The deployment unit now requires a persistent service account and a private state directory.
-
-- Add a separate server release artifact, checksum manifest, isolated installation smoke and persistent hardened deployment unit. Production installation requires no source checkout or package manager. Server package version: 0.2.1; plugin version remains unchanged.
-
-- Focus the recommended writing experience on Obsidian, with an editor-independent CLI and official agent skill.
-- Use explicit operation parameters instead of note frontmatter for every publication option; preserve and skip existing properties without YAML evaluation.
-- Require a format for draft creation, add consistent title/cover/author/summary/caption options to checks and previews, and provide an Obsidian draft options dialog.
+- Nothing yet. Server packages are tagged and released separately (`server-v*`).
 
 
 All notable changes to Publy are documented in this file. The format is
@@ -22,6 +16,10 @@ released**: they have no git tag and no GitHub release, so the jump from
 
 ## [Unreleased]
 
+- Nothing yet.
+
+## [0.8.8] - 2026-11-26
+
 ### Added
 
 - Draft box management for agents and operators: `publy draft list` reads
@@ -32,39 +30,54 @@ released**: they have no git tag and no GitHub release, so the jump from
   `GET /v1/drafts` and `DELETE /v1/drafts/:mediaId` enforce the same
   account-ownership rules as publish; deletions are audited as
   `draft-deleted` and surface in `/v1/history`.
+- Explicit operation parameters replace note frontmatter for every
+  publication option; existing note properties are preserved and skipped
+  without YAML evaluation.
+- Draft creation requires an explicit format and supports consistent
+  title/cover/author/summary/caption options across checks and previews,
+  with an Obsidian draft options dialog.
+- A disposable private purchase lifecycle probe: real Publy signup,
+  checkout and current-proof activation, authenticated synthetic Alipay
+  callback/query through the Commerce journal/projector/evidence-gated
+  issuer, independent Permit verification, restart/operator recovery,
+  wrong-account refusal and signed refund/withdrawal denial. All fixture
+  listeners are loopback-only; synthetic money and a one-day test right
+  only.
+
+### Changed
+
+- Focus the recommended writing experience on Obsidian, with an
+  editor-independent CLI and official agent skill sharing one explicit
+  operation parameter contract.
+- The plugin ships the family design baseline: declared temperament
+  profile, family typography scale and accent/helper/status colours at
+  4.5:1 contrast.
 
 ### Fixed
 
+- Publishing without an explicit `--theme` now applies the account's
+  saved theme instead of ignoring it.
 - Persist independently verified withdrawal revisions in hosted admission's
   durable fence before denying use, so an older signed grant cannot reopen an
   account after refund. The internal Racket CLI exposes an explicit snapshot
   verification mode that never authorizes work.
-
-### Added
-
-- Add a disposable private purchase lifecycle probe: real Publy signup,
-  checkout and current-proof activation, authenticated synthetic Alipay
-  callback/query through the Commerce journal/projector/evidence-gated issuer,
-  independent Permit verification, restart/operator recovery, wrong-account
-  refusal and signed refund/withdrawal denial. Inspect persisted row counts
-  to prove duplicate payment/refund does not add a revision. All fixture
-  listeners are loopback-only, control uses stdin, and external Node fetches
-  are refused. Run it in the pinned Commerce CI lane. This uses synthetic
-  money and a one-day test right, not an official Alipay sandbox transaction,
-  monthly billing policy, live merchant approval or WeChat delivery.
-
-### Fixed
-
 - Verify Commerce-generated Alipay Vibe Pay page-pay fields using the outbound
   OpenAPI signature contract, which includes `sign_type`. Notification rules
   excluded that field and caused valid checkout responses to be rejected as
   unknown. Correct the fixtures for both sandbox and configured hosted
   checkout/return paths and reject notification-style signatures for requests.
 - Pin the synthetic Commerce probes and CI to Commerce `af6494a` and Permit
-  `a55632b`. Run the real Racket checkout signer against Publy's verifier in CI
-  so matching mock mistakes cannot hide this interoperability failure. This
-  uses temporary keys and loopback only; it does not establish merchant
+  `a55632b`. Run the real Racket checkout signer against Publy's verifier in
+  CI so matching mock mistakes cannot hide this interoperability failure.
+  This uses temporary keys and loopback only; it does not establish merchant
   admission, real payment or entitlement fulfilment.
+
+### Honest boundaries
+
+- Publy is not yet confirmed as an Obsidian Community Directory listing;
+  directory-install acceptance remains tracked in issues #12 and #14.
+- Public purchasing stays disabled; controlled real-payment acceptance is
+  tracked in issue #17.
 
 ## [0.8.7] - 2026-11-08
 
@@ -354,6 +367,7 @@ as global installs; 1.0.3 is the first usable npm install.
   comma-separated dirs, and network errors report the real cause (#4).
 
 [Unreleased]: https://github.com/turlamai/publy/compare/0.8.7...HEAD
+[0.8.8]: https://github.com/turlamai/publy/releases/tag/0.8.8
 [0.8.7]: https://github.com/turlamai/publy/releases/tag/0.8.7
 [0.8.3]: https://github.com/turlamai/publy/releases/tag/0.8.3
 [0.8.2]: https://github.com/turlamai/publy/releases/tag/0.8.2
