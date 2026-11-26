@@ -390,7 +390,7 @@ button{border:0;border-radius:8px;background:var(--green);color:var(--on-accent)
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:14px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 #direct-qr{max-width:100%;height:auto;background:#fff;padding:10px;border-radius:8px;margin:12px auto;display:block}input{min-height:44px;color:var(--ink)}
-.order-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}.order-summary .small{margin-top:4px}.amount{font-size:32px;font-weight:650;white-space:nowrap;line-height:1.2}.amount small{display:block;font-size:12px;font-weight:400;color:var(--muted);text-align:right}#pay{width:100%;min-height:48px}#direct-result{border-top:1px solid var(--line);margin-top:20px;padding-top:12px;text-align:center}#purchase-link{display:block;padding:12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600}#refresh{margin-top:0}
+.order-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}.order-summary .small{margin-top:4px}.amount{font-size:32px;font-weight:650;white-space:nowrap;line-height:1.2}.amount small{display:block;font-size:12px;font-weight:400;color:var(--muted);text-align:right}#pay{width:100%;min-height:48px}#direct-result{border-top:1px solid var(--line);margin-top:20px;padding-top:12px;text-align:center}#purchase-link{display:block;padding:12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600}#refresh{margin-top:0}.next-primary{display:block;background:var(--green);color:var(--on-accent);border-radius:8px;padding:12px;text-decoration:none;font-weight:650}#onboarding-next p{color:var(--muted)}
 @media(max-width:480px){.wrap{padding:24px 16px 48px}.card{padding:18px}.order-summary{gap:8px}.amount{font-size:28px}}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
@@ -410,7 +410,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
   </div>
   <button type="submit" id="pay">支付宝付款 · ¥29</button>
   <p class="small">付款确认后自动开通。<a href="#" id="restore-toggle">已有账户？用 API Key 恢复</a></p>
-  <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p></section>
+  <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p><div id="onboarding-next" hidden><p>服务已开通。请先保存上方 API Key，再连接公众号。</p><a class="next-primary" href="/setup">连接我的公众号</a><p><a href="https://publy.jrtx.site/start.html?lang=zh">安装插件与使用指南</a></p></div></section>
 </form>
 <div class="card">
   <strong>付款后，三步发出第一篇草稿</strong>
@@ -427,6 +427,7 @@ var KEY = 'publy_hosted_api_key';
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
 var apiKey = '', timer, revision = 0, active = false, checking = false;
+var next = document.getElementById('onboarding-next'), refreshButton = document.getElementById('refresh');
 try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
 document.getElementById('existingKey').value = apiKey;
 document.getElementById('copy-key').disabled = !apiKey;
@@ -438,7 +439,7 @@ document.getElementById('restore-toggle').addEventListener('click', function (e)
   if (!block.hidden) document.getElementById('existingKey').focus();
 });
 document.getElementById('existingKey').addEventListener('input', function () {
-  revision++; clearTimeout(timer); active = false; checking = false; button.disabled = false; apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
+  revision++; clearTimeout(timer); active = false; checking = false; button.disabled = false; apiKey = ''; section.hidden = true; next.hidden = true; refreshButton.hidden = false; button.hidden = false; qr.hidden = true; qr.removeAttribute('src');
   var link = document.getElementById('purchase-link'); if (link) link.remove();
   document.getElementById('copy-key').disabled = !this.value.trim();
   say('账户凭据已更改，请重新查看权益。');
@@ -460,6 +461,7 @@ async function refresh() {
     section.hidden = false; qr.hidden = true;
     var oldLink = document.getElementById('purchase-link'); if (oldLink) oldLink.remove();
     active = result.status === 'active';
+    next.hidden = !active; refreshButton.hidden = active; button.hidden = active;
     if (active) {
       state.textContent = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。';
       say('请保存你的 API Key，用于 CLI、插件或换设备恢复账户。');
@@ -478,6 +480,7 @@ async function refresh() {
 if (form) form.addEventListener('submit', async function (event) {
   event.preventDefault(); if (button.disabled || checking) return;
   clearTimeout(timer); button.disabled = true; var attempt = ++revision; active = false;
+  say('正在准备账户与付款信息…');
   try {
     apiKey = document.getElementById('existingKey').value.trim();
     if (!apiKey) {
@@ -508,7 +511,6 @@ if (form) form.addEventListener('submit', async function (event) {
   } catch (error) { if (attempt === revision) say(error.message, true); }
   finally { if (attempt === revision) button.disabled = false; }
 });
-var refreshButton = document.getElementById('refresh');
 if (refreshButton) refreshButton.addEventListener('click', refresh);
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && apiKey && !button.disabled) refresh(); });
 // Saved credentials are restored explicitly through the form; do not create a session silently.
