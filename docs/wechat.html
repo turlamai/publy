@@ -33,7 +33,7 @@
 <p>In WeChat’s official interface-permission list, first confirm that the selected account has the required <strong>draft and material-upload API permissions</strong>. Actual permissions depend on that account. Publy cannot bypass platform verification or permissions. A successful credential check alone does not prove draft permission. If unavailable, continue with free local preview/copy; do not pay for hosting to “unlock WeChat permissions”.</p>
 <h2 id="2--copy-the-right-server-ip">2 · Copy the right server IP</h2>
 <ol>
-<li>Open <strong>your Publy service address followed by <code>/setup</code></strong>. Invited official-pilot users use the <a href="https://publy-api.jrtx.site/setup">official connection page</a>. Self-hosted users use their own service, not the official service’s IP.</li>
+<li>Open <strong>your Publy service address followed by <code>/setup</code></strong>. Invited official-pilot users use the <a href="https://publy-api.jrtx.site/setup?lang=en">official connection page</a>. Self-hosted users use their own service, not the official service’s IP.</li>
 <li>Enter your saved <strong>Publy API Key</strong> and click “Check my account”. If you do not have a key, use the invited signup path or ask your self-hosted operator. Do not use an administrator key in ordinary client settings.</li>
 <li>Under step 2, click “Copy server IP”. Copy only the IP, such as the documentation example <code>192.0.2.10</code> (not a usable production address).</li>
 <li>If the page says “IP unavailable”, ask the operator to verify actual egress. Do not substitute your computer IP, home broadband IP, a domain, <code>https://</code> or a port. Operators must identify all actual exits for a multi-egress deployment.</li>
@@ -41,12 +41,14 @@
 <h2 id="3--add-the-api-ip-whitelist-entry-in-wechat">3 · Add the API IP whitelist entry in WeChat</h2>
 <ol>
 <li>Return to the <a href="https://mp.weixin.qq.com/">Official Accounts Platform</a>, signed in to the <strong>correct account</strong>.</li>
-<li>Look for <strong>developer settings / developer interface management / basic configuration</strong> (开发设置 / 开发接口管理 / 基本配置). WeChat has different console versions. If the console says developer information has moved, follow its official <a href="https://developers.weixin.qq.com/platform/">WeChat developer platform</a> link, select this Official Account business, and look for <strong>API IP whitelist</strong> (API IP 白名单) in its basic information. Labels may vary; ask the account administrator about developer access if missing, rather than editing an unrelated whitelist.</li>
-<li>Select “Modify” or “Configure”, then <strong>add the server IP on a new line</strong>. Keep existing entries so other integrations continue to work. This is not “login security IP”, “business domain” or “JS interface security domain”.</li>
+<li>In the left sidebar, expand <strong>Settings and development (设置与开发) → Developer interface management (开发接口管理)</strong>. Do not modify an identically named IP setting in Security Center (安全中心) without confirming its purpose.</li>
+<li>The current console displays <strong>Developer management module migration notice (开发管理模块迁移通知)</strong>. It states that interface management moves to the WeChat developer platform from <strong>1 December 2025</strong>. Click the blue <strong>WeChat developer platform (微信开发者平台)</strong> link in that notice to open the <a href="https://developers.weixin.qq.com/platform/">official platform</a>. Continue there instead of searching for configuration fields on the old notice page.</li>
+<li>Confirm the selected Official Account name at the upper right; use its dropdown if you need to switch. Open <strong>Basic information (基础信息)</strong> and scroll to <strong>Developer keys (开发密钥)</strong>. This section shows both <strong>AppSecret</strong> and <strong>API IP whitelist (API IP 白名单)</strong>, with <strong>Edit (编辑)</strong> beside the whitelist. This is the setting used here.</li>
+<li>First check whether <strong>API IP whitelist</strong> already contains the server IP displayed by Publy. If present, keep it without adding a duplicate. Otherwise select <strong>Edit</strong>, then <strong>add the server IP on a new line</strong>. Keep existing entries so other integrations continue to work. This step changes only the API IP whitelist; leave AppSecret Reset/Freeze and the domain/message-push settings below unchanged.</li>
 <li>Complete WeChat’s administrator verification and save. Check that the added IP appears in the saved list, rather than merely in an unsaved field.</li>
 <li>Return to Publy and check the connection. For <code>40164</code> / “IP not whitelisted”, compare the <strong>actual egress IP reported by WeChat</strong> in Publy’s error with the saved list. If it differs from the connection-page IP, ask the operator to investigate changing egress; do not add guessed IPs repeatedly.</li>
 </ol>
-<p>Official consoles can change. These instructions distinguish feature names and old/new entry points. If labels differ, look for the API IP whitelist feature and ask the account administrator to confirm permissions.</p>
+<p>The old-console entry, migration notice and new-platform Basic information → Developer keys → API IP whitelist → Edit path were checked against official-console screenshots dated 24 November 2026. Menus may change later; interface permissions still depend on the selected account.</p>
 <h2 id="4--check-and-connect">4 · Check and connect</h2>
 <ol>
 <li>Obtain AppID and AppSecret from official WeChat developer settings. Use the existing verified secret; <strong>do not reset it merely to follow this guide</strong>. If lost, the administrator must check other integrations before following WeChat’s reset process, which can interrupt them.</li>
@@ -152,7 +154,7 @@
 <p>先在微信后台的接口权限列表确认你的公众号具有所需的<strong>草稿接口和素材上传接口</strong>。接口是否可用以该公众号官方后台实际显示为准；Publy 不能绕过认证或权限限制。只通过 AppID/AppSecret 校验，并不能证明草稿接口已获准使用。如果没有权限，可以继续免费本地预览/复制，暂不要购买托管来“解锁微信权限”。</p>
 <h2 id="2--复制正确的服务器-ip">2 · 复制正确的服务器 IP</h2>
 <ol>
-<li>打开<strong>你使用的 Publy 服务器地址后加 <code>/setup</code></strong>。例如，受邀使用官方内测的用户打开<a href="https://publy-api.jrtx.site/setup">官方连接页</a>；自托管用户打开自己的服务地址，不能照抄官方服务 IP。</li>
+<li>打开<strong>你使用的 Publy 服务器地址后加 <code>/setup</code></strong>。例如，受邀使用官方内测的用户打开<a href="https://publy-api.jrtx.site/setup?lang=zh">官方连接页</a>；自托管用户打开自己的服务地址，不能照抄官方服务 IP。</li>
 <li>填入之前保存的 <strong>Publy API Key</strong>，点击「查看我的账户」。首次还没有 Key 时，由受邀开户入口或你的自托管运营者提供；不要把管理员 Key 填进普通用户设置。</li>
 <li>在第 2 步找到「服务器出口 IP」，点击「复制服务器 IP」。只复制纯 IP，例如示例 <code>192.0.2.10</code>（这是文档示例，不能实际使用）。</li>
 <li>若显示「IP 未确认」，停止这一步，请运营者确认服务真实出口；不要把电脑 IP、家庭宽带 IP、域名、<code>https://</code> 或端口填进去。服务器有多个实际出口时，应由运营者确认完整列表。</li>
@@ -160,12 +162,14 @@
 <h2 id="3--在微信添加-api-ip-白名单">3 · 在微信添加 API IP 白名单</h2>
 <ol>
 <li>回到<a href="https://mp.weixin.qq.com/">微信公众号平台</a>，保持登录在<strong>正确的公众号</strong>。</li>
-<li>在后台寻找<strong>开发设置 / 开发接口管理 / 基本配置</strong>。微信后台有新旧版本；若页面提示开发者信息已迁移，点击后台给出的官方<a href="https://developers.weixin.qq.com/platform/">微信开发者平台</a>链接，选中对应公众号业务，再寻找基础信息中的 <strong>API IP 白名单</strong>。不同账号的菜单可能不同；找不到就让该公众号管理员确认开发权限，不要在其他“白名单”里试填。</li>
-<li>在 <strong>API IP 白名单</strong> 点击「修改」或「配置」，将刚复制的服务器 IP <strong>另起一行加入</strong>。保留原有条目，避免让其他正在使用的工具失效。不要填到「登录安全 IP」「业务域名」或「JS 接口安全域名」。</li>
+<li>在左侧展开 <strong>「设置与开发」→ 点击「开发接口管理」</strong>。不要根据名称在「安全中心」随意修改 IP 设置；这两个入口用途需要分别确认。</li>
+<li>当前后台会显示 <strong>「开发管理模块迁移通知」</strong>，说明开发接口管理自 <strong>2025 年 12 月 1 日起迁至微信开发者平台</strong>。点击通知正文中的蓝色 <strong>「微信开发者平台」</strong> 链接，进入<a href="https://developers.weixin.qq.com/platform/">官方开发者平台</a>。看到这份迁移通知后，应继续到新平台，而不是停在旧公众号页面寻找配置框。</li>
+<li>进入新平台后，核对右上角选中的公众号名称；如需切换，使用该名称旁的下拉按钮。点击顶部 <strong>「基础信息」</strong>，向下找到 <strong>「开发密钥」</strong>。这里同时显示 <strong>AppSecret</strong> 和 <strong>「API IP 白名单」</strong>，白名单右侧有 <strong>「编辑」</strong>。这就是本教程要操作的位置。</li>
+<li>先检查 <strong>「API IP 白名单」</strong> 是否已经包含 Publy 连接页显示的服务器 IP。如果已经有，直接保留，无需重复添加；如果没有，点击右侧 <strong>「编辑」</strong>，将服务器 IP <strong>另起一行加入</strong>。保留原有条目，避免让其他正在使用的工具失效。本步骤只处理 API IP 白名单，AppSecret 的「重置 / 冻结」和下面的域名、消息推送配置保持原状。</li>
 <li>按微信页面要求，由管理员扫码或完成验证，再保存。回到列表确认新增的 IP 仍在，而不是只停留在编辑框中。</li>
 <li>返回 Publy 连接页，继续检查。若微信返回 <code>40164</code> /「IP 不在白名单」，将 Publy 错误信息中<strong>微信实际报告的出口 IP</strong>与白名单逐字核对，再保存后重试。若它与连接页 IP 不同，请联系运营者排查出口变化，不要不断重复添加猜测的 IP。</li>
 </ol>
-<p>微信官方页面可能调整，以上保留功能名称和新旧入口提示。若实际菜单不同，请按「API IP 白名单」这个功能名称查找，并让公众号管理员确认权限。</p>
+<p>上述旧后台入口、迁移通知和新平台的「基础信息 → 开发密钥 → API IP 白名单 → 编辑」已根据 2026 年 11 月 24 日的官方页面截图核对。菜单后续可能调整，公众号接口权限仍以该账号实际页面为准。</p>
 <h2 id="4--检查并连接公众号">4 · 检查并连接公众号</h2>
 <ol>
 <li>在微信官方开发设置取得 AppID 和 AppSecret。使用已有且确认正确的 AppSecret；<strong>不要为跟随教程重置密钥</strong>。若无法找回，请让管理员先核对其他工具的使用情况，再按微信官方流程处理；重置会影响其他接入。</li>
