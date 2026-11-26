@@ -26,7 +26,7 @@
   .input { flex: 1; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--mute); font-size: 13px; display: flex; align-items: center; min-width: 0; }
   .input.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .drop { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font-size: 13px; display: inline-flex; align-items: center; gap: 10px; }
-  .drop::after { content: "▾"; color: var(--mute); font-size: 11px; }
+  .drop::after { content: "▾"; color: var(--mute); font-size: 12px; }
   .keyrow { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
   .connres { font-size: 13px; color: var(--accent); display: flex; align-items: center; gap: 6px; }
   .connres .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -37,7 +37,7 @@
   .custody { display: flex; gap: 10px; margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: var(--accent-soft); font-size: 13px; line-height: 1.7; color: var(--ink); }
   .custody .ic { color: var(--accent); font-weight: 700; flex: none; }
   .custody b { font-weight: 600; }
-  .custody code { font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .custody code { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 </style>
 </head>
 <body>
@@ -46,7 +46,7 @@
       <div class="lights"><i></i><i></i><i></i></div>
       <div class="tabs"><div class="tab active">居家咖啡指南.md</div></div>
       <div class="sp"></div>
-      <button class="iconbtn" id="themeBtn" title="切换亮暗主题">◐</button>
+      <button class="iconbtn quiet" id="themeBtn" title="切换深色主题" aria-label="切换深色主题"><svg class="ico-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"></path></svg><svg class="ico-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.2 8.2 0 0 1 8.8 4a8.4 8.4 0 1 0 11.2 11.2Z"></path></svg></button>
     </div>
     <div class="split">
       <section class="editor">
@@ -69,7 +69,7 @@
         <div class="dhead">
           <span class="crumb">设置 › <b>Publy</b></span>
           <span class="sp"></span>
-          <button class="iconbtn" title="关闭">✕</button>
+          <button class="iconbtn" title="关闭" aria-label="关闭">✕</button>
         </div>
         <div class="dbody">
           <div class="intro"><b>本地预览和复制富文本无需服务或账号。</b>若要保存到公众号草稿箱，先配置自己的 Publy 服务端、API key 和公众号账号，再测试连接；当前不提供可购买的托管服务。</div>
@@ -110,9 +110,9 @@
           <div class="sgrp">
             <h2>预览行为</h2>
             <div class="frow">
-              <div><div class="fl">打开笔记时自动预览</div><div class="fd">高频预览零交互；预览面板已开时切换笔记自动跟随</div></div>
+              <div><div class="fl" id="fl-autopreview">打开笔记时自动预览</div><div class="fd">高频预览零交互；预览面板已开时切换笔记自动跟随</div></div>
               <div class="sp"></div>
-              <div class="switch on"></div>
+              <div class="switch on" role="switch" aria-checked="true" aria-labelledby="fl-autopreview"></div>
             </div>
             <div class="frow">
               <div><div class="fl">界面语言</div><div class="fd">自动跟随 Obsidian 界面语言</div></div>

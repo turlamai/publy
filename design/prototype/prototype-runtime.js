@@ -16,7 +16,7 @@
   document.head.append(style);
   let timer;
   function status(s) { let el=$('#prototype-status'); if(!el){el=document.createElement('div');el.id='prototype-status';el.className='proto-status';el.setAttribute('role','status');document.body.append(el)} el.textContent=s;el.hidden=false;clearTimeout(timer);timer=setTimeout(()=>el.hidden=true,4200); }
-  function link(el, action) { if(!el)return;el.classList.add('proto-link');if(!el.matches('button,a,input,select,textarea')){el.tabIndex=0;el.setAttribute('role','button');el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();el.click()}})}el.addEventListener('click',e=>{e.preventDefault();action(el,e)}); }
+  function link(el, action) { if(!el)return;el.classList.add('proto-link');if(!el.matches('button,a,input,select,textarea')){el.tabIndex=0;if(!el.hasAttribute('role'))el.setAttribute('role','button');el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();el.click()}})}el.addEventListener('click',e=>{e.preventDefault();action(el,e)}); }
   function match(selector, pattern, action) { $$(selector).filter(el=>pattern.test(text(el)||el.title||el.getAttribute('aria-label')||'')).forEach(el=>link(el,action)); }
   const go = file => { location.href = file; };
   function nav(selector, mapping) { $$(selector).forEach(el=>{const label=text(el).replace(/\s+/g,' ');const route=Object.entries(mapping).find(([name])=>label.includes(name));if(route)link(el,()=>go(route[1]));}); }
@@ -32,6 +32,9 @@
   const app=$('#app')||document.body;
   if(read('dark',false))app.classList.add('dark');
   $('#themeBtn')?.addEventListener('click',()=>save('dark',app.classList.contains('dark')));
+  // Theme toggle: the accessible name and tooltip name the theme a click switches to.
+  function themeName(){const b=$('#themeBtn');if(!b)return;const dark=app.classList.contains('dark'),next=dark?'切换浅色主题':'切换深色主题';b.classList.toggle('is-dark',dark);b.setAttribute('aria-label',next);b.title=next}
+  themeName();new MutationObserver(themeName).observe(app,{attributes:true,attributeFilter:['class']});
   $$('button').forEach(b=>{if(!text(b)&&!b.getAttribute('aria-label'))b.setAttribute('aria-label',b.title||'操作')});
   window.Prototype={$, $$, text, esc, read, save, status, link, match, go, nav, modal, download, copy, choices, switches};
 })();
