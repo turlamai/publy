@@ -1,6 +1,6 @@
 <!doctype html><html lang="en" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy · 隐私 · Publy</title><link rel="stylesheet" href="web.css"><script src="site.js" defer></script></head><body><main class="pw-wrap"><nav class="pw-nav" aria-label="Publy"><a href="index.html">Publy</a><div class="pw-actions"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="hosted.html"><span data-lang="en">Hosted & pricing</span><span data-lang="zh">托管与购买</span></a><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary" data-theme-switch aria-pressed="false"><span data-lang="en">Theme</span><span data-lang="zh">主题</span></button></div></nav><article class="pw-prose"><div data-lang="en"><h1 id="publy-data-and-privacy-status">Publy data and privacy status</h1>
 <p><strong>English</strong> · <a href="privacy.html?lang=zh">简体中文</a></p>
-<p>Public hosting is not open. The old privacy page must not be treated as a promise from a running customer service. This page describes source/self-hosting boundaries, not a guarantee about a third-party deployment.</p>
+<p>Public hosted purchasing opened on 2026-11-26. For the operated service, Publy processes the account contact you register, your API key, the delivery-job metadata and payloads needed to create your drafts, service audit logs, and payment references returned by Alipay. Article content is only processed to deliver your draft; nothing is mass-sent or publicly posted. The self-hosting sections below describe the free path.</p>
 <table>
 <thead>
 <tr>
@@ -32,10 +32,10 @@
 </tbody>
 </table>
 <p>Self-hosting operators own file permissions, HTTPS/private tunnels, authentication, log redaction, encrypted backups and verified restore. Never publish a WebSocket URL containing a key. Unbinding inside an app does not necessarily revoke a WeChat credential or delete old backup copies; rotate exposed credentials at their issuer.</p>
-<p>Before public hosting launches, identify the actual operator, collected fields/purposes, third-party recipients, separate content/media/log/backup retention, export/deletion paths, support and incident response. Do not claim immediate deletion, a seven-day response or fully encrypted handling has already been delivered. Use <a href="https://github.com/turlamai/publy/issues">Issues</a> for non-sensitive problems only; never post personal data or credentials there.</p>
+<p>The complete hosted data-handling terms — operator identity, per-field retention, export/deletion paths and incident response — are being finalised against the running implementation and will be published on this page. Until then, the hosted service processes the minimal set described above; paid accounts may request account deletion via the repository Issues (do not post personal data or credentials publicly).</p>
 </div><div data-lang="zh"><h1 id="publy-数据与隐私状态">Publy 数据与隐私状态</h1>
 <p><a href="privacy.html?lang=en">English</a> · <strong>简体中文</strong></p>
-<p>当前公开托管未开放，不能把旧隐私页面当成已经运行的客户服务承诺。本页描述源码与自托管的数据边界，不保证某个第三方部署按此配置。</p>
+<p>公开托管购买已于 2026-11-26 开放。托管服务会处理你注册时填写的账号联系方式、你的 API Key、创建草稿所必需的排程任务元数据与内容、服务审计日志，以及支付宝返回的支付引用。文章内容仅用于创建你的草稿；不群发、不公开发布。下方自托管章节描述免费路径。</p>
 <table>
 <thead>
 <tr>
@@ -67,5 +67,5 @@
 </tbody>
 </table>
 <p>自托管者负责限制文件权限、HTTPS 或私有隧道、鉴权、日志脱敏、备份加密与恢复验证。不要公开包含 key 的 WebSocket URL。解绑应用内账号不等于微信端凭据自动撤销，也不等于备份中的旧副本已删除；泄露时应在微信或对应服务商处轮换。</p>
-<p>公开托管上线前，还需按实际实现明确经营者、收集字段与用途、第三方接收方、正文/媒体/日志/备份分别的保留期、导出和删除方式、客服与事件响应；不得提前承诺即时删除、7 天处理或全链路加密已经实现。非敏感问题走 <a href="https://github.com/turlamai/publy/issues">Issues</a>，不在公开 issue 提交个人数据或凭据。</p>
+<p>完整的托管数据处理条款——经营者身份、逐字段保留期、导出与删除路径、事件响应——正在按实际运行实现补充，并将在本页发布。在此之前，托管服务仅处理上段所述的最小集合；付费账号可通过仓库 Issues 申请删除账号（请勿在公开 issue 提交个人数据或凭据）。</p>
 </div></article><footer class="pw-step"><a href="wechat.html">WeChat setup · 公众号连接</a> · <a href="user-guide.html">User guide · 使用指南</a> · <a href="privacy.html">Privacy · 隐私</a> · <a href="terms.html">Terms · 条款</a></footer></main></body></html>
