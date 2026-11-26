@@ -33,7 +33,7 @@
 body {
   min-height: 100vh; display: grid; place-items: center; padding: 40px 24px;
   background: radial-gradient(1200px 800px at 20% 0%, #eef0f2, #e0e3e6 60%, #d3d7db);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   -webkit-font-smoothing: antialiased; color: var(--ink);
 }
 .dark body, body:has(.window.dark) { background: radial-gradient(1200px 800px at 20% 0%, #2a2a2a, #1c1c1c 60%, #121212); }
@@ -83,7 +83,7 @@ body {
 .src h1 { font-size: 24px; margin-bottom: 14px; }
 .src h2 { font-size: 18px; margin: 18px 0 8px; }
 .src p { margin: 8px 0; color: var(--ink); opacity: .88; }
-.src .fm { color: var(--mute); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.7; }
+.src .fm { color: var(--mute); font-family: ui-monospace, SFMono-Regular, Menlo, "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei", monospace; font-size: 13px; line-height: 1.7; }
 .src .tag { color: var(--accent); }
 
 /* ---- 右：Publy 面板（侧栏 leaf，窄幅垂直排布） ---- */
@@ -159,3 +159,11 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---- temperament profile pass ---- */
+/* typography baseline (family standard 2026-11-26-temperament-profiles): CJK/Latin spacing and kinsoku come from the rendering layer,
+   never from typed spaces (§4, §10). Values stay in the token block above. */
+body { text-autospace: normal; line-break: strict; }
+::selection { background: var(--accent-soft); color: var(--ink); }
+/* Paired neutral scrollbar for both themes; thin and non-distracting. */
+html { scrollbar-color: var(--line) transparent; }

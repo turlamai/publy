@@ -11,14 +11,14 @@
   .paper {
     max-width: 100%; margin: 0 auto; background: var(--paper); color: var(--paper-ink);
     border-radius: 10px; padding: 24px 22px 30px; box-shadow: var(--shadow-paper);
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   }
   .paper .title { margin: 0 0 12px; font-size: 21px; font-weight: 600; line-height: 1.4; letter-spacing: .01em; color: var(--paper-ink); }
   .paper .meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .paper .avatar { width: 20px; height: 20px; border-radius: 50%; background: rgba(183,92,61,.12); color: var(--wx-avatar); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .paper .acct { font-size: 13px; color: var(--wx-link); }
-  .paper .author { font-size: 13px; color: #999999; }
-  .paper .pill { margin-left: auto; font-size: 12px; color: #b0b0b0; background: #f6f6f6; border-radius: 999px; padding: 2px 9px; flex: none; }
+  .paper .author { font-size: 13px; color: var(--muted); }
+  .paper .pill { margin-left: auto; font-size: 12px; color: var(--muted); background: var(--tint); border-radius: 999px; padding: 2px 9px; flex: none; }
   .paper .hairline { height: 1px; background: var(--paper-line); margin: 14px 0 18px; }
   .paper .body { font-size: 15px; line-height: 1.6; }
   .paper .body p { margin: 0 0 14px; }
@@ -26,16 +26,16 @@
   .paper .body ul { margin: 0 0 14px; padding-left: 22px; }
   .paper .body li { margin: 4px 0; }
   .paper .body blockquote { border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--paper-ink); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 0 0 14px; font-size: 14px; }
-  .paper .body code { font-size: 13px; background: #f6f6f6; border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .paper .body code { font-size: 13px; background: #f6f6f6; border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, "Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei", monospace; }
   .paper .body sup { color: var(--wx-link); font-size: 12px; }
   .imgph {
     height: 150px; border-radius: 8px; margin: 0 0 4px;
     background: linear-gradient(135deg, #3d3126, #6b5335 60%, #8a6a3e);
     display: flex; align-items: flex-end; justify-content: flex-start; color: rgba(255,255,255,.85); font-size: 12px; padding: 8px 10px;
   }
-  .figcap { font-size: 12px; color: #999999; margin: 0 0 14px; }
-  .fnotes { border-top: 1px solid var(--paper-line); margin-top: 20px; padding-top: 10px; font-size: 13px; color: #888888; line-height: 1.7; }
-  .fnotes a { color: var(--wx-link); text-decoration: none; }
+  .figcap { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+  .fnotes { border-top: 1px solid var(--paper-line); margin-top: 20px; padding-top: 10px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .fnotes a { color: var(--green); text-decoration: none; }
 </style>
 </head>
 <body>
