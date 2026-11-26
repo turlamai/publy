@@ -396,7 +396,7 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(-
 ${WEB_CSS}</style></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管版 Personal · ¥29 / 月</h1>
-<p class="lead">一次购买一个自然月，不自动续费。含每月 30 次成功草稿投递、1 个公众号、固定出口 IP、凭据保管、排程与恢复。只创建草稿，不群发。</p>
+<p class="lead">在 Obsidian 里写完，草稿一键直达公众号草稿箱：排版、图片上传、白名单、凭据保管、失败恢复全部由托管服务处理。每月含 30 次成功投递，只创建草稿，不群发。</p>
 <form class="card" id="buy">
   <label class="field" for="contact">联系方式（仅首次开户填写，用于找回账户）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com">
