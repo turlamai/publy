@@ -51,8 +51,7 @@
             <nav class="kit-nav-links">
                 <a href="#how" data-i18n="nav.how">使用方式</a>
                 <a href="start.html" data-i18n="nav.start">开始使用</a>
-                <a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a>
-                <a href="hosted.html" data-i18n="nav.hosted">购买</a>
+                <a href="#pricing" data-i18n="nav.hosted">定价</a>
             </nav>
             <div class="kit-nav-actions">
                 <div class="kit-lang">
@@ -82,7 +81,7 @@
                 <p class="kit-lead" data-i18n="hero.lead">在 Obsidian 中专心写作，Publy 帮你排版、检查图片并投递草稿。无需反复复制粘贴，最终发布仍由你决定。</p>
                 <div class="kit-btn-row">
                     <a class="kit-btn kit-btn--primary" href="https://publy-api.jrtx.site/hosted"><span data-i18n="hero.cta-hosted">立即购买 ¥29/月</span><span aria-hidden="true">→</span></a>
-                    <a class="kit-btn kit-btn--secondary" href="start.html"><span data-i18n="hero.cta-start">上手指南</span><span aria-hidden="true">→</span></a>
+                    <a class="kit-btn kit-btn--secondary" href="start.html"><span data-i18n="hero.cta-start">免费开始</span><span aria-hidden="true">→</span></a>
                 </div>
                 <p class="kit-hero-meta"><span class="kit-badge" data-i18n="hero.note">本地排版免费 · 托管版每月 30 次成功草稿投递</span></p>
 
@@ -145,6 +144,27 @@
             </div>
         </section>
 
+        <section class="kit-section" id="pricing">
+            <div class="kit-container">
+                <h2 class="kit-h2"><span data-lang="zh">选择适合你的版本</span><span data-lang="en">Choose your plan</span></h2>
+                <div class="pricing-grid">
+                    <article class="kit-card notice pricing-plan">
+                        <h3><span data-lang="zh">免费版</span><span data-lang="en">Free</span></h3>
+                        <h2 class="kit-h2 pricing-amount">¥0</h2>
+                        <p><span data-lang="zh">本地预览、排版、复制及自托管。</span><span data-lang="en">Local preview, formatting, copying and self-hosting.</span></p>
+                        <a class="kit-btn kit-btn--secondary" href="start.html"><span data-lang="zh">免费开始</span><span data-lang="en">Get started</span></a>
+                    </article>
+                    <article class="kit-card notice">
+                        <h3>Personal</h3>
+                        <h2 class="kit-h2 pricing-amount">¥29 <small style="font-size:.4em"><span data-lang="zh">/ 自然月</span><span data-lang="en">/ calendar month</span></small></h2>
+                        <p><span data-lang="zh">30 次成功草稿投递 · 1 个公众号 · 托管与排程。</span><span data-lang="en">30 successful draft deliveries · 1 Official Account · hosting and scheduling.</span></p>
+                        <a class="kit-btn kit-btn--primary" href="https://publy-api.jrtx.site/hosted"><span data-lang="zh">立即开通</span><span data-lang="en">Buy now</span></a>
+                        <p style="margin-top:12px"><a class="text-link" href="hosted.html"><span data-lang="zh">查看服务详情</span><span data-lang="en">Plan details</span></a></p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
         <!-- Details -->
         <section class="kit-section kit-section--alt" id="details">
             <div class="kit-container detail-grid">
@@ -178,27 +198,6 @@
                         <strong data-i18n="details.r6.t">你的文件</strong>
                         <p data-i18n="details.r6.b">笔记仍由你在原处管理，Publy 不替你建立另一套笔记库。</p>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="kit-section" id="pricing">
-            <div class="kit-container">
-                <h2 class="kit-h2"><span data-lang="zh">选择适合你的版本</span><span data-lang="en">Choose your plan</span></h2>
-                <div class="start-grid" style="margin-top:24px;gap:24px">
-                    <article class="kit-card notice">
-                        <h3><span data-lang="zh">免费版</span><span data-lang="en">Free</span></h3>
-                        <h2 class="kit-h2">¥0</h2>
-                        <p><span data-lang="zh">本地预览、排版、复制及自托管。</span><span data-lang="en">Local preview, formatting, copying and self-hosting.</span></p>
-                        <a class="kit-btn kit-btn--secondary" href="start.html"><span data-lang="zh">免费开始</span><span data-lang="en">Get started</span></a>
-                    </article>
-                    <article class="kit-card notice">
-                        <h3>Personal</h3>
-                        <h2 class="kit-h2">¥29 <small style="font-size:.4em"><span data-lang="zh">/ 自然月</span><span data-lang="en">/ calendar month</span></small></h2>
-                        <p><span data-lang="zh">30 次成功草稿投递 · 1 个公众号 · 托管与排程。</span><span data-lang="en">30 successful draft deliveries · 1 Official Account · hosting and scheduling.</span></p>
-                        <a class="kit-btn kit-btn--primary" href="https://publy-api.jrtx.site/hosted"><span data-lang="zh">立即开通</span><span data-lang="en">Buy now</span></a>
-                        <p style="margin-top:12px"><a class="text-link" href="hosted.html"><span data-lang="zh">查看服务详情</span><span data-lang="en">Plan details</span></a></p>
-                    </article>
                 </div>
             </div>
         </section>
@@ -293,12 +292,12 @@
             }
         },
         "zh": {
-            "nav.how": "使用方式", "nav.start": "开始使用", "nav.hosted": "购买",
+            "nav.how": "使用方式", "nav.start": "开始使用", "nav.hosted": "定价",
             "hero.eyebrow": "为微信公众号创作者打造",
             "hero.h1a": "将 Markdown 文章",
             "hero.h1b": "一键投递到公众号草稿箱。",
             "hero.lead": "在 Obsidian 中专心写作，Publy 帮你排版、检查图片并投递草稿。无需反复复制粘贴，最终发布仍由你决定。",
-            "hero.cta-start": "上手指南",
+            "hero.cta-start": "免费开始",
             "hero.cta-hosted": "立即购买 ¥29/月",
             "hero.cta-api": "查看 API 指南",
             "hero.note": "本地排版免费 · 托管版每月 30 次成功草稿投递",
@@ -375,7 +374,7 @@
             "hero.h1a": "Turn Markdown articles",
             "hero.h1b": "into WeChat drafts.",
             "hero.lead": "Write in Obsidian. Publy formats your article, checks images and delivers a draft to WeChat. Skip the copy and paste; stay in control of publication.",
-            "hero.cta-start": "Setup guide",
+            "hero.cta-start": "Start for free",
             "hero.cta-hosted": "Buy hosted · ¥29/mo",
             "hero.cta-api": "Read the API guide",
             "hero.note": "Free local formatting · 30 successful draft deliveries per hosted month",
