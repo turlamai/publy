@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hosted Personal · 托管版 · ¥29/月</title>
-<meta name="description" content="Publy hosted draft delivery is open: Personal ¥29 per calendar month, one purchase per month, no auto-renewal. Fixed egress IP, credential custody, draft recovery, scheduling and quotas.">
+<title>购买托管版 · ¥29/月 · Publy</title>
+<meta name="description" content="Publy 托管版 Personal：¥29 一个自然月，不自动续费。稳定出口 IP、凭据保管、草稿恢复、排程与月度配额。注册并扫码即开。">
 <link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
       <a href="index.html"><span data-lang="en">Product</span><span data-lang="zh">产品</span></a>
       <a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a>
       <a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a>
-      <a href="hosted.html" aria-current="page"><span data-lang="en">Pricing</span><span data-lang="zh">托管与购买</span></a>
+      <a href="hosted.html" aria-current="page"><span data-lang="en">Pricing</span><span data-lang="zh">购买</span></a>
       <a href="https://github.com/turlamai/publy">GitHub</a>
     </div>
     <button class="secondary" type="button" data-theme-switch aria-pressed="false">亮 / 暗</button><div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
@@ -25,57 +25,34 @@
 <main>
 <section class="wrap hero">
   <div>
-    <div class="kicker"><span data-lang="en">Hosted service</span><span data-lang="zh">托管服务</span></div>
-    <h1><span data-lang="en">Now open.<br>¥29 / calendar month.</span><span data-lang="zh">已开放。<br>¥29 / 个自然月。</span></h1>
-    <p class="lead"><span data-lang="en">The hosted version is the same draft-delivery service, operated for you with a stable egress IP, credential custody and recovery. One purchase covers one calendar month. It never auto-renews — you buy the next month only when you want it.</span><span data-lang="zh">托管版就是同一套草稿投递服务，由我们代运营，提供稳定出口 IP、凭据保管与恢复。一次购买覆盖一个自然月，绝不自动续费——下个月要不要续，由你自己决定。</span></p>
+    <div class="kicker"><span data-lang="en">Hosted Personal</span><span data-lang="zh">托管版 · Personal</span></div>
+    <h1><span data-lang="en">¥29 / calendar month.<br>No auto-renewal.</span><span data-lang="zh">¥29 / 个自然月。<br>不自动续费。</span></h1>
+    <p class="lead"><span data-lang="en">One purchase covers one month. Scan, pay, and drafts start flowing — no subscription, no card on file.</span><span data-lang="zh">一次购买覆盖一个自然月。扫码支付后立即生效——没有订阅，不绑卡，到期不自动扣款。</span></p>
     <div class="buttons">
-      <a class="btn primary" href="https://publy-api.jrtx.site/hosted"><span data-lang="en">Sign up &amp; buy now</span><span data-lang="zh">注册并购买</span> →</a>
-      <a class="btn" href="start.html"><span data-lang="en">Or use the free self-hosted path</span><span data-lang="zh">或使用免费的自托管路径</span></a>
+      <a class="btn primary" href="https://publy-api.jrtx.site/hosted"><span data-lang="en">Buy now</span><span data-lang="zh">立即购买</span> →</a>
     </div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:12px"><span data-lang="en">Alipay only · activates automatically after payment · refund via Alipay revokes access</span><span data-lang="zh">仅支持支付宝 · 付款后自动开通 · 退款即撤销权益</span></p>
   </div>
   <aside class="note">
-    <strong><span data-lang="en">What you get.</span><span data-lang="zh">你得到什么。</span></strong>
-    <span data-lang="en"> Fixed WeChat-accepted egress IP, AppSecret kept server-side, draft recovery with unknown-outcome handling, server-side scheduling and an atomic monthly quota. Draft-only: no mass-send, no public posting.</span>
-    <span data-lang="zh"> 微信白名单认可的固定出口 IP，AppSecret 只留在服务端；草稿恢复与未知结果处理；服务端排程与原子化月度额度。只投草稿：不群发、不公开发布。</span>
+    <strong><span data-lang="en">Included.</span><span data-lang="zh">包含什么。</span></strong>
+    <span data-lang="en"> 30 successful draft deliveries per month · 1 Official Account · fixed WeChat-accepted egress IP · AppSecret kept server-side · draft recovery with unknown-outcome handling · server-side scheduling. Draft-only: no mass-send, no public posting.</span>
+    <span data-lang="zh"> 每月 30 次成功草稿投递 · 1 个公众号 · 微信白名单认可的固定出口 IP · AppSecret 只存服务端 · 草稿恢复与未知结果处理 · 服务端排程。只投草稿：不群发、不公开发布。</span>
   </aside>
 </section>
 
-<section class="wrap section"><p><a href="wechat.html"><span data-lang="en">After signup, follow the WeChat connection guide.</span><span data-lang="zh">注册后，先看公众号连接与白名单教程。</span></a></p>
-  <div class="section-head"><div><div class="kicker"><span data-lang="en">What it adds</span><span data-lang="zh">托管提供什么</span></div><h2><span data-lang="en">Reliability, not lock-in.</span><span data-lang="zh">可靠投递，不锁定内容。</span></h2></div><p><span data-lang="en">The hosted service sells operational reliability and recovery — never moving content between editors.</span><span data-lang="zh">付费服务卖的是运营可靠性与恢复能力，不是编辑器之间的搬运。</span></p></div>
+<section class="wrap section">
+  <div class="section-head"><div><div class="kicker"><span data-lang="en">Three steps</span><span data-lang="zh">三步开通</span></div><h2><span data-lang="en">Buy, connect, send.</span><span data-lang="zh">购买、连接、投递。</span></h2></div></div>
   <div class="grid">
-    <div class="card"><h3><span data-lang="en">Fixed egress + credentials</span><span data-lang="zh">固定出口 + 凭据保管</span></h3><p><span data-lang="en">A stable server IP accepted by WeChat, with the AppSecret kept server-side and never sent to the client.</span><span data-lang="zh">微信白名单认可的稳定 IP；AppSecret 只留在服务端，不下发客户端。</span></p></div>
-    <div class="card"><h3><span data-lang="en">Draft recovery</span><span data-lang="zh">草稿恢复</span></h3><p><span data-lang="en">Confirmed vs unknown outcomes, same-request retry and operator reconciliation against the WeChat draft box.</span><span data-lang="zh">区分已确认与结果未知；同请求重试；运营者按微信草稿箱核对。</span></p></div>
-    <div class="card"><h3><span data-lang="en">Scheduling + quota</span><span data-lang="zh">排程与配额</span></h3><p><span data-lang="en">Server-side scheduled drafts, cancellation before send and an atomic monthly allowance.</span><span data-lang="zh">服务端排程草稿、发送前取消，以及原子化的月度额度。</span></p></div>
-    <div class="card"><h3><span data-lang="en">Still draft-only</span><span data-lang="zh">仍然只到草稿</span></h3><p><span data-lang="en">No mass-send and no public posting. You review and publish in WeChat yourself.</span><span data-lang="zh">不群发、不公开发布；最终检查与发布仍由你在微信后台完成。</span></p></div>
-  </div>
-</section>
-
-<section class="wrap section">
-  <div class="section-head"><div><div class="kicker"><span data-lang="en">How it works</span><span data-lang="zh">购买与开通</span></div><h2><span data-lang="en">Three steps to your first draft.</span><span data-lang="zh">三步到第一篇草稿。</span></h2></div></div>
-  <div class="card">
-    <ol>
-      <li><span data-lang="en"><strong>Sign up</strong> at the hosted service page — it creates your account and the API key you paste into the Obsidian plugin or CLI.</span><span data-lang="zh"><strong>注册</strong>：在托管服务页创建账号，得到 API Key，填进 Obsidian 插件或 CLI。</span></li>
-      <li><span data-lang="en"><strong>Bind your Official Account</strong> on the <code>/setup</code> page and add the server IP to your WeChat API IP whitelist (full walkthrough in the <a href="wechat.html">connection guide</a>).</span><span data-lang="zh"><strong>绑定公众号</strong>：在 <code>/setup</code> 页完成绑定，并把服务器 IP 加进微信 API IP 白名单（完整教程见<a href="wechat.html">连接指南</a>）。</span></li>
-      <li><span data-lang="en"><strong>Buy the month</strong>: on the same page, scan the Alipay QR for the ¥29 month pack. Entitlement activates automatically, survives server restarts, and expires at the end of the paid month — buy again only if you want to continue.</span><span data-lang="zh"><strong>购买当月</strong>：在同一页面扫码支付 ¥29 月包。权益自动开通、服务重启后依然有效，到到期日为止——想继续再手动续购。</span></li>
-    </ol>
-    <p style="font-size:12.5px;color:var(--muted);margin-top:12px"><span data-lang="en">Price: ¥29 per calendar month (CNY 2900 minor units), Alipay only, one-time payment — no card on file, no automatic renewal. Refunds go through Alipay's official path; a completed refund revokes the entitlement on the next verified check.</span><span data-lang="zh">价格：¥29 / 自然月，仅支持支付宝，一次付款——不存卡、不自动扣款。退款走支付宝官方渠道；退款完成后，权益在下一次校验时即被撤销。</span></p>
-  </div>
-</section>
-
-<section class="wrap section">
-  <div class="hosted">
-    <div>
-      <h2><span data-lang="en">The free path stays free.</span><span data-lang="zh">免费路径保持免费。</span></h2>
-      <p><span data-lang="en">Local preview and rich-text copy need no account at all, and the self-hosted server is yours to run under the same AGPL core. Annual and Studio plans are not offered yet; when they appear, they will be announced here and in the repository releases.</span><span data-lang="zh">本地预览与富文本复制完全不需要账号；自托管服务在同样的 AGPL 核心下归你自己运行。年付与 Studio 档暂未开放，开放时会在这里和仓库 Release 同步公告。</span></p>
-    </div>
-    <a class="btn" href="start.html"><span data-lang="en">Start free</span><span data-lang="zh">免费开始</span> →</a>
+    <div class="card"><h3><span data-lang="en">1 · Buy</span><span data-lang="zh">1 · 购买</span></h3><p><span data-lang="en">Tap <a href="https://publy-api.jrtx.site/hosted">Buy now</a>, register with your contact, scan the Alipay QR. The month activates automatically and survives restarts.</span><span data-lang="zh">点<a href="https://publy-api.jrtx.site/hosted">立即购买</a>，填写联系方式，扫支付宝二维码。当月自动生效，服务重启不影响。</span></p></div>
+    <div class="card"><h3><span data-lang="en">2 · Connect</span><span data-lang="zh">2 · 连接</span></h3><p><span data-lang="en">Paste your API key into the Obsidian plugin, and bind your Official Account on the <code>/setup</code> page (<a href="wechat.html">step-by-step guide</a>).</span><span data-lang="zh">把 API Key 填进 Obsidian 插件，在 <code>/setup</code> 页绑定公众号（<a href="wechat.html">手把手教程</a>）。</span></p></div>
+    <div class="card"><h3><span data-lang="en">3 · Send</span><span data-lang="zh">3 · 投递</span></h3><p><span data-lang="en">Preview locally, then send the draft — it lands in your WeChat draft box, ready to publish.</span><span data-lang="zh">本地预览后一键投递——草稿直达你的公众号草稿箱，随时发布。</span></p></div>
   </div>
 </section>
 </main>
 
 <footer><div class="wrap inner">
-  <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Free local tools. Hosted delivery ¥29/month.</span><span data-lang="zh">本地工具免费，托管投递 ¥29/月。</span></div></div>
-  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Pricing</span><span data-lang="zh">托管与购买</span></a><a href="https://github.com/turlamai/publy/blob/main/PRICING.md"><span data-lang="en">Pricing policy</span><span data-lang="zh">定价政策</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
+  <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Local tools free · Hosted ¥29/month · <a href="https://github.com/turlamai/publy">self-hosting in the open-source repo</a></span><span data-lang="zh">本地工具免费 · 托管 ¥29/月 · <a href="https://github.com/turlamai/publy">自部署见开源仓库</a></span></div></div>
+  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Pricing</span><span data-lang="zh">购买</span></a><a href="https://github.com/turlamai/publy/blob/main/PRICING.md"><span data-lang="en">Pricing policy</span><span data-lang="zh">定价政策</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
 </div></footer>
 <script src="site.js"></script>
 </body>
