@@ -9,10 +9,10 @@ header { position: sticky; top: 0; z-index: 20; background:var(--paper); border-
 .nav { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 750; color: var(--ink); }
 .brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--green); color: #fff; display: inline-grid; place-items: center; font-size: 13px; }
-.navlinks { display: flex; gap: 22px; font-size: 13px; color: var(--muted); }
+.navlinks { display: flex; flex-wrap: wrap; row-gap: 4px; gap: 14px 22px; font-size: 13px; color: var(--muted); }
 .navlinks a { color: inherit; }
 .navlinks a[aria-current="page"] { color: var(--ink); font-weight: 650; }
-.nav-right { display: flex; align-items: center; gap: 16px; }
+.nav-right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .langs { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
 .langs button { border: 0; background: transparent; padding: 5px 10px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
 .langs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
