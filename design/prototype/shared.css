@@ -6,12 +6,14 @@
   --bg-alt: #f2f3f5;        /* Obsidian --background-secondary */
   --line: #dcdde0;          /* Obsidian --background-modifier-border */
   --ink: #222222;
-  --mute: #7a7a7a;
-  --accent: #07c160;        /* --publy-accent 微信绿 */
-  --accent-hover: #06ad56;
+  --mute: #6f6f6f;
+  /* 微信绿，同一色相的亮色取值：可作文字与主按钮底（对白底 5.13:1）；暗色用回原值 #07c160。 */
+  --accent: #057f3f;        /* --publy-accent 微信绿 */
+  --accent-hover: #047239;
+  --accent-contrast: #ffffff; /* accent 之上的文字/图标 */
   --accent-soft: rgba(7,193,96,.10);
-  --danger: #e5484d;        /* --publy-danger */
-  --amber: #b8860b;         /* --publy-amber */
+  --danger: #d61e24;        /* --publy-danger */
+  --amber: #8d6608;         /* --publy-amber */
   --paper: #ffffff;         /* 公众号纸面：恒白 */
   --paper-ink: #1a1a1a;
   --paper-line: #f0f0f0;
@@ -22,6 +24,7 @@
 .dark {
   --bg: #1e1e1e; --bg-alt: #161616; --line: #363636;
   --ink: #dcddde; --mute: #999999;
+  --accent: #07c160; --accent-hover: #1ecb75; --accent-contrast: #102016;
   --accent-soft: rgba(7,193,96,.14);
   --danger: #f87171; --amber: #d9a514;
   --shadow-paper: 0 1px 3px rgba(0,0,0,.5), 0 12px 36px rgba(0,0,0,.6);
@@ -100,14 +103,14 @@ body {
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
 .toolbar .sp { flex: 1 1 0; }
 .tbtn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 10px; border-radius: 6px;
   border: 1px solid var(--line); background: transparent; color: var(--ink);
   font-size: 13px; line-height: 1.4; cursor: pointer; font-family: inherit;
 }
 .tbtn:hover { background: var(--bg-alt); }
-.tbtn.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 500; }
+.tbtn.primary { background: var(--accent); border-color: transparent; color: var(--accent-contrast); font-weight: 500; }
 .tbtn.primary:hover { background: var(--accent-hover); }
-.tbtn.primary .spin { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: rotate .7s linear infinite; }
+.tbtn.primary .spin { width: 12px; height: 12px; border: 2px solid color-mix(in srgb, var(--accent-contrast) 35%, transparent); border-top-color: var(--accent-contrast); border-radius: 50%; animation: rotate .7s linear infinite; }
 @keyframes rotate { to { transform: rotate(360deg); } }
 .segpill { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
 .segpill .seg { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 24px; border: none; background: transparent; color: var(--mute); cursor: pointer; font-size: 12px; }

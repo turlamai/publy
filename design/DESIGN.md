@@ -27,7 +27,7 @@ Tokens 提取自 `packages/obsidian-plugin/styles.css` 现行值；亮暗两套�
 |---|---|
 | `--bg --bg-alt --line` | 面板画布（Obsidian `--background-primary`）/ 次级画布卡片底（`--background-secondary`）/ 描边分隔（`--background-modifier-border`） |
 | `--ink --mute` | 主/次级文字 |
-| `--accent --accent-hover --accent-soft` | 微信绿：主投递按钮/选中态/成功态（`--publy-accent`）+ 悬停进行中 + 弱底 |
+| `--accent --accent-hover --accent-contrast --accent-soft` | 微信绿：主投递按钮/选中态/成功态（`--publy-accent`）+ 悬停进行中 + accent 之上的文字与图标 + 弱底 |
 | `--danger --amber` | 失败/拦截（`--publy-danger`）/ 已排期·结果未知·警告（`--publy-amber`） |
 | `--paper --paper-ink` | 公众号纸面：恒白恒黑不随主题变化（唯一恒白表面，见不变式 1） |
 | `--wx-link --wx-avatar` | 微信账号名蓝（views.ts meta 行）/ 头像锈红（微信品牌色，不随主题变化） |
@@ -117,4 +117,30 @@ Operator follow-up within #107: `prototype/operator-web.html` records the shared
 
 **偏离登记**：主题切换图标用家族线性 SVG，与上文「图标」一行的 unicode 优先不同。其余 unicode 符号（↻ ⧉ ➤ ≡ ✕ ▾）本轮未换，留待下一切片与实现（`views.ts` 已用 `setIcon`）一并对齐。
 
-**仍开放（需产品决策）**：① `setup.html` 导航栏的主题切换是带文字的 `.secondary` 按钮，与同栏 EN / 中文 一致，线上另 7 个公开页共用同类写法（文案在 `design/` 之外）；换成家族图标要连同 `docs/*.html` 与 `scripts/build-user-pages.mjs` 一起改。② 浅色主题对比度均来自 token 值：`--mute` 4.29:1（`bg-alt` 上 3.87:1）、绿色文字 2.15:1、主按钮白字 2.38:1、`--amber` 3.25:1、`--danger` 3.91:1。③ 结果条与历史行里的小号 `.tbtn` 高约 25px，低于紧凑控件的 28px。④ `settings.html` 的主题按钮被弹窗遮罩盖住，深浅色靠其他页面记住的偏好。
+**仍开放（需产品决策）**：① `setup.html` 导航栏的主题切换是带文字的 `.secondary` 按钮，与同栏 EN / 中文 一致，线上另 7 个公开页共用同类写法（文案在 `design/` 之外）；换成家族图标要连同 `docs/*.html` 与 `scripts/build-user-pages.mjs` 一起改。② ~~浅色主题对比度~~ 已于 2026-11-26 落地，见下节。③ ~~小号 `.tbtn` 高约 25px~~ 已随下节改为 `min-height: 28px`。④ `settings.html` 的主题按钮被弹窗遮罩盖住，深浅色靠其他页面记住的偏好。
+
+## 对比度落地（2026-11-26）
+
+起始 SHA `a0b731c`，只改 `design/prototype/shared.css` 与本文件。上节「仍开放」②③由 owner 授权按「保色相、普通文字不低于 4.5:1」处理。
+
+| Token | 亮色 | 暗色 | 说明 |
+|---|---|---|---|
+| `--accent` | `#07c160` → `#057f3f` | `#07c160`（不变） | 同一绿色色相。亮色作为文字对白底 5.13、`bg-alt` 4.62、弱底 4.68；暗色原值对深底已有 6.99。与公开网页 `public-web.css` 的配对一致（亮 `#176842` / 暗 `#9ed7ad`）。 |
+| `--accent-hover` | `#06ad56` → `#047239` | 新增 `#1ecb75` | 悬停只做明度微调。 |
+| `--accent-contrast` | 新增 `#ffffff` | 新增 `#102016` | 主按钮文字与进行中图标。暗色 accent 偏亮，白字只有 2.38，改用深墨。 |
+| `--mute` | `#7a7a7a` → `#6f6f6f` | 不变 | `bg-alt` 上 3.87 → 4.56。 |
+| `--amber` | `#b8860b` → `#8d6608` | 不变 | 白底 3.25 → 5.19。 |
+| `--danger` | `#e5484d` → `#d61e24` | 不变 | 白底 3.91 → 5.14。 |
+
+`.tbtn` 加 `min-height: 28px`，结果条与历史行里的小号按钮不再只有约 25px 高。
+
+**登记例外（对比度，内容示意）**：`preview-cards.html` 的 `.card`、`.canvas` 内文字与字面量 `#07c160`，`preview-article.html` 的 `.paper` 内文字，以及编辑器正文里的 `.figcap` / `.fnotes` / `.proto-link`。
+- 场景：预览面板里的卡片图片示意、恒白的公众号纸面、作为上下文的编辑器正文。
+- 偏离项：普通文字对比度 4.5:1。
+- 用户收益：这些字代表导出图片与用户文档的实际样子，不是界面；按界面上调会让预览失真。
+- 替代方案：承载操作与状态的界面文字全部走 token，已过线。
+- 验收证据：渲染 `low` 的 32 个节点全部落在上述三类内容内。
+
+**产品侧待同步**：值类 token 真源是 `packages/obsidian-plugin/styles.css`，本轮只改了原型镜像；产品样式与 `server` 暗色页随下一个实现切片对齐，属于漂移台账项。
+
+验证：无头 Edge 1280×800，9 页 × 亮/暗，低于 4.5:1 的文字对由 159 / 34 降为 32 / 32（全部在登记的内容示意内）；小字、溢出、可访问名称无变化。
