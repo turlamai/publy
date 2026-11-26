@@ -12,12 +12,14 @@ function browserFixture(fetcher: (url:string, init:any)=>Promise<any>) {
       removeAttribute(name:string){delete this[name];},remove(){elements.delete(id);},appendChild(child:any){elements.set(child.id,child);}});
     return elements.get(id);
   };
-  const document={getElementById:(id:string)=>id==='purchase-link'?(elements.get(id)||null):element(id),createElement:()=>({}),visibilityState:'visible'};
+  const events=new Map<string,()=>unknown>();
+  const timers=new Map<number,()=>Promise<void>>();let sequence=0;
+  const document={addEventListener:(name:string,fn:()=>unknown)=>events.set(name,fn),getElementById:(id:string)=>id==='purchase-link'?(elements.get(id)||null):element(id),createElement:()=>({}),visibilityState:'visible'};
   const saved=new Map([['publy_hosted_api_key','fixture-old']]);
-  const context=vm.createContext({document,fetch:fetcher,sessionStorage:{getItem:(k:string)=>saved.get(k),setItem:(k:string,v:string)=>saved.set(k,v)},setTimeout:()=>1,clearTimeout:()=>{},navigator:{clipboard:{writeText:async()=>{}}}});
+  const context=vm.createContext({document,fetch:fetcher,sessionStorage:{getItem:(k:string)=>saved.get(k),setItem:(k:string,v:string)=>saved.set(k,v)},setTimeout:(fn:()=>Promise<void>)=>{timers.set(++sequence,fn);return sequence;},clearTimeout:(id:number)=>timers.delete(id),navigator:{clipboard:{writeText:async()=>{}}}});
   const script=hostedPurchasePage(true,undefined,true).match(/<script>([\s\S]*?)<\/script>/)![1];
   vm.runInContext(script,context);
-  return {element,saved,submit:()=>element('buy').handlers.submit({preventDefault(){}})};
+  return {element,saved,events,timers,tick:async()=>{const next=timers.entries().next().value;if(next){timers.delete(next[0]);await next[1]();}},submit:()=>element('buy').handlers.submit({preventDefault(){}})};
 }
 const response=(value:unknown)=>({ok:true,json:async()=>value});
 
@@ -43,4 +45,20 @@ test('clearing a saved key uses explicit signup rather than silently reusing the
   assert.equal(requests[0].url,'/v1/signup');assert.equal(requests[0].key,undefined);
   assert.deepEqual(requests.slice(1).map(r=>r.key),['fixture-new','fixture-new']);
   assert.equal(ui.saved.get('publy_hosted_api_key'),'fixture-new');
+});
+
+test('pending checkout polls until confirmed and removes the payment link on activation', async()=>{
+  let checks=0;
+  const ui=browserFixture(async(url)=>response(url==='/v1/hosted/status'?(++checks<3?{status:'purchase_required',purchaseUrl:'https://example.test/pay'}:{status:'active',validUntil:'2026-12-01T00:00:00Z'}):{}));
+  await ui.submit();
+  assert.equal(ui.timers.size,1);
+  assert.equal(ui.element('purchase-link').href,'https://example.test/pay');
+  await ui.tick();
+  assert.equal(ui.timers.size,1);
+  await ui.tick();
+  assert.equal(checks,3);
+  assert.equal(ui.timers.size,0);
+  assert.match(ui.element('direct-state').textContent,/已开通/);
+  assert.equal(ui.element('direct-qr').hidden,true);
+  assert.equal(ui.element('purchase-link').href,undefined);
 });
