@@ -168,6 +168,7 @@ Operator follow-up within #107: `prototype/operator-web.html` records the shared
 ### 本轮改动
 
 - 字体栈：UI 栈与等宽栈在通用回退前补 CJK 回退（§9「等宽与中文」）；值仍只维护在 `shared.css`。
+- 上述字体栈改动经 `public-web.css` 进入产品网页：`docs/web.css` 与 `packages/server/src/web-assets.ts` 已由 `scripts/sync-public-web.mjs` 重新生成。
 - 排版基线块：`body { text-autospace: normal; line-break: strict }`、亮暗成对的 `::selection`、中性 `scrollbar-color`（§10 中文排版、状态齐全）。
 - `preview-article.html`：作者名、图注、脚注由硬编码的浅灰（2.85:1、3.54:1）改为 `--muted`；「草稿预览」胶囊改为 `--muted` 压 `--tint`（原 2.01:1）；脚注链接改用 `--green`（暗色原 3.13:1）。
 
