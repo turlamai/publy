@@ -6,7 +6,7 @@
 <p>The development plugin embeds its rendering assets in <code>main.js</code>. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open (<a href="https://github.com/turlamai/publy/issues/12">#12</a>, <a href="https://github.com/turlamai/publy/issues/15">#15</a>).</p>
 <h2 id="first-use-without-server-knowledge">First use without server knowledge</h2>
 <p>Follow the <a href="wechat.html?lang=en">step-by-step WeChat connection guide</a>: check official API permissions → open your service’s <code>/setup</code> → copy its egress IP → add the <strong>API IP whitelist</strong> in the official WeChat console → check and connect → configure Obsidian with the service root URL and Publy Key → explicitly approve one test draft and inspect it in WeChat.</p>
-<p>The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosting is not on sale; invited acceptance users use the provided service and original key. Do not pay just to connect or reset AppSecret merely to follow the guide.</p>
+<p>The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosted purchasing is open: Personal ¥29 per calendar month, bought at the official connection page. Do not pay just to connect or reset AppSecret merely to follow the guide.</p>
 <h2 id="platforms-and-installation">Platforms and installation</h2>
 <p>Use the developer CLI or the Obsidian plugin. Published release assets currently include the Obsidian plugin. A server needs stable outbound IP and the account’s actual official API permissions. The development server binds to loopback by default; use a protected HTTPS reverse proxy for remote access. If upgrading a direct network listener, adjust access or explicitly set <code>host</code>.</p>
 <p>Source builds require Node.js 22+, pnpm and Git; follow the <a href="https://github.com/turlamai/publy/blob/main/docs/guide.md">developer installation and setup</a>. Release assets do not constitute a deployed service.</p>
@@ -70,7 +70,7 @@ private. See the <a href="https://github.com/turlamai/publy/blob/main/docs/opera
 <p>开发版插件已将渲染资源嵌入 <code>main.js</code>。离线三文件安装仍在测试；真实干净笔记库的安装与更新验收尚未完成（<a href="https://github.com/turlamai/publy/issues/12">#12</a>、<a href="https://github.com/turlamai/publy/issues/15">#15</a>）。</p>
 <h2 id="第一次使用不用懂服务器">第一次使用：不用懂服务器</h2>
 <p>先按<a href="wechat.html?lang=zh">公众号连接手把手教程</a>完成：核对微信接口权限 → 打开自己服务的 <code>/setup</code> → 复制真实出口 IP → 在微信官方后台添加 <strong>API IP 白名单</strong> → 检查并连接 → 在 Obsidian 填服务根地址与 Publy Key → 明确确认后投递一篇测试草稿并到微信草稿箱检查。</p>
-<p>教程包含官方入口、每个凭据从哪里取得、该点哪里、成功的判断标准，以及白名单、换电脑、未知结果和支付未开通的恢复方法。公开托管尚未开卖；受邀验收用户使用已提供的服务与原 Key。不要为连接公众号提前付款，也不要重置 AppSecret 来跟随教程。</p>
+<p>教程包含官方入口、每个凭据从哪里取得、该点哪里、成功的判断标准，以及白名单、换电脑、未知结果和支付未开通的恢复方法。公开托管已开放购买：Personal 每个自然月 ¥29，在官方连接页注册购买。不要为连接公众号提前付款，也不要重置 AppSecret 来跟随教程。</p>
 <h2 id="平台与安装">平台与安装</h2>
 <p>目前可使用开发版 CLI 或 Obsidian 插件。当前发布附件包含 Obsidian 插件。服务端需要稳定出口 IP，以及公众号实际具备的官方 API 权限。开发版服务默认只监听本机；需要远程访问时请配置经过保护的 HTTPS 反向代理。旧版若直接对外监听，升级时需调整访问方式或明确设置 <code>host</code>。</p>
 <p>源码构建需要 Node.js 22+、pnpm 和 Git；步骤见<a href="https://github.com/turlamai/publy/blob/main/docs/guide.zh-CN.md#%E5%87%86%E5%A4%87%E5%B7%A5%E4%BD%9C">开发版安装与配置</a>。发布附件不等于完整部署服务。</p>
