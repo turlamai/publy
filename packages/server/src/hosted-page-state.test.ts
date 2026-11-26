@@ -61,4 +61,11 @@ test('pending checkout polls until confirmed and removes the payment link on act
   assert.match(ui.element('direct-state').textContent,/已开通/);
   assert.equal(ui.element('direct-qr').hidden,true);
   assert.equal(ui.element('purchase-link').href,undefined);
+  assert.equal(ui.element('onboarding-next').hidden,false);
+  assert.equal(ui.element('pay').hidden,true);
+  assert.equal(ui.element('refresh').hidden,true);
+  const input=ui.element('existingKey');input.value='fixture-other';input.handlers.input.call(input);
+  assert.equal(ui.element('onboarding-next').hidden,true);
+  assert.equal(ui.element('pay').hidden,false);
+  assert.equal(ui.element('refresh').hidden,false);
 });
