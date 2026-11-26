@@ -41,7 +41,16 @@ html.publy-web {
 .publy-web .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
 .publy-web header{background:var(--paper);backdrop-filter:none}.publy-web .hosted{background:var(--tint)}
 .publy-web code{background:var(--tint);color:var(--ink);overflow-wrap:anywhere}.publy-web pre code{background:transparent;color:inherit}
-.publy-web .brand-mark{color:var(--on-accent)}.publy-web .langs button{background:transparent;color:var(--muted);border:0}
+.publy-web .brand-mark{color:var(--on-accent)}
+/* Theme & language switchers — mirror the family kit controls (round icon button,
+   segmented language pill) so every Publy page reads as one product. */
+.publy-web .nav .theme-toggle{width:42px;min-height:42px;padding:0;border-radius:999px;font-size:15px;line-height:1;justify-content:center;display:inline-flex;align-items:center}
+.publy-web .nav .theme-toggle::before{content:"☾"}
+.publy-web .nav .theme-toggle[aria-pressed="true"]::before{content:"☀"}
+.publy-web .langs{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px}
+.publy-web .langs button{background:transparent;color:var(--muted);border:0;border-radius:999px;min-height:32px;padding:4px 12px;font-size:12.5px}
+.publy-web .langs button::after{content:" ✓";font-size:11px}
+.publy-web .langs button[aria-pressed="false"]::after{content:""}
 .publy-web .langs button[aria-pressed="true"]{background:var(--green);color:var(--on-accent)}
 .publy-web .pw-wrap{max-width:860px;margin:auto;padding:24px 24px 64px}.publy-web .pw-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:32px}
 .publy-web .pw-nav a{font-weight:600}.publy-web .pw-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0}
