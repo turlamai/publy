@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Nothing yet. Server packages are tagged and released separately (`server-v*`).
+- Public hosted purchasing opened on production (2026-11-26, owner decision): the issuer's `purchasing_enabled` gate, the Publy `hostedDirect.purchasingEnabled` gate and the empty `purchase_buyer_allowlist` restriction (an empty list allows nobody) were resolved together and verified end-to-end by a no-payment signup smoke that received a live Alipay purchase URL and QR. Real-money purchase, restart recovery and refund-to-withdrawal acceptance remain open in issue #17. Server packages are tagged and released separately (`server-v*`).
 
 
 All notable changes to Publy are documented in this file. The format is

@@ -71,11 +71,14 @@ The official Community Directory listing and its three-file install/download
 are still unverified for cards/fonts/WASM (#12); listing/review remains
 unresolved (#14). A side-loaded ZIP is not proof of directory compatibility.
 
-**Commercial:** Public hosted checkout is disabled by default; manual-only
-legacy tests are not live sales. Paid state must come from Commerce / Permit
-after the upstream product-neutral entitlement interface, account/identity
-mapping, reconciliation and real merchant admission (#17, Commerce #21).
-No product is currently authorized to charge money through this repository.
+**Commercial (updated 2026-11-26):** Public hosted checkout is OPEN on
+production by owner decision: the Commerce/Permit entitlement interface,
+account binding, atomic quotas and real merchant admission are the shipped
+path (#17), and the issuer and Publy purchasing gates were verified end-to-end
+with a no-payment signup smoke (live Alipay purchase URL + QR). Real-money
+acceptance (first purchase, restart recovery, refund-to-withdrawal) has not
+been exercised; the refund fence is fail-closed by design and remains tracked
+in #17.
 
 **Operations:** #7/#8 still require independently reproduced fixed-egress
 WeChat draft delivery and restart, scheduling, quotas, credential/key rotation,

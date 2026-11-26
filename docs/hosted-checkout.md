@@ -1,9 +1,14 @@
 # Hosted checkout configuration (Publy side)
 
-Status: **wiring and UI implemented; paid admission is not yet enabled.** Do not
-turn this on for customers until the Commerce hosted-entitlement admission and
-Publy quota/admission slice is complete. A configured checkout can create a
-real Alipay order; it does not by itself grant hosted rights.
+Status: **purchasing opened on production 2026-11-26 by owner decision.** The
+Commerce hosted-entitlement admission and Publy quota/admission slice are the
+implemented path; the issuer gate (`purchasing_enabled`), the Publy gate
+(`hostedDirect.purchasingEnabled`) and the empty-allowlist restriction were all
+removed/true that day, verified end-to-end by a no-payment signup smoke that
+received a live Alipay purchase URL. A configured checkout can create a real
+Alipay order; it does not by itself grant hosted rights. Real-money acceptance
+(customer purchase, restart recovery, officially supported refund-to-withdrawal)
+has not been exercised yet and stays tracked in issue #17.
 
 The public `/hosted`, `/v1/signup` and `/v1/hosted/checkout` flow requires
 **both** `hostedCheckout` and `hostedAdmission`. A deployment with only the
