@@ -426,7 +426,7 @@ ${WEB_CSS}</style></head><body><div class="wrap">
 var KEY = 'publy_hosted_api_key';
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
-var apiKey = '', timer, revision = 0, active = false;
+var apiKey = '', timer, revision = 0, active = false, checking = false;
 try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
 document.getElementById('existingKey').value = apiKey;
 document.getElementById('copy-key').disabled = !apiKey;
@@ -438,7 +438,7 @@ document.getElementById('restore-toggle').addEventListener('click', function (e)
   if (!block.hidden) document.getElementById('existingKey').focus();
 });
 document.getElementById('existingKey').addEventListener('input', function () {
-  revision++; clearTimeout(timer); active = false; button.disabled = false; apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
+  revision++; clearTimeout(timer); active = false; checking = false; button.disabled = false; apiKey = ''; section.hidden = true; qr.hidden = true; qr.removeAttribute('src');
   var link = document.getElementById('purchase-link'); if (link) link.remove();
   document.getElementById('copy-key').disabled = !this.value.trim();
   say('账户凭据已更改，请重新查看权益。');
@@ -451,9 +451,9 @@ async function post(url, body) {
   return value;
 }
 async function refresh() {
-  if (!apiKey) return;
+  if (!apiKey || checking) return;
   var current = revision;
-  button.disabled = true;
+  checking = true; button.disabled = true;
   try {
     var result = await post('/v1/hosted/status', {});
     if (current !== revision) return;
@@ -473,10 +473,11 @@ async function refresh() {
       say(result.purchaseUrl || result.qrDataUrl ? '请在支付宝确认商品与金额。付款后返回此页，系统将自动查询开通结果。' : '暂未开放购买，请稍后再试。');
     }
   } catch (error) { if (current === revision) say(error.message, true); }
-  finally { if (current === revision) button.disabled = false; }
+  finally { if (current === revision) { checking = false; button.disabled = false; } }
 }
 if (form) form.addEventListener('submit', async function (event) {
-  event.preventDefault(); button.disabled = true; var attempt = revision;
+  event.preventDefault(); if (button.disabled || checking) return;
+  clearTimeout(timer); button.disabled = true; var attempt = ++revision; active = false;
   try {
     apiKey = document.getElementById('existingKey').value.trim();
     if (!apiKey) {
@@ -499,12 +500,13 @@ if (form) form.addEventListener('submit', async function (event) {
     var checks = 0;
     async function poll() {
       if (attempt !== revision) return;
+      if (active) return;
       if (document.visibilityState === 'visible') await refresh();
       if (++checks < 60 && !active) timer = setTimeout(poll, 10000);
     }
-    if (attempt === revision) timer = setTimeout(poll, 10000);
+    if (attempt === revision && !active) timer = setTimeout(poll, 10000);
   } catch (error) { if (attempt === revision) say(error.message, true); }
-  finally { button.disabled = false; }
+  finally { if (attempt === revision) button.disabled = false; }
 });
 var refreshButton = document.getElementById('refresh');
 if (refreshButton) refreshButton.addEventListener('click', refresh);
