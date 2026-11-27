@@ -1,3 +1,4 @@
+import { richClipboard } from "./rich-clipboard.mjs";
 import { previewLocalArticle, localMediaKey } from "../../core/src/local-article-preview.js";
 import claude from "../../core/themes/claude.css";
 import medium from "../../core/themes/medium.css";
@@ -14,21 +15,24 @@ const get = id => document.getElementById(id);
 const source=get("source"), frame=get("preview"), status=get("status"), file=get("file"), theme=get("theme");
 const media = new Map(); let mediaGeneration=0;
 let lang=navigator.language.toLowerCase().startsWith("zh")?"zh":"en", revision=0, timer;
-const strings={zh:{stage:"本地预览开发版",open:"打开 Markdown",theme:"文章主题",width:"预览宽度",source:"Markdown 原文",preview:"文章预览",limits:"支持文本及选定的本地图片；公式、富文本复制与草稿投递尚未实现。",media:"添加图片",folder:"添加图片目录",clear:"清除图片",mediaError:"图片无效、重名或超过大小限制",ok:"本地预览完成",error:"无法预览",large:"文件超过 2 MiB",warning:"部分内容暂不支持"},en:{stage:"Local preview · development",open:"Open Markdown",theme:"Article theme",width:"Preview width",source:"Markdown source",preview:"Article preview",limits:"Text and selected local images. Formulas, rich-text copying and draft delivery are not yet supported.",media:"Add images",folder:"Add image folder",clear:"Clear images",mediaError:"Invalid, duplicate or oversized image",ok:"Local preview ready",error:"Cannot preview",large:"File exceeds 2 MiB",warning:"Some content is not yet supported"}};
+const copy=get("copy"); let currentPreview=null;
+const strings={zh:{stage:"本地预览开发版",open:"打开 Markdown",theme:"文章主题",width:"预览宽度",source:"Markdown 原文",preview:"文章预览",limits:"支持文本及选定的本地图片；公式与草稿投递尚未实现；微信粘贴效果待验证。",copy:"复制富文本",copied:"已复制富文本",copyError:"无法复制：请使用支持富文本剪贴板的浏览器",media:"添加图片",folder:"添加图片目录",clear:"清除图片",mediaError:"图片无效、重名或超过大小限制",ok:"本地预览完成",error:"无法预览",large:"文件超过 2 MiB",warning:"部分内容暂不支持"},en:{stage:"Local preview · development",open:"Open Markdown",theme:"Article theme",width:"Preview width",source:"Markdown source",preview:"Article preview",limits:"Text and selected local images. Formulas and draft delivery are not yet supported; WeChat paste fidelity is unverified.",copy:"Copy rich text",copied:"Rich text copied",copyError:"Copy failed: use a browser with rich clipboard support",media:"Add images",folder:"Add image folder",clear:"Clear images",mediaError:"Invalid, duplicate or oversized image",ok:"Local preview ready",error:"Cannot preview",large:"File exceeds 2 MiB",warning:"Some content is not yet supported"}};
 function render(){
  const t=strings[lang];
+ currentPreview=null;copy.disabled=true;
  try{
   const result=previewLocalArticle(source.value,themes[theme.value],media);
   // All CSS is bundled, reviewed theme CSS, never user input. The sandbox has no
   // scripts, same-origin privileges, forms or navigation; CSP blocks resources.
   frame.srcdoc='<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'"><style>html{background:white;color:#222}body{margin:16px;overflow-wrap:anywhere}pre{overflow:auto}img{max-width:100%;height:auto}'+result.css+'</style></head><body>'+result.html+'</body></html>';
+  currentPreview=result;copy.disabled=!source.value.trim()||result.warnings.length>0;
   status.textContent=result.warnings.length?t.warning:t.ok;
  }catch{frame.srcdoc="";status.textContent=t.error;}
 }
-function queue(){clearTimeout(timer);timer=setTimeout(render,120);}
+function queue(){currentPreview=null;copy.disabled=true;clearTimeout(timer);timer=setTimeout(render,120);}
 source.addEventListener("input",()=>{revision++;queue();});
 theme.addEventListener("change",render);
-get("width").addEventListener("change",e=>{frame.width=e.target.value;frame.style.width=e.target.value+"px";});
+get("width").addEventListener("change",e=>{frame.dataset.width=e.target.value;});
 file.addEventListener("change",async()=>{
  const picked=file.files?.[0];if(!picked)return;const current=++revision;
  try{if(picked.size>2*1024*1024){status.textContent=strings[lang].large;return;}
@@ -57,6 +61,15 @@ async function loadMedia(input, folder){
 get("media").addEventListener("change",e=>loadMedia(e.target,false));
 get("folder").addEventListener("change",e=>loadMedia(e.target,true));
 get("clear-media").addEventListener("click",()=>{mediaGeneration++;media.clear();render();});
-function translate(){const t=strings[lang];document.documentElement.lang=lang==="zh"?"zh-CN":"en";for(const [id,key] of [["stage","stage"],["open-label","open"],["theme-label","theme"],["width-label","width"],["source-label","source"],["preview-label","preview"],["limits","limits"],["media-label","media"],["folder-label","folder"],["clear-media","clear"]])get(id).textContent=t[key];get("language").textContent=lang==="zh"?"EN":"中文";frame.title=t.preview;render();}
+copy.addEventListener("click",async()=>{
+ const snapshot=currentPreview;if(!snapshot||snapshot.warnings.length)return;
+ try{
+  if(!navigator.clipboard?.write||!globalThis.ClipboardItem)throw Error("unsupported");
+  const output=richClipboard(snapshot.html,snapshot.css,document);
+  await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([output.html],{type:"text/html"}),"text/plain":new Blob([output.text],{type:"text/plain"})})]);
+  status.textContent=strings[lang].copied;
+ }catch{status.textContent=strings[lang].copyError;}
+});
+function translate(){const t=strings[lang];document.documentElement.lang=lang==="zh"?"zh-CN":"en";for(const [id,key] of [["stage","stage"],["open-label","open"],["theme-label","theme"],["width-label","width"],["source-label","source"],["preview-label","preview"],["limits","limits"],["media-label","media"],["folder-label","folder"],["clear-media","clear"],["copy","copy"]])get(id).textContent=t[key];get("language").textContent=lang==="zh"?"EN":"中文";frame.title=t.preview;render();}
 get("language").addEventListener("click",()=>{lang=lang==="zh"?"en":"zh";translate();});
 translate();
