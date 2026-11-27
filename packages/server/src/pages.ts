@@ -95,7 +95,7 @@ export function shell(title: string, body: string, extraCss = ""): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <style>${BASE_CSS}${extraCss}${WEB_CSS}</style>
-</head><body>${body}<script>${WEB_JS}</script></body></html>`;
+<meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body>${body}<script>${WEB_JS}</script></body></html>`;
 }
 
 export function purchasePage(publicIp = "你的服务器公网 IP"): string {
@@ -291,7 +291,7 @@ button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inher
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--green)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
-${WEB_CSS}</style></head><body><div class="wrap">
+${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body><div class="wrap">
 <a href="https://publy.jrtx.site/">← Publy</a>
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
@@ -372,7 +372,7 @@ export function hostedResultPage(title: string, message: string, ok: boolean): s
 <title>${escapeHtml(title)} · Publy</title><style>body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
 main{max-width:620px;margin:0 auto;padding:40px 22px 70px}.result-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:36px}.result-nav a{font-weight:650;text-decoration:none}.result-actions{display:flex;flex-direction:column;gap:12px;margin-top:24px}.result-primary{display:block;background:var(--green);color:var(--on-accent)!important;border-radius:8px;padding:12px 18px;text-decoration:none;text-align:center;font-weight:650}.result-secondary{text-align:center}.result-nav button{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:8px 12px}h1{font:600 30px/1.2 var(--sans);margin:0 0 10px}p{color:var(--muted)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:var(--line);background:var(--tint)}
-a{color:var(--green)}${WEB_CSS}</style></head><body><main><nav class="result-nav" aria-label="页面导航"><a href="https://publy.jrtx.site/">Publy</a><button type="button" data-theme-switch aria-pressed="false">切换主题</button></nav><h1>${escapeHtml(title)}</h1><div class="card ${ok ? "ok" : ""}"><p>${escapeHtml(message)}</p></div>
+a{color:var(--green)}${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body><main><nav class="result-nav" aria-label="页面导航"><a href="https://publy.jrtx.site/">Publy</a><button type="button" data-theme-switch aria-pressed="false">切换主题</button></nav><h1>${escapeHtml(title)}</h1><div class="card ${ok ? "ok" : ""}"><p>${escapeHtml(message)}</p></div>
 <div class="result-actions">${ok ? '<a class="result-primary" href="/setup">连接公众号</a><a class="result-secondary" href="/hosted">查看账户与权益</a>' : '<a class="result-primary" href="/hosted">查看账户与权益</a>'}<a class="result-secondary" href="https://publy.jrtx.site/start.html">使用指南</a></div></main><script>${WEB_JS}</script></body></html>`;
 }
 
@@ -395,7 +395,7 @@ button{border:0;border-radius:8px;background:var(--green);color:var(--on-accent)
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
 [hidden]{display:none!important}
-${WEB_CSS}</style></head><body><div class="wrap">
+${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body><div class="wrap">
 <nav class="checkout-nav" aria-label="页面导航"><a href="https://publy.jrtx.site/">← Publy</a><button class="secondary" type="button" data-theme-switch aria-pressed="false">切换主题</button></nav>
 <h1>开通 Publy Personal</h1>
 <p class="lead">完成支付宝付款，开始使用公众号草稿托管服务。</p>
