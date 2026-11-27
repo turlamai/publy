@@ -1,27 +1,27 @@
 /* Public web tokens and common controls. Canonical source; generated consumers must not be edited. */
 html.publy-web {
-  color-scheme: light; --paper:#f7f8f4; --card:#fff; --ink:#16271e; --muted:#52645b;
-  --line:#819286; --green:#176842; --green-dark:#0d5030; --on-accent:#fff;
-  --tint:#e9f2e9; --amber:#80500c; --amber-tint:#fdf3e2; --danger:#a33427; --danger-tint:#fbeaea;
+  color-scheme: light; --paper:#FAF8F5; --card:#fff; --ink:#201B16; --muted:#5D554C;
+  --line:#B5A99C; --green:#A94E31; --green-dark:#913D25; --on-accent:#fff;
+  --tint:#F3EFE9; --amber:#80500c; --amber-tint:#fdf3e2; --danger:#a33427; --danger-tint:#fbeaea;
   --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
   --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono","Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei", monospace; --serif:var(--sans);
 }
 html.publy-web[data-theme="dark"] {
-  color-scheme:dark; --paper:#181e1a; --card:#222b25; --ink:#e7eee9; --muted:#b3c1b8;
-  --line:#708878; --green:#9ed7ad; --green-dark:#b9e7c5; --on-accent:#16271e;
-  --tint:#2a3c30; --amber:#f0cf93; --amber-tint:#382e1e; --danger:#ffb5a0; --danger-tint:#432823;
+  color-scheme:dark; --paper:#16120F; --card:#1F1A16; --ink:#F1ECE5; --muted:#A89F93;
+  --line:#796E63; --green:#E08A6B; --green-dark:#E89E82; --on-accent:#201B16;
+  --tint:#2E2721; --amber:#f0cf93; --amber-tint:#382e1e; --danger:#ffb5a0; --danger-tint:#432823;
 }
 @media(prefers-color-scheme:dark){html.publy-web:not([data-theme="light"]):not([data-theme="dark"]){
-  color-scheme:dark; --paper:#181e1a; --card:#222b25; --ink:#e7eee9; --muted:#b3c1b8;
-  --line:#708878; --green:#9ed7ad; --green-dark:#b9e7c5; --on-accent:#16271e;
-  --tint:#2a3c30; --amber:#f0cf93; --amber-tint:#382e1e; --danger:#ffb5a0; --danger-tint:#432823;
+  color-scheme:dark; --paper:#16120F; --card:#1F1A16; --ink:#F1ECE5; --muted:#A89F93;
+  --line:#796E63; --green:#E08A6B; --green-dark:#E89E82; --on-accent:#201B16;
+  --tint:#2E2721; --amber:#f0cf93; --amber-tint:#382e1e; --danger:#ffb5a0; --danger-tint:#432823;
 }}
 html.publy-web {
   --bg:var(--paper); --surface:var(--card); --surface-2:var(--tint); --border:var(--line); --border-light:var(--line);
   --text:var(--ink); --text-2:var(--muted); --text-3:var(--muted); --accent:var(--green); --accent-hover:var(--green-dark); --accent-dim:var(--tint);
   --kit-bg:var(--paper); --kit-bg-elevated:var(--card); --kit-surface:var(--card); --kit-surface-2:var(--tint);
   --kit-text:var(--ink); --kit-text-2:var(--muted); --kit-text-3:var(--muted); --kit-border:var(--line); --kit-border-strong:var(--line);
-  --kit-accent:var(--green); --kit-accent-hover:var(--green-dark); --kit-accent-strong:var(--green); --kit-on-accent:var(--on-accent);
+  --kit-accent:#D97757; --kit-accent-hover:#C25F3D; --kit-accent-strong:var(--green); --kit-on-accent:var(--on-accent);
   --kit-accent-soft:var(--tint); --kit-accent-soft-strong:var(--tint); --kit-font-sans:var(--sans); --kit-font-display:var(--sans); --kit-font-mono:var(--mono);
 }
 .publy-web *{box-sizing:border-box}.publy-web body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 var(--sans);letter-spacing:normal}
@@ -77,6 +77,10 @@ html.publy-web{--warn:var(--amber)}
   .publy-web .sidebar-foot>:not(.sidebar-logout){display:none}
 }
 
+/* Public brand follows site-kit; green is reserved for success states. */
+html.publy-web[data-theme="dark"]{--kit-accent:#E08A6B;--kit-accent-hover:#E89E82;--kit-on-accent:#1D120C}
+.publy-web .brand-mark{background:#D97757;color:#fff}
+
 /* Family kit buttons rendered as anchors + unified theme/language switchers
    (mirror of the kit controls; keeps every Publy page on one product look). */
 .publy-web a.kit-btn{color:var(--kit-text)}.publy-web a.kit-btn--primary,.publy-web a.kit-btn--primary:hover{color:var(--kit-on-accent)}.publy-web a.kit-btn--secondary{color:var(--kit-text)}
@@ -84,6 +88,5 @@ html.publy-web{--warn:var(--amber)}
 .publy-web .theme-toggle::before{content:"☾"}.publy-web .theme-toggle[aria-pressed="true"]::before{content:"☀"}
 .publy-web .langs{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px}
 .publy-web .langs button{background:transparent;color:var(--muted);border:0;border-radius:999px;min-height:32px;padding:4px 12px;font-size:12.5px}
-.publy-web .langs button[aria-pressed="true"]{background:var(--green);color:var(--on-accent)}
 .publy-web .pw-actions [data-switch]{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:999px;min-height:36px;padding:2px 12px;font-size:12.5px}
 .publy-web .pw-actions [data-switch][aria-pressed="true"]{background:var(--green);color:var(--on-accent);border-color:var(--green)}

@@ -23,9 +23,9 @@ Decision `2026-10-auth-1`: Online hosted-service entitlement, verified on the se
 - Public user documentation is English with a complete Chinese path; historical internal design notes may remain Chinese. Code comments use English.
 - 退出码与 `--json` 输出是对外契约，变更需同步 design.md 第 3 节和 docs/agent-cli.md / docs/agent-cli.zh-CN.md。使用 `publy capabilities --json` 发现实际支持的命令；不要把目标文档里的“所有命令 JSON”当作当前代码事实。Agent 不可自动创建草稿、取消/重试服务端任务或公开发布，除非用户对该副作用做了明确授权。CLI 不依赖某个编辑器，而发布目标只限公众号草稿箱。
 
-## Publication decision (2026-11-23)
+## Publication decision (2026-11-27)
 
-Owner decision `2026-11-23-operation-options`: Obsidian is the only recommended editor/plugin experience. CLI stays editor-independent; the official skill invokes its explicit parameters and asks when format is unclear. No Typora-specific expansion or publishing companion. WeChat Official Account drafts remain the only destination.
+Owner decision `2026-11-27-desktop-web` supersedes the client-scope restriction in `2026-11-23-operation-options`: Desktop (Racket + Glaze, subject to capability validation), Web workspace, optional Obsidian plugin and editor-independent CLI/Skill are first-class entry points in this repository. Use design/prototype as the baseline, share the existing renderer and hosted entitlement, and preserve the explicit operation contract below. Do not create another note database or editor-specific integrations. WeChat Official Account drafts remain the only destination. Track Desktop #118 and Web #119; approval is not implementation or release evidence.
 
 All clients share explicit operation options. Note frontmatter is preserved and skipped, never used for format/title/cover/theme/author/caption/digest/tags or asset roots. Check/preview default to article; publish requires explicit format and account. A format choice is not permission to submit. The plugin previews or confirms in its operation dialog; source and account identity must not drift while a dialog is open. See docs/editor-workflows.md and its Chinese counterpart.
 

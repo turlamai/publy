@@ -1,10 +1,10 @@
-# Publy product focus — 2026-11-23
+# Publy product focus — 2026-11-27
 
 **English** · [简体中文](platform-strategy.zh-CN.md)
 
-Obsidian is the sole recommended editor and plugin experience. The CLI remains editor-independent and the official agent skill uses its explicit operation parameters. Stop editor-specific expansion and independent publishing-companion work. Keep existing Markdown and assets in place; use one renderer, local checks/previews and the same explicit options for authorized delivery.
+Desktop, Web workspace, Obsidian plugin and CLI/Skill are first-class entry points. Desktop targets Racket + Glaze after capability validation; Web targets local-first browser rendering. Both follow design/prototype and reuse existing Core and hosted entitlement rather than duplicating business logic. Obsidian is optional. Keep original Markdown and assets in place; use one renderer, local checks/previews and explicit options for authorized delivery. Track #118 and #119. These are approved development targets, not shipped clients.
 
-WeChat Official Account drafts remain the only destination. No public sending, mass sending, cross-posting, browser automation of WeChat, or new destination abstraction. No Typora-specific integration or compatibility programme. Ordinary Markdown files remain valid CLI inputs.
+WeChat Official Account drafts remain the only destination. No public sending, mass sending, cross-posting, browser automation of WeChat, or new destination abstraction. No Typora-specific integration or compatibility programme. Ordinary Markdown files remain valid inputs for every client.
 
 Note properties are preserved and skipped, never used as publication configuration. The plugin asks in a draft options dialog; the skill asks when intent is unclear; the CLI requires a format for submission. Selecting a format is separate from authorization to submit. See [workflow](editor-workflows.md).
 
