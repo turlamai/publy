@@ -64,7 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Playwright 1.51.1 supports Ubuntu 24.04, not the floating 26.04 runner.
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       # fetch-depth: 0 so check-plugin-metadata.mjs can match every
@@ -82,6 +83,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: pnpm -r test
+      - run: node scripts/build-workbench.mjs
+      - name: Chromium workbench acceptance
+        if: runner.os == 'Linux'
+        run: bash scripts/test-workbench-browser.sh
+      - run: node --test packages/workbench/tests/hosted-client.test.mjs packages/workbench/tests/pending-draft.test.mjs
       - run: node --test scripts/public-web-generation.test.mjs
       - run: node scripts/sync-public-web.mjs --check
       - run: node scripts/build-user-pages.mjs --check

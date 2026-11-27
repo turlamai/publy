@@ -1,0 +1,115 @@
+name: Desktop installer candidates
+
+on:
+  pull_request:
+    paths:
+      - 'packages/desktop/**'
+      - 'packages/workbench/**'
+      - 'packages/core/**'
+      - 'scripts/build-workbench.mjs'
+      - 'scripts/package-desktop.mjs'
+      - 'scripts/test-desktop-upgrade.mjs'
+      - 'scripts/test-desktop-feed.sh'
+      - 'scripts/*desktop-update*.rkt'
+      - '.github/workflows/desktop-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installer:
+    name: Installer (${{ matrix.platform }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            baseline-sha256: 131b62ff99ff6e2ff2c21144f3d64e136113d0aad9b2123097e8a661ad40c981
+            platform: linux-x64
+            racket: x64
+          - runner: macos-latest
+            baseline-sha256: d42b183df5151bf846eb1be76ff94ea25523aeffcaabf24387566e59478b2d1b
+            platform: macos-arm64
+            racket: arm64
+          - runner: windows-latest
+            baseline-sha256: 52e142f90182486ffa4c9228b8f0052952e53c8a05488c285e7a5d4ddd3dfc21
+            platform: windows-x64
+            racket: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          architecture: ${{ matrix.racket }}
+          distribution: full
+          variant: CS
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/glaze
+          ref: ba2442bb001910d20bca41d0de876e58d6341b63
+          path: .deps/glaze
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --tool-path "$env:RUNNER_TEMP\wix" wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$env:RUNNER_TEMP\wix" >> $env:GITHUB_PATH
+      - run: raco pkg install --auto --batch --no-docs --link .deps/glaze
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-workbench.mjs
+      - run: raco test packages/desktop/main.rkt
+      - run: node scripts/package-desktop.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 45999719044
+          github-token: ${{ github.token }}
+          name: publy-desktop-candidate-${{ matrix.platform }}
+          path: dist/desktop-baseline
+      - name: Install 0.1.0 and upgrade to the current candidate
+        env:
+          PUBLY_BASELINE_SHA256: ${{ matrix.baseline-sha256 }}
+        run: node scripts/test-desktop-upgrade.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publy-desktop-candidate-${{ matrix.platform }}
+          path: dist/desktop-candidate/
+          if-no-files-found: error
+
+  signed-feed:
+    name: Signed update feed
+    needs: installer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          architecture: x64
+          distribution: full
+          variant: CS
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/glaze
+          ref: ba2442bb001910d20bca41d0de876e58d6341b63
+          path: .deps/glaze
+      - run: raco pkg install --auto --batch --no-docs --link .deps/glaze
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: publy-desktop-candidate-*
+          path: dist/feed-fixture
+          merge-multiple: true
+      - run: bash scripts/test-desktop-feed.sh dist/feed-fixture

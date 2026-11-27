@@ -8,6 +8,7 @@
 // identifiers. Keep the same request identity for true network retries and
 // outcome reconciliation. This does not replace server authorization.
 import crypto from "node:crypto";
+import { visitDraftIdentityFields } from "./draft-identity-fields.js";
 import type { PublishRequest } from "@publy/shared";
 
 export function draftIdempotencyKey(
@@ -21,25 +22,6 @@ export function draftIdempotencyKey(
     hash.update(":");
     hash.update(value, "utf8");
   };
-  field("publy-wechat-draft-v2");
-  field(request.account);
-  field(request.type);
-  field(request.title);
-  field(request.html ?? "");
-  field(request.cover ?? "");
-  field(request.coverMode ?? "");
-  field(request.author ?? "");
-  field(request.digest ?? "");
-  field(request.contentSourceUrl ?? "");
-  field(request.needOpenComment === undefined ? "unset" : String(request.needOpenComment));
-  field(request.onlyFansCanComment === undefined ? "unset" : String(request.onlyFansCanComment));
-  field(request.publishAt ?? "");
-  const attachments = request.images ?? [];
-  field(String(attachments.length));
-  for (const image of attachments) {
-    field(image.name);
-    field(image.contentType ?? "");
-    field(image.data);
-  }
+  visitDraftIdentityFields(request, field);
   return hash.digest("hex").slice(0, 32);
 }
