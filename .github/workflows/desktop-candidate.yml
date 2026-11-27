@@ -8,11 +8,13 @@ on:
       - 'packages/core/**'
       - 'scripts/build-workbench.mjs'
       - 'scripts/package-desktop.mjs'
+      - 'scripts/test-desktop-upgrade.mjs'
       - '.github/workflows/desktop-candidate.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   installer:
@@ -23,12 +25,15 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-24.04
+            baseline-sha256: 131b62ff99ff6e2ff2c21144f3d64e136113d0aad9b2123097e8a661ad40c981
             platform: linux-x64
             racket: x64
           - runner: macos-latest
+            baseline-sha256: d42b183df5151bf846eb1be76ff94ea25523aeffcaabf24387566e59478b2d1b
             platform: macos-arm64
             racket: arm64
           - runner: windows-latest
+            baseline-sha256: 52e142f90182486ffa4c9228b8f0052952e53c8a05488c285e7a5d4ddd3dfc21
             platform: windows-x64
             racket: x64
     runs-on: ${{ matrix.runner }}
@@ -65,29 +70,16 @@ jobs:
       - run: node scripts/build-workbench.mjs
       - run: raco test packages/desktop/main.rkt
       - run: node scripts/package-desktop.mjs
-      - if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install -y ./dist/desktop-candidate/*.deb
-          /usr/bin/Publy --check-bundle
-      - if: runner.os == 'macOS'
-        run: |
-          mount="$(mktemp -d)"
-          trap 'hdiutil detach "$mount"' EXIT
-          hdiutil attach dist/desktop-candidate/*.dmg -readonly -nobrowse -mountpoint "$mount"
-          codesign --verify --deep --strict "$mount/Publy.app"
-          "$mount/Publy.app/Contents/MacOS/Publy" --check-bundle
-      - if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $msi = (Get-ChildItem dist/desktop-candidate/*.msi).FullName
-          $install = Join-Path $env:RUNNER_TEMP 'Publy'
-          $args = '/i "{0}" /qn /norestart INSTALLDIR="{1}"' -f $msi, $install
-          $process = Start-Process msiexec.exe -ArgumentList $args -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "MSI failed: $($process.ExitCode)" }
-          $app = Get-ChildItem $install -Filter Publy.exe -Recurse | Select-Object -First 1
-          if (!$app) { throw "MSI did not install Publy.exe" }
-          & $app.FullName --check-bundle
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 45999719044
+          github-token: ${{ github.token }}
+          name: publy-desktop-candidate-${{ matrix.platform }}
+          path: dist/desktop-baseline
+      - name: Install 0.1.0 and upgrade to the current candidate
+        env:
+          PUBLY_BASELINE_SHA256: ${{ matrix.baseline-sha256 }}
+        run: node scripts/test-desktop-upgrade.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: publy-desktop-candidate-${{ matrix.platform }}
