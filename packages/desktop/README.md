@@ -24,3 +24,5 @@ Run `raco test packages/desktop/main.rkt` to test the bundle readiness guard. Na
 - Preview parity, formula support, and explicit authenticated draft delivery.
 
 Not a released installer. The existing Obsidian/CLI paths remain unchanged.
+
+The restricted upstream adapter in `hosted-transport.rkt` defines only the fixed hosted account, publish and result operations, uses certificate-verifying TLS, rejects header injection and never follows redirects. Its mock tests run with the desktop readiness tests. It is deliberately not exposed to the WebView until native recovery storage and the bridge authorization are implemented; no desktop hosted delivery is enabled yet.

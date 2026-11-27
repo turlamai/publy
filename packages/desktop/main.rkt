@@ -1,6 +1,6 @@
 #lang racket/base
 ;; Native desktop entry point. The browser and desktop share the same built UI.
-(require racket/file racket/runtime-path glaze)
+(require racket/file racket/runtime-path glaze "hosted-transport.rkt")
 (define-runtime-path public "../workbench/dist")
 (define (workbench-ready? dir)
   (for/and ([name '("index.html" "workbench.js" "workbench.css")])
@@ -16,7 +16,7 @@
            #:app-id "site.jrtx.publy"
            #:window-state #t))
 (module+ test
-  (require rackunit)
+  (require rackunit (submod "hosted-transport.rkt" test))
   (define dir (make-temporary-file "publy-desktop~a" 'directory))
   (dynamic-wind void
     (lambda ()
