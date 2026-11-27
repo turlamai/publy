@@ -286,7 +286,7 @@ export function hostedPurchasePage(available: boolean, publicUrl?: string, direc
 .notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
 .plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
 .plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
-label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text]{width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{color:var(--ink);width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--green)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
@@ -303,6 +303,9 @@ ${available ? `<form class="card" id="buy" >
   <label class="field">联系方式（邮箱或手机号，用于开户与对账）
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com" required>
   </label>
+  <label class="field">已有账户 API Key
+    <input type="password" id="legacy-key" autocomplete="off">
+  </label>
   <button type="submit" id="pay">去支付宝付款</button>
   <div id="msg" role="status" aria-live="polite"></div>
 </form>` : ""}
@@ -318,7 +321,7 @@ ${available ? `<form class="card" id="buy" >
 <p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </div>
 <script>
-var KEY = 'publy_hosted_api_key';
+try { sessionStorage.removeItem('publy_hosted_api_key'); } catch (_) {}
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
 function post(url, body, apiKey) {
@@ -330,14 +333,17 @@ if (form) form.addEventListener('submit', async function (event) {
   say('正在创建订单…');
   try {
     var contact = document.getElementById('contact').value.trim();
-    var apiKey = sessionStorage.getItem(KEY);
+    var keyInput = document.getElementById('legacy-key');
+    var apiKey = keyInput.value.trim();
     if (!apiKey) {
       var signup = await post('/v1/signup', { contact: contact });
       var account = await signup.json();
       if (signup.status === 409) throw new Error('该联系方式已开户；如已购买，请联系运营者找回 key。');
       if (!signup.ok) throw new Error(account.message || account.code || '开户失败');
-      apiKey = account.apiKey;
-      sessionStorage.setItem(KEY, apiKey);
+      keyInput.value = account.apiKey;
+      button.disabled = false;
+      say('请先复制并保存上方的 API Key，然后继续付款。');
+      return;
     }
     var offer = form.querySelector('input[name=offer]:checked').value;
     // Reuse one request id across transport/unknown-outcome retries; a new id
@@ -409,7 +415,7 @@ ${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" ty
     <label class="field" for="existingKey" id="restore-label">已有账户 API Key（用于恢复同一账户）</label><input type="password" id="existingKey" autocomplete="off"><button type="button" id="copy-key" disabled>复制 API Key 并妥善保存</button>
   </div>
   <button type="submit" id="pay">支付宝付款 · ¥29</button>
-  <p class="small">付款确认后自动开通。<a href="#" id="restore-toggle">已有账户？用 API Key 恢复</a></p>
+  <p class="small">付款确认后自动开通。刷新页面或换设备时，请用保存的 API Key 恢复。<a href="#" id="restore-toggle">已有账户？用 API Key 恢复</a></p>
   <div id="msg" role="status" aria-live="polite"></div><section id="direct-result" hidden><p id="direct-state"></p><img id="direct-qr" alt="支付宝购买二维码" width="240" height="240"><p><button type="button" id="refresh">已完成付款，刷新权益</button></p><div id="onboarding-next" hidden><p>服务已开通。请先保存上方 API Key，再连接公众号。</p><a class="next-primary" href="/setup">连接我的公众号</a><p><a href="https://publy.jrtx.site/start.html?lang=zh">安装插件与使用指南</a></p></div></section>
 </form>
 <div class="card">
@@ -423,15 +429,11 @@ ${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" ty
 <p class="foot"><a href="https://publy.jrtx.site/">首页</a> · <a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a> · 运营者：Publy</p>
 </div>
 <script>
-var KEY = 'publy_hosted_api_key';
+try { sessionStorage.removeItem('publy_hosted_api_key'); } catch (_) {}
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 var section = document.getElementById('direct-result'), state = document.getElementById('direct-state'), qr = document.getElementById('direct-qr');
 var apiKey = '', timer, revision = 0, active = false, checking = false;
 var next = document.getElementById('onboarding-next'), refreshButton = document.getElementById('refresh');
-try { apiKey = sessionStorage.getItem(KEY) || ''; } catch (_) {}
-document.getElementById('existingKey').value = apiKey;
-document.getElementById('copy-key').disabled = !apiKey;
-if (apiKey) { document.getElementById('restore-block').hidden = false; }
 document.getElementById('restore-toggle').addEventListener('click', function (e) {
   e.preventDefault();
   var block = document.getElementById('restore-block');
@@ -493,13 +495,12 @@ if (form) form.addEventListener('submit', async function (event) {
       if (attempt !== revision) return;
       apiKey = account.apiKey;
     }
-    await post('/v1/hosted/session', {});
-    if (attempt !== revision) return;
-    try { sessionStorage.setItem(KEY, apiKey); } catch (_) {}
     document.getElementById('existingKey').value = apiKey;
     document.getElementById('copy-key').disabled = false;
     document.getElementById('restore-block').hidden = false;
     document.getElementById('restore-label').textContent = '你的 API Key（复制并妥善保存，换设备恢复要用）';
+    await post('/v1/hosted/session', {});
+    if (attempt !== revision) return;
     await refresh();
     var checks = 0;
     async function poll() {
@@ -514,7 +515,6 @@ if (form) form.addEventListener('submit', async function (event) {
 });
 if (refreshButton) refreshButton.addEventListener('click', refresh);
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && apiKey && !button.disabled) refresh(); });
-// Saved credentials are restored explicitly through the form; do not create a session silently.
 
 var copy = document.getElementById("copy-key"); if (copy) copy.addEventListener("click", async function () { try { var value = document.getElementById("existingKey").value.trim(); if (!value) { say("还没有 API Key，请先开户或恢复账户。", true); return; } await navigator.clipboard.writeText(value); say("已复制，请保存在密码管理器中。"); } catch (_) { say("请手动复制 API Key 并妥善保存。"); } });
 </script><script>${WEB_JS}</script></body></html>`;
