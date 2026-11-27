@@ -14,7 +14,7 @@ function browserFixture(fetcher: (url:string, init:any)=>Promise<any>) {
   };
   const events=new Map<string,()=>unknown>();
   const timers=new Map<number,()=>Promise<void>>();let sequence=0;
-  const document={addEventListener:(name:string,fn:()=>unknown)=>events.set(name,fn),getElementById:(id:string)=>id==='purchase-link'?(elements.get(id)||null):element(id),createElement:()=>({}),visibilityState:'visible'};
+  const document={addEventListener:(name:string,fn:()=>unknown)=>events.set(name,fn),getElementById:(id:string)=>id==='purchase-link'?(elements.get(id)||null):element(id),createElement:()=>({id:'',remove(){elements.delete(this.id);}}),visibilityState:'visible'};
   const saved=new Map([['publy_hosted_api_key','fixture-old']]);
   const context=vm.createContext({document,fetch:fetcher,sessionStorage:{getItem:(k:string)=>saved.get(k),setItem:(k:string,v:string)=>saved.set(k,v)},setTimeout:(fn:()=>Promise<void>)=>{timers.set(++sequence,fn);return sequence;},clearTimeout:(id:number)=>timers.delete(id),navigator:{clipboard:{writeText:async()=>{}}}});
   const script=hostedPurchasePage(true,undefined,true).match(/<script>([\s\S]*?)<\/script>/)![1];
