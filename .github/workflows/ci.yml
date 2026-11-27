@@ -64,7 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Playwright 1.51.1 supports Ubuntu 24.04, not the floating 26.04 runner.
+        os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       # fetch-depth: 0 so check-plugin-metadata.mjs can match every
