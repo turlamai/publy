@@ -18,3 +18,4 @@ packages/obsidian-plugin/dist/
 packages/obsidian-plugin/publy-obsidian-*.zip
 
 /packages/workbench/dist-desktop/
+/packages/desktop/glaze-build-entry.rkt

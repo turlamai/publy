@@ -71,8 +71,11 @@ jobs:
           /usr/bin/Publy --check-bundle
       - if: runner.os == 'macOS'
         run: |
-          codesign --verify --deep --strict dist/desktop/Publy.app
-          dist/desktop/Publy.app/Contents/MacOS/Publy --check-bundle
+          mount="$(mktemp -d)"
+          trap 'hdiutil detach "$mount"' EXIT
+          hdiutil attach dist/desktop-candidate/*.dmg -readonly -nobrowse -mountpoint "$mount"
+          codesign --verify --deep --strict "$mount/Publy.app"
+          "$mount/Publy.app/Contents/MacOS/Publy" --check-bundle
       - if: runner.os == 'Windows'
         shell: pwsh
         run: |

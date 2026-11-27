@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {spawnSync} from "node:child_process";
-import {copyFileSync,mkdirSync,readFileSync,readdirSync,writeFileSync} from "node:fs";
+import {copyFileSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from "node:fs";
 import path from "node:path";
 
 const platforms={
@@ -21,18 +21,22 @@ const version=run("racket",["-e",'(require "packages/desktop/version.rkt")(displ
                   {stdio:["ignore","pipe","inherit"]}).trim();
 if(!/^\d+\.\d+\.\d+$/.test(version))throw Error("Invalid desktop version");
 mkdirSync("dist",{recursive:true});
-const dist=path.resolve("dist","desktop");
+const dist=mkdtempSync(path.resolve("dist","publy-build-"));
 const glArgs=["glaze","build","--entry","packages/desktop/main.rkt","--name","Publy",
               "--version",version,"--identifier","site.jrtx.publy","--out",dist,"--installer"];
 if(process.platform==="darwin")glArgs.push("--sign","-");
-run("raco",glArgs);
-const installers=readdirSync(dist).filter(name=>name.endsWith(platform.suffix));
-if(installers.length!==1)throw Error("Expected one "+platform.suffix+" installer");
-const target=path.resolve("dist","desktop-candidate");
-mkdirSync(target,{recursive:true});
-const filename=`publy-desktop-${version}-${platform.id}-${platform.arch}${platform.suffix}`;
-const artifact=path.join(target,filename);
-copyFileSync(path.join(dist,installers[0]),artifact);
-const digest=createHash("sha256").update(readFileSync(artifact)).digest("hex");
-writeFileSync(artifact+".sha256",digest+"  "+filename+"\n");
-console.log(filename,digest);
+try{
+ run("raco",glArgs);
+ const installers=readdirSync(dist).filter(name=>name.endsWith(platform.suffix));
+ if(installers.length!==1)throw Error("Expected one "+platform.suffix+" installer");
+ const target=path.resolve("dist","desktop-candidate");
+ mkdirSync(target,{recursive:true});
+ const filename=`publy-desktop-${version}-${platform.id}-${platform.arch}${platform.suffix}`;
+ const artifact=path.join(target,filename);
+ copyFileSync(path.join(dist,installers[0]),artifact);
+ const digest=createHash("sha256").update(readFileSync(artifact)).digest("hex");
+ writeFileSync(artifact+".sha256",digest+"  "+filename+"\n");
+ console.log(filename,digest);
+}finally{
+ rmSync(dist,{recursive:true,force:true});
+}
