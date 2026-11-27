@@ -39,9 +39,11 @@
       #f 'exclusive
       (lambda ()
         (define db-path (path-add-extension path #".sqlite3" #"."))
-        (unless (file-exists? db-path)
+        ;; Preserve Unix file mode bits. On Windows use the current user's
+        ;; profile ACL; Racket's Unix-style creation mode marks files read-only.
+        (unless (or (eq? (system-type 'os) 'windows) (file-exists? db-path))
           (call-with-output-file db-path void #:permissions #o600 #:exists 'error))
-        (define db (sqlite3-connect #:database db-path #:mode 'read/write))
+        (define db (sqlite3-connect #:database db-path #:mode 'create))
         (dynamic-wind
           void
           (lambda ()
@@ -87,6 +89,8 @@
     void
     (lambda ()
       (check-false (with-db read-pending))
+      (unless (eq? (system-type 'os) 'windows)
+        (check-equal? (file-or-directory-permissions (path-add-extension path #".sqlite3" #".") 'bits) #o600))
       (call-with-output-file path (lambda (out) (write-json metadata out)))
       (check-equal? (with-db read-pending) metadata)
       (check-false (file-exists? path))
