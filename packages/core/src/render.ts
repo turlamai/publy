@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import MarkdownIt from "markdown-it";
-import hljs from "highlight.js/lib/common";
+import { createArticleParser } from "./article-parser.js";
 import * as cheerio from "cheerio";
 import juice from "juice";
 import { ATTACHMENT_SCHEME } from "@publy/shared";
@@ -61,15 +61,6 @@ const CONTENT_TYPES: Record<string, string> = {
   ".gif": "image/gif",
   ".webp": "image/webp",
 };
-
-function highlight(code: string, lang: string): string {
-  const language = lang && hljs.getLanguage(lang) ? lang : "plaintext";
-  try {
-    return hljs.highlight(code, { language }).value;
-  } catch {
-    return MarkdownIt().utils.escapeHtml(code);
-  }
-}
 
 // --- math (TeX) -------------------------------------------------------------
 // $...$ inline, $$...$$ block. The rules emit placeholder <img> nodes carrying
@@ -188,14 +179,7 @@ function renderMarkdownWithCleanup(
   }
 
   // 2. markdown → html fragment
-  const md = new MarkdownIt({ html: true, breaks: false, highlight });
-  // Typora may write file:///... for local inserted images. MarkdownIt's
-  // default link validator bans file: for both links and images; permit the
-  // syntax at parsing time, then remove file: from ordinary <a> hrefs in the
-  // DOM sanitizer and resolve <img> to the usual local attachment pipeline.
-  const defaultValidateLink = md.validateLink.bind(md);
-  md.validateLink = (url: string): boolean =>
-    /^file:\/\/\//i.test(url) || defaultValidateLink(url);
+  const md = createArticleParser();
   md.block.ruler.before("fence", "publy_math_block", mathBlockRule);
   md.inline.ruler.after("escape", "publy_math_inline", mathInlineRule);
   const bodyHtml = md.render(pre.body);
