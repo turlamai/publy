@@ -9,6 +9,8 @@ on:
       - 'scripts/build-workbench.mjs'
       - 'scripts/package-desktop.mjs'
       - 'scripts/test-desktop-upgrade.mjs'
+      - 'scripts/test-desktop-feed.sh'
+      - 'scripts/*desktop-update*.rkt'
       - '.github/workflows/desktop-candidate.yml'
   workflow_dispatch:
 
@@ -85,3 +87,29 @@ jobs:
           name: publy-desktop-candidate-${{ matrix.platform }}
           path: dist/desktop-candidate/
           if-no-files-found: error
+
+  signed-feed:
+    name: Signed update feed
+    needs: installer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          architecture: x64
+          distribution: full
+          variant: CS
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/glaze
+          ref: ba2442bb001910d20bca41d0de876e58d6341b63
+          path: .deps/glaze
+      - run: raco pkg install --auto --batch --no-docs --link .deps/glaze
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: publy-desktop-candidate-*
+          path: dist/feed-fixture
+          merge-multiple: true
+      - run: bash scripts/test-desktop-feed.sh dist/feed-fixture

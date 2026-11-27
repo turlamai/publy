@@ -50,16 +50,43 @@ workflow builds candidates only and records a SHA-256 checksum. macOS
 development builds use ad-hoc signing. A release needs production platform
 signing and clean-machine acceptance.
 
-Build a signed update feed locally with
-`racket scripts/make-desktop-update-manifest.rkt <artifacts> <private.pem> <public.pem> <key-id>`.
-The release build must embed the matching public key and key ID in
-`update-trust.rkt`. The signed feed belongs at the dedicated desktop manifest
-URL and refers to installer assets on the matching `desktop-v<version>` GitHub
-release. The client only checks on request, verifies the feed and installer,
-and saves the verified file under Downloads for manual installation.
-Development candidates omit the trust key and hide the update action.
+The installer matrix first installs the checksum-pinned 0.1.0 GitHub
+Actions artifact, then applies the current installer and checks the installed
+version. The matrix also tests the signed update manifest against the actual
+three installer artifacts using a disposable key. Installers built in pull
+requests remain development candidates.
 
-开发候选包覆盖 Apple silicon DMG、Windows x64 MSI 和 Linux x64 DEB，
-构建时记录 SHA-256。生产签名、正式更新源和干净机器验收是独立环节。
-配置发布验签公钥后，桌面端才显示更新入口。用户检查并确认下载后，应用
-验证清单签名和安装包摘要，将文件保存到「下载」目录，由用户手动安装。
+Use `node scripts/package-desktop.mjs --release` to write production bytes
+to `dist/desktop-production`. These builds use the stable public key
+embedded in `update-trust.rkt`. macOS requires a Developer ID Application
+identity in `PUBLY_MAC_SIGN_IDENTITY` and an authenticated Apple notary
+profile in `PUBLY_MAC_NOTARY_PROFILE`. Set `PUBLY_MAC_NOTARY_KEYCHAIN` when the
+profile lives outside the default keychain. The command checks the signature,
+waits for notarization, and validates the ticket on the DMG. Windows requires
+a trusted code-signing identity in the certificate store, the Windows SDK
+Signing Tools on PATH, and `PUBLY_WINDOWS_CERT_THUMBPRINT`. It checks the MSI's
+Authenticode signature and timestamp. Linux authenticity comes from the
+Ed25519-signed feed and the DEB digest. Build and accept each final installer
+before staging the feed.
+
+Collect the three accepted production installers in a directory and run
+`racket scripts/make-desktop-update-manifest.rkt <artifacts> <private.pem>`.
+A private key that differs from the embedded public key cannot write the
+manifest. Run `racket scripts/check-desktop-update-feed.rkt <artifacts>` to
+check all three staged installers. The signed manifest's canonical address is
+`https://publy.jrtx.site/desktop/update-manifest.json`, served by GitHub Pages
+from `main:docs/desktop/update-manifest.json`. Installers are served by the
+version-specific `desktop-v<version>` GitHub release. Publication is a
+separate operator action. Once authorized, publish the checked installer
+bytes before promoting the verified manifest, then run
+`racket scripts/check-desktop-update-feed.rkt` to validate HTTPS, the live
+manifest and all three installer downloads.
+
+桌面安装门禁先安装带固定校验值的 0.1.0，再应用本次安装包并检查版本。
+生产构建输出到 `dist/desktop-production`。macOS 校验 Developer ID
+签名和公证票据，Windows 校验 Authenticode 与时间戳，Linux 用 Ed25519
+签名清单及 DEB 摘要验证。生成清单时，签名私钥必须和应用内置公钥成对。
+
+正式安装包和更新清单由运营者独立发布。先验收准备发布的安装包，再发布
+版本对应的 GitHub Release 资产，最后推进官网更新清单。桌面端只在用户
+主动检查并确认下载后取回并验证安装包，由用户手动安装。

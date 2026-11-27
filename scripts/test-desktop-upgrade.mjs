@@ -9,8 +9,8 @@ const formats={linux:"deb",darwin:"dmg",win32:"msi"};
 const extension=formats[process.platform];
 assert.ok(extension,"unsupported upgrade platform");
 
-function findInstaller(directory){
- const names=readdirSync(directory).filter(name=>name.endsWith("."+extension));
+function findInstaller(directory,version){
+ const names=readdirSync(directory).filter(name=>name.startsWith(`publy-desktop-${version}-`)&&name.endsWith("."+extension));
  assert.equal(names.length,1,"expected exactly one installer in "+directory);
  return path.resolve(directory,names[0]);
 }
@@ -27,10 +27,10 @@ function checkBundle(executable,version){
 }
 function digest(file){return createHash("sha256").update(readFileSync(file)).digest("hex");}
 
-const old=findInstaller("dist/desktop-baseline");
-const next=findInstaller("dist/desktop-candidate");
 const oldVersion="0.1.0";
-const nextVersion=path.basename(next).match(/^publy-desktop-(\d+\.\d+\.\d+)-/)?.[1];
+const nextVersion=run("racket",["-e",'(require "packages/desktop/version.rkt")(display app-version)'],{capture:true}).trim();
+const old=findInstaller("dist/desktop-baseline",oldVersion);
+const next=findInstaller("dist/desktop-candidate",nextVersion);
 assert.ok(path.basename(old).startsWith("publy-desktop-"+oldVersion+"-"));
 assert.ok(nextVersion&&nextVersion!==oldVersion,"expected distinct versions");
 assert.match(process.env.PUBLY_BASELINE_SHA256??"",/^[a-f0-9]{64}$/);

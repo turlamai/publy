@@ -1,10 +1,10 @@
 #lang racket/base
 (require glaze glaze/update (only-in net/url-connect current-https-protocol) openssl racket/file racket/match racket/path
          "deadline.rkt" "update-trust.rkt" "version.rkt")
-(provide make-update-routes desktop-artifact-name eligible-candidate release-asset-url)
+(provide make-update-routes desktop-artifact-name eligible-candidate release-asset-url desktop-max-artifact-size desktop-manifest-url)
 
-(define manifest-url "https://publy.jrtx.site/desktop/update-manifest.json")
-(define maximum-size (* 150 1024 1024))
+(define desktop-manifest-url "https://publy.jrtx.site/desktop/update-manifest.json")
+(define desktop-max-artifact-size (* 150 1024 1024))
 (define (extension platform arch)
   (match (list platform arch)
     ['(macos arm64) 'dmg]
@@ -27,7 +27,7 @@
     (unless (and filename (regexp-match? #px"^[0-9]+[.][0-9]+[.][0-9]+$" version)
                  (equal? (update-artifact-url artifact) (release-asset-url version filename))
                  (eq? (update-artifact-installer artifact) (extension platform arch))
-                 (<= 1 (update-artifact-size artifact) maximum-size))
+                 (<= 1 (update-artifact-size artifact) desktop-max-artifact-size))
       (error 'updater "Invalid signed Publy installer metadata")))
   candidate)
 
@@ -46,21 +46,15 @@
         lock
         (lambda ()
           (with-handlers ([exn:fail? (lambda (_) (state "unavailable"))])
-            (define public (make-temporary-file "publy-update-public~a.pem"))
-            (dynamic-wind
-              void
-              (lambda ()
-                (call-with-output-file public
-                  (lambda (out) (display update-public-key-pem out))
-                  #:exists 'truncate)
-                (call-with-deadline
-                 timeout
-                 (lambda ()
-                   (parameterize ([current-https-protocol (ssl-secure-client-context)])
-                     (define config (updater-config desktop-app-id app-version 'stable platform arch public update-key-id 0 maximum-size))
-                     (define manifest (fetch-update-manifest manifest-url public #:key-id update-key-id))
-                     (request config (eligible-candidate config manifest))))))
-              (lambda () (delete-file public)))))
+            (call-with-embedded-update-key
+             (lambda (public)
+               (call-with-deadline
+                timeout
+                (lambda ()
+                  (parameterize ([current-https-protocol (ssl-secure-client-context)])
+                    (define config (updater-config desktop-app-id app-version 'stable platform arch public update-key-id 0 desktop-max-artifact-size))
+                    (define manifest (fetch-update-manifest desktop-manifest-url public #:key-id update-key-id))
+                    (request config (eligible-candidate config manifest)))))))))
         (lambda () (state "busy")))]))
   (define-api-routes routes
     [(POST "api/update-enabled" #:permission 'update:use)
@@ -106,7 +100,7 @@
   (define artifact (update-artifact 'linux 'x64 (release-asset-url test-version filename)
                                     (make-string 64 #\a) 10 'deb '() #f))
   (define manifest (update-manifest desktop-app-id test-version 1 'stable "2026-11-27T00:00:00Z" "0.1.0" #f #f 100 (list artifact)))
-  (define config (updater-config desktop-app-id "0.1.0" 'stable 'linux 'x64 #f #f 0 maximum-size))
+  (define config (updater-config desktop-app-id "0.1.0" 'stable 'linux 'x64 #f #f 0 desktop-max-artifact-size))
   (check-equal? (update-candidate-artifact (eligible-candidate config manifest)) artifact)
   (check-false (eligible-candidate (struct-copy updater-config config [current-version test-version]) manifest))
   (check-false (eligible-candidate (struct-copy updater-config config [platform 'windows]) manifest))
