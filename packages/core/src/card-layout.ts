@@ -212,4 +212,3 @@ export function lintCards(sections: CardSection[], caption: string): LintResult 
   }
   return { ok: problems.length === 0, problems };
 }
-

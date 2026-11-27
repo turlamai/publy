@@ -1,8 +1,9 @@
 // This driver runs only in the synthetic native test application.
 (async () => {
  const get=id=>document.getElementById(id);
- const wait=async (condition,label)=>{
-  for(let i=0;i<200;i++){
+ const wait=async (condition,label,timeout=5000)=>{
+  const until=performance.now()+timeout;
+  while(performance.now()<until){
    if(condition())return;
    await new Promise(resolve=>setTimeout(resolve,25));
   }
@@ -47,7 +48,22 @@
   get("draft-close").click();
   get("format").value="cards";get("format").dispatchEvent(new Event("change"));
   enter("source","A caption\n\n## cover\n咖啡 Coffee\n\n## point\nA tip\n\n## ending\nThanks");
-  await wait(()=>document.querySelectorAll("#card-strip img").length===3,"cards");
+  try{
+   await wait(()=>document.querySelectorAll("#card-strip img").length===3,"cards",25000);
+  }catch{
+   const diagnostic=[get("status").textContent,document.querySelectorAll("#card-strip img").length+" images"];
+   if(globalThis.PublyCards){
+    const outcome=await Promise.race([
+     PublyCards.renderCard({colors:{bg:"#fff",text:"#111",muted:"#666",accent:"#111",rule:"#ddd"}},
+                           {kind:"cover",lines:["Card probe"]},0,1).then(()=> "rasterizer ready",error=>String(error)),
+     new Promise(resolve=>setTimeout(()=>resolve("rasterizer timed out"),3000))
+    ]);
+    diagnostic.push(outcome);
+   }else{
+    diagnostic.push("card module unavailable");
+   }
+   throw Error(diagnostic.join("; "));
+  }
   const card=document.querySelector("#card-strip img");
   await card.decode();
   assert(card.naturalWidth===1080&&card.naturalHeight===1440,"card dimensions");

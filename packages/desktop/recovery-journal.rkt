@@ -109,7 +109,16 @@
           (check-eq? (with-db read-pending) 'busy)
           (subprocess-kill proc #t)
           (subprocess-wait proc)
-          (check-equal? (with-db read-pending) metadata))
+          ;; Windows may release a terminated process's byte-range locks
+          ;; after the process handle has signaled. Claims stay blocked
+          ;; until the kernel actually grants the next lock.
+          (define restored
+            (let loop ([attempts 100])
+              (define result (with-db read-pending))
+              (if (and (eq? result 'busy) (positive? attempts))
+                  (begin (sleep 0.1) (loop (sub1 attempts)))
+                  result)))
+          (check-equal? restored metadata))
         (lambda ()
           (subprocess-kill proc #t)
           (close-input-port stdout)
