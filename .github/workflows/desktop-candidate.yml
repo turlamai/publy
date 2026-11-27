@@ -1,0 +1,92 @@
+name: Desktop installer candidates
+
+on:
+  pull_request:
+    paths:
+      - 'packages/desktop/**'
+      - 'packages/workbench/**'
+      - 'packages/core/**'
+      - 'scripts/build-workbench.mjs'
+      - 'scripts/package-desktop.mjs'
+      - '.github/workflows/desktop-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    name: Installer (${{ matrix.platform }})
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-x64
+            racket: x64
+          - runner: macos-latest
+            platform: macos-arm64
+            racket: arm64
+          - runner: windows-latest
+            platform: windows-x64
+            racket: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          architecture: ${{ matrix.racket }}
+          distribution: full
+          variant: CS
+      - uses: actions/checkout@v4
+        with:
+          repository: turlamai/glaze
+          ref: ba2442bb001910d20bca41d0de876e58d6341b63
+          path: .deps/glaze
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --tool-path "$env:RUNNER_TEMP\wix" wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$env:RUNNER_TEMP\wix" >> $env:GITHUB_PATH
+      - run: raco pkg install --auto --batch --no-docs --link .deps/glaze
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-workbench.mjs
+      - run: raco test packages/desktop/main.rkt
+      - run: node scripts/package-desktop.mjs
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ./dist/desktop-candidate/*.deb
+          /usr/bin/Publy --check-bundle
+      - if: runner.os == 'macOS'
+        run: |
+          codesign --verify --deep --strict dist/desktop/Publy.app
+          dist/desktop/Publy.app/Contents/MacOS/Publy --check-bundle
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem dist/desktop-candidate/*.msi).FullName
+          $install = Join-Path $env:RUNNER_TEMP 'Publy'
+          $args = '/i "{0}" /qn /norestart INSTALLDIR="{1}"' -f $msi, $install
+          $process = Start-Process msiexec.exe -ArgumentList $args -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "MSI failed: $($process.ExitCode)" }
+          $app = Get-ChildItem $install -Filter Publy.exe -Recurse | Select-Object -First 1
+          if (!$app) { throw "MSI did not install Publy.exe" }
+          & $app.FullName --check-bundle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publy-desktop-candidate-${{ matrix.platform }}
+          path: dist/desktop-candidate/
+          if-no-files-found: error

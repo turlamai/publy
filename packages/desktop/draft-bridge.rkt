@@ -1,9 +1,9 @@
 #lang racket/base
 (require file/sha1 glaze json racket/list racket/string
          "hosted-transport.rkt" "recovery-journal.rkt")
-(provide draft-capability make-draft-routes)
+(provide draft-permissions make-draft-routes)
 
-(define draft-capability (make-capability "publy-workbench" '(draft:read draft:prepare draft:send)))
+(define draft-permissions '(draft:read draft:prepare draft:send))
 (define (state status) (hasheq 'status status))
 (define busy (state "busy"))
 (define unavailable (state "storage-error"))
@@ -15,32 +15,40 @@
   (and (hash? value) (= (hash-count value) (length fields))
        (andmap (lambda (field) (hash-has-key? value field)) fields)))
 
-(define (read-article body)
+(define (read-draft body)
   (unless (<= (bytes-length (string->bytes/utf-8 body)) max-body)
     (error 'draft "Invalid article size"))
   (define in (open-input-string body))
   (define article (read-json in))
+  (define cards? (and (hash? article) (equal? (hash-ref article 'type #f) "image_post")))
   (unless (and (eof-object? (read-json in))
-               (exact-fields? article '(account type title html images))
-               (equal? (hash-ref article 'type) "article")
+               (if cards?
+                   (exact-fields? article '(account type title html images cover))
+                   (and (exact-fields? article '(account type title html images))
+                        (equal? (hash-ref article 'type) "article")))
                (for/and ([field '(account title)])
                  (define text (hash-ref article field))
                  (and (string? text) (<= 1 (string-length text) 64)
                       (equal? text (string-trim text))))
                (string? (hash-ref article 'html))
                (list? (hash-ref article 'images))
-               (<= (length (hash-ref article 'images)) 100)
+               (if cards?
+                   (<= 3 (length (hash-ref article 'images)) 9)
+                   (<= (length (hash-ref article 'images)) 100))
                (for/and ([image (in-list (hash-ref article 'images))])
                  (and (exact-fields? image '(name contentType data))
                       (string? (hash-ref image 'name))
                       (member (hash-ref image 'contentType)
                               '("image/png" "image/jpeg" "image/gif" "image/webp"))
-                      (string? (hash-ref image 'data)))))
+                      (or (not cards?) (equal? (hash-ref image 'contentType) "image/png"))
+                      (string? (hash-ref image 'data))))
+               (or (not cards?) (equal? (hash-ref article 'cover)
+                                        (hash-ref (car (hash-ref article 'images)) 'name))))
     (error 'draft "Invalid article fields"))
   article)
 
-;; The immediate article subset of core/src/draft-identity-fields.ts.
-(define (article-id article)
+;; The immediate article and image-post subset of core/src/draft-identity-fields.ts.
+(define (draft-id article)
   (define images (hash-ref article 'images))
   (define out (open-output-bytes))
   (define (write-field text)
@@ -48,9 +56,9 @@
     (fprintf out "~a:" (bytes-length bytes))
     (write-bytes bytes out))
   (for-each write-field
-            (list "publy-wechat-draft-v2" (hash-ref article 'account) "article"
+            (list "publy-wechat-draft-v2" (hash-ref article 'account) (hash-ref article 'type)
                   (hash-ref article 'title) (hash-ref article 'html)
-                  "" "" "" "" "" "unset" "unset" "" (number->string (length images))))
+                  (hash-ref article 'cover "") "" "" "" "" "unset" "unset" "" (number->string (length images))))
   (for* ([image (in-list images)] [field '(name contentType data)])
     (write-field (hash-ref image field)))
   (substring (bytes->hex-string (sha256-bytes (get-output-bytes out))) 0 32))
@@ -94,12 +102,12 @@
     [(POST "api/draft/identity" #:permission 'draft:prepare)
      (draftIdentity [body GString])
      (with-handlers ([exn:fail? (lambda (_) invalid)])
-       (hasheq 'id (article-id (read-article body))))]
+       (hasheq 'id (draft-id (read-draft body))))]
     [(POST "api/draft/send" #:permission 'draft:send)
      (draftSend [key GString] [approved GString] [body GString])
-     (define article (with-handlers ([exn:fail? (lambda (_) #f)]) (read-article body)))
+     (define article (with-handlers ([exn:fail? (lambda (_) #f)]) (read-draft body)))
      (cond
-       [(not (and (valid-key? key) article (equal? approved (article-id article)))) invalid]
+       [(not (and (valid-key? key) article (equal? approved (draft-id article)))) invalid]
        [else
         (with-journal
          (lambda (db)

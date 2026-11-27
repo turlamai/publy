@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import MarkdownIt from "markdown-it";
+import { configureArticleMath } from "./article-math.js";
 import { createArticleParser } from "./article-parser.js";
 import { sanitizeArticleSource } from "./article-sanitize.js";
 import * as cheerio from "cheerio";
@@ -77,55 +78,6 @@ function mathPlaceholder(tex: string, display: boolean): string {
   return `<img class="publy-math" src="publy-math://${hex}" alt="${escapeAttr(tex)}" data-tex="${escapeAttr(tex)}" data-display="${display ? 1 : 0}" data-hex="${hex}">`;
 }
 
-function mathInlineRule(state: any, silent: boolean): boolean {
-  const src = state.src;
-  const pos = state.pos;
-  if (src.charCodeAt(pos) !== 0x24 /* $ */) return false;
-  // find the closer: a $ with an even number of backslashes before it
-  let end = pos + 1;
-  for (;;) {
-    end = src.indexOf("$", end);
-    if (end === -1) return false;
-    let bs = 0;
-    for (let k = end - 1; src.charCodeAt(k) === 0x5c; k--) bs++;
-    if (bs % 2 === 0) break;
-    end++;
-  }
-  const content = src.slice(pos + 1, end);
-  if (!content.trim() || /[\n\r]/.test(content)) return false;
-  // pandoc-style guard: no unescaped whitespace hugging the delimiters
-  if (/^\s|\s$/.test(content)) return false;
-  if (!silent) state.push("html_inline", "", 0).content = mathPlaceholder(content, false);
-  state.pos = end + 1;
-  return true;
-}
-
-function mathBlockRule(state: any, startLine: number, endLine: number, silent: boolean): boolean {
-  const startPos = state.bMarks[startLine] + state.tShift[startLine];
-  if (state.src.charCodeAt(startPos) !== 0x24 || state.src.charCodeAt(startPos + 1) !== 0x24) return false;
-  let pos = startPos + 2;
-  let closeLine = startLine;
-  let closeIdx = -1;
-  while (closeLine < endLine) {
-    const lineEnd = state.eMarks[closeLine];
-    const rel = state.src.slice(pos, lineEnd).indexOf("$$");
-    if (rel !== -1) {
-      closeIdx = pos + rel;
-      break;
-    }
-    closeLine++;
-    pos = state.bMarks[closeLine] + state.tShift[closeLine];
-  }
-  if (closeIdx === -1) return false;
-  const content = state.src.slice(startPos + 2, closeIdx).trim();
-  if (!content) return false;
-  if (!silent) {
-    state.push("html_block", "", 0).content = mathPlaceholder(content, true) + "\n";
-  }
-  state.line = closeLine + 1;
-  return true;
-}
-
 class AttachmentCollector {
   attachments: Attachment[] = [];
   private used = new Set<string>();
@@ -181,8 +133,7 @@ function renderMarkdownWithCleanup(
 
   // 2. markdown → html fragment
   const md = createArticleParser();
-  md.block.ruler.before("fence", "publy_math_block", mathBlockRule);
-  md.inline.ruler.after("escape", "publy_math_inline", mathInlineRule);
+  configureArticleMath(md, mathPlaceholder);
   const bodyHtml = md.render(pre.body);
   const theme = opts.customThemePath
     ? loadThemeFromCss(opts.customThemePath)

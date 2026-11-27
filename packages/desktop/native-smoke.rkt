@@ -9,6 +9,7 @@
 (define journal (build-path dir "pending.json"))
 (define calls '())
 (define sent #f)
+(define valid-formula #f)
 (define done #f)
 (define (mock path method key body)
   (unless (equal? key "synthetic-key") (error 'synthetic "Unexpected key"))
@@ -19,6 +20,7 @@
     [(equal? path "/v1/publish")
      (set! sent (read-json (open-input-bytes body)))
      (unless (equal? (hash-ref sent 'title) "Sample") (error 'synthetic "Unexpected title"))
+     (set! valid-formula (= (length (hash-ref sent 'images)) 1))
      (error 'synthetic "Reply lost")]
     [else
      (hasheq 'ok #t 'data
@@ -51,5 +53,6 @@
                     (list '("GET" . "/v1/accounts") '("POST" . "/v1/publish")
                           (cons "GET" (string-append "/v1/publish-result/" (hash-ref sent 'idempotencyKey)))))
       (error 'native-smoke "Unexpected upstream calls: ~a" (reverse calls)))
+    (unless valid-formula (error 'native-smoke "Missing formula attachment"))
     (displayln "Native workbench delivery/recovery smoke passed"))
   (lambda () (delete-directory/files dir)))

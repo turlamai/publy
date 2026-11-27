@@ -1,5 +1,6 @@
 // Local-only article preview foundation. Never mount this fragment directly in the host DOM.
 // The workbench must use a sandboxed iframe with a deny-by-default CSP.
+import { configureArticleMath } from "./article-math.js";
 import { createArticleParser } from "./article-parser.js";
 import { parseSource, publicationTitle } from "./frontmatter.js";
 import { rewriteOutsideCode } from "./markdown-rewrite.js";
@@ -12,11 +13,10 @@ export interface LocalArticlePreview {
   warnings: string[];
 }
 
-/** Preview accepts only explicitly selected raster images. Raw HTML and TeX parity remain open. */
-export function previewLocalArticle(raw: string, trustedThemeCss: string, media: ReadonlyMap<string, string> = new Map()): LocalArticlePreview {
+/** Only explicitly selected raster images and renderer-owned markup are allowed. */
+export function previewLocalArticle(raw: string, trustedThemeCss: string, media: ReadonlyMap<string, string> = new Map(), renderMath?: (tex: string, display: boolean) => string): LocalArticlePreview {
   const warnings = new Set<string>();
   const body = rewriteOutsideCode(parseSource(raw).body, text => {
-    if (/\$/.test(text)) warnings.add("Formula rendering is not yet supported in this preview.");
     return text.replace(/!\[\[([^\]]+)\]\]/g, (_match, name: string) => {
       return "![Image](" + encodeURIComponent(name.split("|")[0].trim()) + ")";
     }).replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target: string, alias?: string) => (alias ?? target).trim());
@@ -24,6 +24,10 @@ export function previewLocalArticle(raw: string, trustedThemeCss: string, media:
   const parser = createArticleParser();
   // Author-supplied HTML and network URLs never reach the preview.
   parser.set({ html: false });
+  configureArticleMath(parser, renderMath ?? ((tex) => {
+    warnings.add("Formula rendering is not available in this preview.");
+    return parser.utils.escapeHtml(tex);
+  }));
   parser.renderer.rules.image = (tokens, idx) => {
     const token = tokens[idx];
     const src = token.attrGet("src") ?? "";

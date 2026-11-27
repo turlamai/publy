@@ -203,3 +203,15 @@ unreadable recovery state block new delivery.
 在内存。桌面进程共享系统文件锁，投递前由 SQLite 提交请求编号、公众号和标题。
 重新启动后输入 API Key，只查询原请求。确认结果与原请求一致才清除记录。
 结果不明或恢复记录不可读时，禁止新投递。
+
+The image card format shows the core card layout and exports the same 1080 ×
+1440 PNG bytes used for an explicitly confirmed image draft. The download
+and preview steps stay local. TeX renders to PNG attachments before review.
+The desktop build shows a check for updates when it has a release verification
+key. A signed manifest selects the matching installer and an explicit
+download verifies the checksum. Installation remains a separate user action.
+
+卡片预览和下载使用 1080 × 1440 PNG，确认图片草稿后发送同一组图像。
+预览和下载卡片在本机完成。公式在确认前转为 PNG 附件。桌面正式构建在配置
+验签公钥后显示更新入口，按签名清单选择当前系统安装包，用户明确下载后校验
+摘要，安装由用户单独操作。

@@ -120,6 +120,14 @@
               <div class="drop">自动</div>
             </div>
           </div>
+          <div class="sgrp" data-host="desktop" hidden>
+            <h2>桌面更新</h2>
+            <div class="frow">
+              <div><div class="fl">检查更新</div><div class="fd">发布版本可检查并下载已验签的安装包，再手动安装。</div></div>
+              <div class="sp"></div>
+              <button class="tbtn" type="button" disabled>检查更新</button>
+            </div>
+          </div>
           <div class="custody">
             <span class="ic">◆</span>
             <div><b>凭据托管</b>：API key 只存本机 vault，不进同步盘；公众号 AppSecret 只存在于你的自托管服务端（<code>server.json</code>），加密托管、永不下发。预览与检查全程不联网。</div>
@@ -134,6 +142,9 @@
     </div>
   </div>
   <script>
+    if (new URLSearchParams(location.search).get('host') === 'desktop') {
+      document.querySelector('[data-host="desktop"]').hidden = false;
+    }
     document.getElementById('themeBtn').addEventListener('click', () => {
       document.getElementById('app').classList.toggle('dark');
     });

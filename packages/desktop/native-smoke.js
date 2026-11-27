@@ -18,7 +18,7 @@
   try{await glaze.api.testDenied({});}catch(error){denied=error?.code==="capability-denied";}
   assert(denied,"Ungranted capability was accepted");
   if(document.documentElement.lang!=="en")get("language").click();
-  enter("source","# Sample\n\nHello **bold**.");
+  enter("source","# Sample\n\nHello **bold**. $x^2$");
   await wait(()=>!get("draft-open").disabled,"preview");
   assert(get("preview").getAttribute("sandbox")==="","No preview sandbox");
   get("draft-open").click();
@@ -44,6 +44,13 @@
   get("draft-reconcile").click();
   await wait(()=>get("draft-status").textContent.includes("Draft creation confirmed"),"readback");
   assert((await glaze.api.draftPending({})).pending===null,"Recovery record remained");
+  get("draft-close").click();
+  get("format").value="cards";get("format").dispatchEvent(new Event("change"));
+  enter("source","A caption\n\n## cover\n咖啡 Coffee\n\n## point\nA tip\n\n## ending\nThanks");
+  await wait(()=>document.querySelectorAll("#card-strip img").length===3,"cards");
+  const card=document.querySelector("#card-strip img");
+  await card.decode();
+  assert(card.naturalWidth===1080&&card.naturalHeight===1440,"card dimensions");
   await glaze.api.testDone({message:"passed"});
  }catch(error){
   await glaze.api.testDone({message:String(error)});

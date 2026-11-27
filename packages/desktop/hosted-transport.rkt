@@ -1,6 +1,6 @@
 #lang racket/base
 ;; Restricted upstream transport. No caller-controlled origin, headers or redirects.
-(require net/http-client openssl json racket/port racket/string)
+(require net/http-client openssl json racket/port racket/string "deadline.rkt")
 (provide hosted-request make-hosted-request valid-key?)
 (define host "publy-api.jrtx.site")
 (define limit (* 30 1024 1024))
@@ -48,21 +48,7 @@
     (send path (if publish? "POST" "GET") key
           (and body (string->bytes/utf-8 body)))))
 (define (bounded-upstream path method key body)
-  (define scope (make-custodian))
-  (dynamic-wind
-    void
-    (lambda ()
-      (define result (make-channel))
-      (parameterize ([current-custodian scope])
-        (thread (lambda ()
-                  (channel-put result
-                               (with-handlers ([exn:fail? values])
-                                 (upstream path method key body))))))
-      (define value (sync/timeout 45 result))
-      (cond [(exn:fail? value) (raise value)]
-            [value value]
-            [else (error 'hosted-request "Upstream timeout")]))
-    (lambda () (custodian-shutdown-all scope))))
+  (call-with-deadline 45 (lambda () (upstream path method key body))))
 (define hosted-request (make-hosted-request bounded-upstream))
 
 (module+ test
