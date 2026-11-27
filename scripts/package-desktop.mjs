@@ -56,7 +56,7 @@ try{
  const staged=path.join(dist,installers[0]);
  if(release&&process.platform==="darwin"){
   run("codesign",["--verify","--deep","--strict","--test-requirement",
-                   "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists",
+                   "=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists",
                    path.join(dist,"Publy.app")]);
   run("codesign",["--sign",process.env.PUBLY_MAC_SIGN_IDENTITY,"--timestamp",staged]);
   const notaryArgs=["notarytool","submit",staged,"--keychain-profile",

@@ -74,7 +74,7 @@ if(process.platform==="linux"){
    renameSync(incoming,installed);
    run("codesign",["--verify","--deep","--strict",installed]);
    const info=path.join(installed,"Contents","Info.plist");
-   assert.equal(run("/usr/libexec/PlistBuddy",["-c","Print :CFBundleIdentifier",info],{capture:true}).trim(),"site.jrtx.publy");
+   assert.equal(run("/usr/libexec/PlistBuddy",["-c","Print :CFBundleIdentifier",info],{capture:true}).trim(),"io.glaze.Publy");
    checkBundle(path.join(installed,"Contents","MacOS","Publy"),version);
   }
  }finally{rmSync(directory,{recursive:true,force:true});}
