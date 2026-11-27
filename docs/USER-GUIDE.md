@@ -6,7 +6,7 @@ Turn Markdown into WeChat article drafts and image-post cards, with local previe
 
 ## Availability
 
-CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted subscriptions are not open; there is no unlimited plan for sale.
+CLI, default themes, Obsidian and self-hosting remain free under their existing licences. Public hosted purchasing is open (Personal ¥29 per calendar month, no auto-renewal); there is no unlimited plan.
 
 The development plugin embeds its rendering assets in `main.js`. Three-file offline installation is under test; actual clean-vault installation and update acceptance remain open ([#12](https://github.com/turlamai/publy/issues/12), [#15](https://github.com/turlamai/publy/issues/15)).
 
@@ -14,7 +14,7 @@ The development plugin embeds its rendering assets in `main.js`. Three-file offl
 
 Follow the [step-by-step WeChat connection guide](wechat-setup.md): check official API permissions → open your service’s `/setup` → copy its egress IP → add the **API IP whitelist** in the official WeChat console → check and connect → configure Obsidian with the service root URL and Publy Key → explicitly approve one test draft and inspect it in WeChat.
 
-The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosting is not on sale; invited acceptance users use the provided service and original key. Do not pay just to connect or reset AppSecret merely to follow the guide.
+The guide includes official entry links, credential sources, concrete actions, success criteria, and recovery for whitelist errors, a new computer, unknown outcomes and paid-but-inactive access. Public hosted purchasing is open: Personal ¥29 per calendar month, bought at the official connection page. Do not pay just to connect or reset AppSecret merely to follow the guide.
 
 
 ## Platforms and installation

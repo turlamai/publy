@@ -80,3 +80,13 @@ html.publy-web{--warn:var(--amber)}
 /* Public brand follows site-kit; green is reserved for success states. */
 html.publy-web[data-theme="dark"]{--kit-accent:#E08A6B;--kit-accent-hover:#E89E82;--kit-on-accent:#1D120C}
 .publy-web .brand-mark{background:#D97757;color:#fff}
+
+/* Family kit buttons rendered as anchors + unified theme/language switchers
+   (mirror of the kit controls; keeps every Publy page on one product look). */
+.publy-web a.kit-btn{color:var(--kit-text)}.publy-web a.kit-btn--primary,.publy-web a.kit-btn--primary:hover{color:var(--kit-on-accent)}.publy-web a.kit-btn--secondary{color:var(--kit-text)}
+.publy-web .nav .theme-toggle,.publy-web .pw-nav .theme-toggle{width:42px;min-height:42px;padding:0;border-radius:999px;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.publy-web .theme-toggle::before{content:"☾"}.publy-web .theme-toggle[aria-pressed="true"]::before{content:"☀"}
+.publy-web .langs{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px}
+.publy-web .langs button{background:transparent;color:var(--muted);border:0;border-radius:999px;min-height:32px;padding:4px 12px;font-size:12.5px}
+.publy-web .pw-actions [data-switch]{background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:999px;min-height:36px;padding:2px 12px;font-size:12.5px}
+.publy-web .pw-actions [data-switch][aria-pressed="true"]{background:var(--green);color:var(--on-accent);border-color:var(--green)}
