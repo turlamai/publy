@@ -5,9 +5,9 @@
 .publy-web .compact-hero .kit-btn-row { justify-content:center; margin-top:24px; }
 .publy-web .hero-account { margin-top:14px; font-size:14px; }
 .publy-web .compact-plans { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; max-width:840px; padding-block: 20px 30px; }
-.publy-web .compact-plan { border:1px solid var(--kit-border); background:var(--kit-bg-elevated); border-radius:var(--kit-radius-m); padding:24px; }
+.publy-web .compact-plan { border:1px solid var(--kit-border); background:var(--kit-bg-elevated); border-radius:var(--kit-radius-m, 14px); padding:24px; }
 .publy-web .compact-plan h2 { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; font-size:1.2rem; }
-.publy-web .compact-plan h2>span { font-size:1.8rem; font-weight:600; }
+.publy-web .compact-plan h2>.plan-price { font-size:1.8rem; font-weight:600; }
 .publy-web .compact-plan h2 small { font-size:.75rem; font-weight:400; color:var(--kit-text-2); }
 .publy-web .compact-plan p { margin:12px 0; color:var(--kit-text-2); min-height:3em; }
 .publy-web .compact-plan a { font-weight:600; }

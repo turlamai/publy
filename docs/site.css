@@ -1,4 +1,4 @@
-/* Product-site subpages: same paper/green language as the homepage, no webfonts. */
+/* Product-site subpages: same warm-neutral/terracotta language as the homepage, no webfonts. */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 body { background: var(--paper); color: var(--ink); font: 16px/1.7 var(--sans); letter-spacing: -.011em; }
@@ -15,7 +15,7 @@ header { position: sticky; top: 0; z-index: 20; background:var(--paper); border-
 .nav-right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .langs { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
 .langs button { border: 0; background: transparent; padding: 5px 10px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
-.langs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.langs button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 [data-lang] { display: none; }
 html[lang="en"] [data-lang="en"], html[lang="zh-CN"] [data-lang="zh"] { display: revert; }
 h1, h2, h3 { letter-spacing: -.03em; }
@@ -24,9 +24,9 @@ h1, h2, h3 { letter-spacing: -.03em; }
 .hero h1 { font: 500 clamp(38px, 5vw, 58px)/1.08 var(--serif); margin: 14px 0 18px; }
 .lead { color: var(--muted); font-size: 17px; max-width: 620px; }
 .buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
-.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 650; color: var(--ink); background: #fff; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 650; color: var(--ink); background: var(--card); }
 .btn:hover { text-decoration: none; border-color: var(--ink); }
-.btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.primary { background: var(--green); border-color: var(--green); color: var(--on-accent, #fff); }
 .btn.primary:hover { background: var(--green-dark); }
 .note { border: 1px solid #ecd6a6; background: var(--amber-tint); color: var(--amber); border-radius: 12px; padding: 14px 16px; font-size: 12px; line-height: 1.8; }
 .section { padding: 40px 0; }
@@ -44,12 +44,12 @@ h1, h2, h3 { letter-spacing: -.03em; }
 .card li { margin-bottom: 4px; }
 .card .links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; font-weight: 650; }
 code, pre { font-family: var(--mono); }
-code { background: #eef3ec; border-radius: 5px; padding: 1px 5px; font-size: .88em; }
-pre { background: #101914; color: #dce8e0; border-radius: 10px; padding: 14px 16px; font-size: 12px; line-height: 1.8; overflow: auto; margin: 10px 0 0; }
+code { background: var(--tint); border-radius: 5px; padding: 1px 5px; font-size: .88em; }
+pre { background: #211a16; color: #f1ece5; border-radius: 10px; padding: 14px 16px; font-size: 12px; line-height: 1.8; overflow: auto; margin: 10px 0 0; }
 pre code { background: transparent; padding: 0; color: inherit; }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 th { text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; border-bottom: 1px solid var(--line); padding: 8px 10px; }
-td { border-bottom: 1px solid #edf2ea; padding: 10px; vertical-align: top; }
+td { border-bottom: 1px solid var(--line); padding: 10px; vertical-align: top; }
 td code { white-space: nowrap; }
 .hosted { border: 1px solid var(--line); background:var(--tint); border-radius: 16px; padding: 24px; display: flex; justify-content: space-between; gap: 26px; align-items: center; }
 .hosted h2 { font-size: 22px; }
@@ -68,3 +68,10 @@ footer a { color: var(--muted); margin-right: 14px; }
   .hosted { flex-direction: column; align-items: flex-start; }
   .section-head { flex-direction: column; align-items: flex-start; }
 }
+
+/* Customer pages keep readable spacing without introducing additional panels. */
+.customer-start > p { margin: 14px 0; }
+.customer-start > .grid { margin-top: 24px; }
+.customer-start .card h2 { font: 650 1.2rem/1.4 var(--sans); }
+.customer-start details > summary { cursor: pointer; font-weight: 650; }
+.customer-start .buttons { margin-top: 16px; }
