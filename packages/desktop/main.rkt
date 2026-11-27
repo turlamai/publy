@@ -1,7 +1,7 @@
 #lang racket/base
 ;; Native desktop entry point. The browser and desktop share the same built UI.
-(require racket/file racket/runtime-path glaze "hosted-transport.rkt")
-(define-runtime-path public "../workbench/dist")
+(require racket/file racket/runtime-path glaze "draft-bridge.rkt" "recovery-journal.rkt")
+(define-runtime-path public "../workbench/dist-desktop")
 (define (workbench-ready? dir)
   (for/and ([name '("index.html" "workbench.js" "workbench.css")])
     (file-exists? (build-path dir name))))
@@ -10,6 +10,10 @@
   (unless (workbench-ready? public)
     (error 'publy "Workbench is not built. Run node scripts/build-workbench.mjs from the repository root."))
   (run-app #:public-dir public
+           #:api (make-draft-routes (default-recovery-path))
+           #:transport 'native
+           #:max-body-size (* 32 1024 1024)
+           #:capability draft-capability
            #:title "Publy"
            #:width 1120
            #:height 800

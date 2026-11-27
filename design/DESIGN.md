@@ -184,3 +184,22 @@ Operator follow-up within #107: `prototype/operator-web.html` records the shared
 - 行内文字链接的命中区不足 24px（上轮基线遗留，面广）：本轮未动，需逐页裁决是加内边距还是改成按钮。
 - 上文已记的尺度待办（圆角、字号、字重）不变，继续渐进对齐。
 - §10 核心屏打磨轮：每轮须 owner 裁决；本轮只有 agent 的测量与自评，不计入打磨轮次。
+
+
+### Shared workbench draft recovery
+
+The desktop build of the shared workbench uses Glaze native transport and a
+default-deny capability for the fixed account, identity, submission and
+readback routes. The article preview stays in an opaque sandbox. The desktop
+page disables network Fetch. The API key is entered per session and held in
+memory. A per-user OS lock serializes recovery operations across desktop
+processes. Before submitting, SQLite commits the request ID, account and
+title. Restart recovery asks for the API key and queries only that request.
+Only matching confirmation clears the record. Ambiguous responses and
+unreadable recovery state block new delivery.
+
+桌面工作台由 Glaze 原生通道连接固定的账户、请求标识、草稿投递和查询接口，
+默认拒绝其他权限。文章预览在隔离沙箱中，桌面页面禁用 Fetch。API Key 仅保留
+在内存。桌面进程共享系统文件锁，投递前由 SQLite 提交请求编号、公众号和标题。
+重新启动后输入 API Key，只查询原请求。确认结果与原请求一致才清除记录。
+结果不明或恢复记录不可读时，禁止新投递。

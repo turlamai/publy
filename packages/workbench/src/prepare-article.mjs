@@ -2,10 +2,9 @@ import { browserDraftIdempotencyKey } from "../../core/src/draft-identity-browse
 import { richClipboard } from "./rich-clipboard.mjs";
 
 // Operates only on an already reviewed local preview; does not perform a network request.
-export async function prepareArticle(preview, account, title, document, subtle=globalThis.crypto?.subtle){
+export async function prepareArticle(preview, account, title, document, identify=browserDraftIdempotencyKey){
  if(!preview||preview.warnings.length)throw new Error("PREVIEW_INCOMPLETE");
  if(!account?.trim()||!title?.trim())throw new Error("ACCOUNT_AND_TITLE_REQUIRED");
- if(!subtle)throw new Error("SECURE_CONTEXT_REQUIRED");
  const output=richClipboard(preview.html,preview.css,document);
  const doc=document.implementation.createHTMLDocument("");
  const root=doc.createElement("div");root.innerHTML=output.html;
@@ -23,8 +22,9 @@ export async function prepareArticle(preview, account, title, document, subtle=g
   image.setAttribute("src","attachment://"+name);
  }
  const payload={account:account.trim(),type:"article",title:title.trim(),html:root.innerHTML,images};
- const id=await browserDraftIdempotencyKey(payload,subtle);
+ const id=await identify(payload,globalThis.crypto?.subtle);
+ if(!/^[a-f0-9]{32}$/.test(id))throw new Error("INVALID_DRAFT_ID");
  const body=JSON.stringify({...payload,idempotencyKey:id});
  if(new TextEncoder().encode(body).length>29*1024*1024)throw new Error("REQUEST_TOO_LARGE");
- return Object.freeze({id,body,account:payload.account,title:payload.title});
+ return Object.freeze({id,body,payload:JSON.stringify(payload),account:payload.account,title:payload.title});
 }

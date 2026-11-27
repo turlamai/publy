@@ -37,3 +37,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-workbench.mjs
       - run: raco test packages/desktop/main.rkt
+      - run: timeout 60s xvfb-run -a racket packages/desktop/native-smoke.rkt

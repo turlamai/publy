@@ -1,5 +1,4 @@
-import {pendingDraftStore,withDraftLock} from "./pending-draft.mjs";
-import {createHostedClient} from "./hosted-client.mjs";
+import {createDraftFlow} from "./draft-flow.mjs";
 import {prepareArticle} from "./prepare-article.mjs";
 
 const messages={
@@ -9,47 +8,56 @@ const messages={
 export function installDraftDialog({getPreview,getLanguage}){
  const get=id=>document.getElementById(id);
  const dialog=get("draft-dialog"),key=get("draft-key"),account=get("draft-account"),title=get("draft-title"),open=get("draft-open"),connect=get("draft-connect"),review=get("draft-review"),send=get("draft-send"),reconcile=get("draft-reconcile"),close=get("draft-close"),status=get("draft-status"),summary=get("draft-summary");
- let client=null,snapshot=null,prepared=null,phase="idle",generation=0,message="",mediaId="";
- let store=null,recovery=null,storageFailed=false;
- try{store=pendingDraftStore(globalThis.localStorage);recovery=store.read();}catch{storageFailed=true;}
+ let credential=null,snapshot=null,prepared=null,phase="idle",generation=0,message="",mediaId="";
+ let flow=null,recovery=null,storageFailed=false,reading=false,recoveryBusy=false;
+ try{flow=createDraftFlow();}catch{storageFailed=true;}
+ async function loadRecovery(){
+  reading=true;state();
+  try{if(flow){recovery=await flow.read();storageFailed=false;}recoveryBusy=false;}
+  catch(err){
+   recoveryBusy=err?.message==="DRAFT_LOCK_BUSY";
+   storageFailed=!recoveryBusy;
+  }finally{reading=false;state();}
+ }
  const t=()=>messages[getLanguage()];
  function translate(){
   const m=t();for(const [id,name] of [["draft-open","open"],["draft-heading","heading"],["draft-intro","intro"],["draft-key-label","key"],["draft-connect","connect"],["draft-account-label","account"],["draft-title-label","title"],["draft-review","review"],["draft-send","send"],["draft-close","close"],["draft-reconcile","reconcile"]])get(id).textContent=m[name];
-  open.textContent=recovery||storageFailed?m.recover:m.open;
+  open.textContent=recovery||storageFailed||recoveryBusy?m.recover:m.open;
   status.textContent=message?m[message]+(mediaId?" · "+mediaId:""):"";
   summary.textContent=prepared?m.summary+": "+prepared.account+" / "+prepared.title+" / "+prepared.id:"";
  }
  function state(){
   const locked=["connecting","preparing","sending","querying"].includes(phase);
   const terminal=["unknown","confirmed"].includes(phase);
-  key.disabled=locked||terminal;connect.disabled=locked||terminal||phase==="recover"||storageFailed;account.disabled=locked||terminal||phase==="recover"||!client||!account.options.length;title.disabled=locked||terminal||phase==="recover";
-  review.hidden=terminal||phase==="recover";review.disabled=storageFailed||!!recovery||locked||terminal||!client||!account.value||!title.value.trim()||!snapshot||snapshot!==getPreview();
+  key.disabled=locked||terminal;connect.disabled=locked||terminal||phase==="recover"||storageFailed;account.disabled=locked||terminal||phase==="recover"||!credential||!account.options.length;title.disabled=locked||terminal||phase==="recover";
+  review.hidden=terminal||phase==="recover";review.disabled=storageFailed||!!recovery||locked||terminal||!credential||!account.value||!title.value.trim()||!snapshot||snapshot!==getPreview();
   send.hidden=phase!=="reviewed";send.disabled=storageFailed||!!recovery||phase!=="reviewed"||snapshot!==getPreview();
-  reconcile.hidden=phase!=="unknown"&&phase!=="recover";reconcile.disabled=locked||(phase==="recover"&&!key.value.trim());close.disabled=locked;open.disabled=!recovery&&!storageFailed&&(!getPreview()||getPreview().warnings.length>0);
+  reconcile.hidden=phase!=="unknown"&&phase!=="recover";reconcile.disabled=locked||(phase==="recover"&&!credential&&!key.value.trim());close.disabled=locked;open.disabled=reading||(!recovery&&!storageFailed&&!recoveryBusy&&(!getPreview()||getPreview().warnings.length>0));
   translate();
  }
- function reset(){generation++;client=null;prepared=null;phase="idle";message="";mediaId="";key.value="";account.replaceChildren();snapshot=null;summary.textContent="";}
+ function reset(){generation++;credential=null;prepared=null;phase="idle";message="";mediaId="";key.value="";account.replaceChildren();snapshot=null;summary.textContent="";}
  function invalidate(){generation++;prepared=null;phase="idle";message="";}
- open.addEventListener("click",()=>{
-  try{recovery=store?.read()??null;}catch{storageFailed=true;}
+ open.addEventListener("click",async()=>{
+  await loadRecovery();
+  if(recoveryBusy){reset();message="busy";dialog.showModal();state();return;}
   if(storageFailed){reset();message="storageError";dialog.showModal();state();return;}
   if(recovery){reset();prepared=recovery;phase="recover";message="recoverKey";dialog.showModal();state();key.focus();return;}
   const p=getPreview();if(!p||p.warnings.length)return;
   reset();snapshot=p;title.value=p.title??"";dialog.showModal();state();key.focus();
  });
- key.addEventListener("input",()=>{if(phase==="recover"){state();return;}invalidate();client=null;account.replaceChildren();state();});
+ key.addEventListener("input",()=>{if(phase==="recover"){state();return;}invalidate();credential=null;account.replaceChildren();state();});
  for(const el of [account,title])el.addEventListener("input",()=>{invalidate();state();});
  connect.addEventListener("click",async()=>{
   if(!key.value.trim())return;
-  const g=++generation;prepared=null;client=null;account.replaceChildren();phase="connecting";message="connecting";state();
-  try{const candidate=createHostedClient(key.value);const names=await candidate.accounts();if(g!==generation)return;client=candidate;key.value="";for(const name of names){const option=document.createElement("option");option.value=name;option.textContent=name;account.append(option);}message=names.length?"connected":"empty";}
+  const g=++generation;prepared=null;credential=null;account.replaceChildren();phase="connecting";message="connecting";state();
+  try{const candidate=key.value;const names=await flow.connect(candidate);if(g!==generation)return;credential=candidate;key.value="";for(const name of names){const option=document.createElement("option");option.value=name;option.textContent=name;account.append(option);}message=names.length?"connected":"empty";}
   catch{if(g!==generation)return;message="connectError";}
   finally{if(g===generation){phase="idle";state();}}
  });
  review.addEventListener("click",async()=>{
-  if(!client||snapshot!==getPreview())return;
+  if(!credential||snapshot!==getPreview())return;
   const g=++generation;phase="preparing";message="preparing";prepared=null;state();
-  try{const result=await prepareArticle(snapshot,account.value,title.value,document);if(g!==generation)return;if(snapshot!==getPreview()){phase="idle";message="changed";return;}prepared=result;phase="reviewed";message="reviewed";}
+  try{const result=await prepareArticle(snapshot,account.value,title.value,document,flow.identify);if(g!==generation)return;if(snapshot!==getPreview()){phase="idle";message="changed";return;}prepared=result;phase="reviewed";message="reviewed";}
   catch{if(g!==generation)return;phase="idle";message="prepareError";}
   finally{if(g===generation)state();}
  });
@@ -59,38 +67,33 @@ export function installDraftDialog({getPreview,getLanguage}){
   storageFailed=true;message="storageError";
  }
  send.addEventListener("click",async()=>{
-  if(phase!=="reviewed"||!prepared||!client||snapshot!==getPreview())return;
+  if(phase!=="reviewed"||!prepared||!credential||snapshot!==getPreview())return;
   const request=prepared;phase="sending";message="sending";state();
   try{
-   await withDraftLock(navigator.locks,async()=>{
-    recovery=store.read();
-    if(recovery){prepared=recovery;client=null;phase="recover";message="recoverKey";return;}
-    recovery=store.save(request);
-    finish(await client.submit(request,request.id));
-   });
+   finish(await flow.submit(credential,request));
   }catch(err){phase=recovery?"unknown":"reviewed";lockError(err);}
   finally{state();}
  });
  reconcile.addEventListener("click",async()=>{
   if(!["unknown","recover"].includes(phase)||!prepared)return;
-  if(!client){if(!key.value.trim())return;client=createHostedClient(key.value);key.value="";}
+  if(!credential){if(!key.value.trim())return;credential=key.value;key.value="";}
   const previous=phase;phase="querying";message="querying";state();
-  try{
-   await withDraftLock(navigator.locks,async()=>{
-    const saved=store.read();
-    if(!saved||saved.id!==prepared.id){recovery=saved;phase="idle";prepared=null;client=null;message="busy";return;}
-    finish(await client.reconcile(saved));
-   });
-  }catch(err){phase=previous;lockError(err);}
+  try{finish(await flow.reconcile(credential,prepared));}
+  catch(err){phase=previous;lockError(err);}
   finally{state();}
  });
  function finish(result){
+  recovery=result.pending??null;
+  if(result.status==="pending"||result.status==="changed"){
+   prepared=recovery;credential=null;key.value="";
+   phase=recovery?"recover":"idle";message=recovery?"recoverKey":"busy";return;
+  }
   phase=result.status==="confirmed"?"confirmed":"unknown";message=phase;mediaId=result.mediaId??"";
-  if(phase==="confirmed"){try{store.clear(prepared.id);recovery=null;}catch{storageFailed=true;message="storageError";}}
-  state();
+  if(phase==="confirmed")credential=null;
  }
  close.addEventListener("click",()=>{if(close.disabled)return;dialog.close();reset();state();open.focus();});
  dialog.addEventListener("cancel",e=>{e.preventDefault();if(!close.disabled)close.click();});
- globalThis.addEventListener("storage",()=>{if(dialog.open)return;try{recovery=store.read();}catch{storageFailed=true;}state();});
+ globalThis.addEventListener("storage",()=>{if(!dialog.open&&!reading)void loadRecovery();});
+ void loadRecovery();
  return {refresh:state,translate};
 }

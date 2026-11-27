@@ -1,10 +1,16 @@
 # Publy Desktop (development)
 
-The Glaze native WebView hosts the exact bundle used by the browser workbench. No separate renderer, Node server, or browser fallback is introduced. This slice exposes no native file or shell bridge, and never sends drafts.
+The Glaze WebView hosts the shared workbench. The desktop build injects the
+native client and disables browser network access. Its first draft-delivery
+slice uses the fixed hosted account, publish and result endpoints over
+certificate-verified TLS. The workbench requires explicit confirmation.
 
 ## Build and run
 
-Install Racket 9.0+ CS, Node 22+, pnpm and Glaze from the source revision used to develop this integration: `ba2442bb001910d20bca41d0de876e58d6341b63`. Check out that revision in a separate Glaze checkout and run `raco pkg install --auto --link <checkout>`.
+Install Racket 9.0+ CS, Node 22+, pnpm and Glaze at
+`ba2442bb001910d20bca41d0de876e58d6341b63`. Check out that revision separately
+and run `raco pkg install --auto --link <checkout>`. Native WebView
+prerequisites are described in Glaze's getting-started guide.
 
 From the Publy root:
 
@@ -12,19 +18,26 @@ From the Publy root:
 pnpm install --frozen-lockfile
 node scripts/build-workbench.mjs
 racket packages/desktop/main.rkt
+raco test packages/desktop/main.rkt
+racket packages/desktop/native-smoke.rkt
 ```
 
-Run `raco test packages/desktop/main.rkt` to test the bundle readiness guard. Native WebView prerequisites are described in Glaze's getting-started guide. A missing bundle fails with an explicit build instruction.
+The native smoke uses a synthetic upstream and a temporary recovery directory.
+On Linux run it with `xvfb-run -a` when a display is unavailable.
 
-## Acceptance still required
+## Recovery
 
-- Real native windows on Windows, macOS and Linux, with file picker, IME, scaling, keyboard navigation and light/dark theme.
-- Clipboard support in each WebView; browser clipboard permission is not guaranteed.
-- Native scoped file access, packaging, signing and update verification.
-- Preview parity, formula support, and explicit authenticated draft delivery.
+The per-user recovery directory is `site.jrtx.publy` under Racket's preferences
+directory. An OS file lock covers the full operation across processes. SQLite
+commits only the request ID, account name and title before the POST. API keys,
+article content and attachments stay in memory. The previous development
+JSON journal is migrated on first access under the same lock.
 
-Not a released installer. The existing Obsidian/CLI paths remain unchanged.
+When a response is lost, reopen the draft dialog, enter the key again and
+check the original request. A matching confirmation clears the pending record.
+An unknown outcome requires checking the WeChat draft box. Keep the recovery
+directory intact while the outcome is unknown.
 
-The restricted upstream adapter in `hosted-transport.rkt` defines only the fixed hosted account, publish and result operations, uses certificate-verifying TLS, rejects header injection and never follows redirects. Its mock tests run with the desktop readiness tests. It is deliberately not exposed to the WebView until native recovery storage and the bridge authorization are implemented; no desktop hosted delivery is enabled yet.
-
-`recovery-journal.rkt` adds a stable per-user pending-draft file under the Racket preference directory. Only request ID, account and title are stored. Exclusive creation prevents overlapping claims; malformed or incomplete files block further delivery. Matching confirmation is required for deletion. Tests cover reopen, overlapping claims, privacy and malformed journals. The caller must still serialize confirmation and deletion across processes before exposing the journal to native delivery. Flush is not a guarantee of physical power-loss durability; crash/power-loss testing and OS-specific durability remain open. The WebView is not wired to this module yet.
+Native clipboard, Windows and Linux desktop interaction, physical power-loss
+recovery, signed distribution and live WeChat delivery require separate
+acceptance.
