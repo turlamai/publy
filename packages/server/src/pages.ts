@@ -370,10 +370,10 @@ if (form) form.addEventListener('submit', async function (event) {
 export function hostedResultPage(title: string, message: string, ok: boolean): string {
   return `<!doctype html><html lang="zh-CN" class="publy-web"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)} · Publy</title><style>body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
-main{max-width:620px;margin:12vh auto;padding:0 22px}h1{font:600 30px/1.2 var(--sans);margin:0 0 10px}p{color:var(--muted)}
-.card{background:var(--card);border:1px solid #dce5d9;border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:var(--line);background:var(--tint)}
-a{color:#176842}${WEB_CSS}</style></head><body><main><h1>${escapeHtml(title)}</h1><div class="card ${ok ? "ok" : ""}"><p>${escapeHtml(message)}</p></div>
-<p style="margin-top:18px"><a href="https://publy.jrtx.site/start.html">返回使用指南</a> · <a href="/hosted">账户与权益</a> · <a href="/setup">连接公众号</a></p></main><script>${WEB_JS}</script></body></html>`;
+main{max-width:620px;margin:0 auto;padding:40px 22px 70px}.result-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:36px}.result-nav a{font-weight:650;text-decoration:none}.result-actions{display:flex;flex-direction:column;gap:12px;margin-top:24px}.result-primary{display:block;background:var(--green);color:var(--on-accent)!important;border-radius:8px;padding:12px 18px;text-decoration:none;text-align:center;font-weight:650}.result-secondary{text-align:center}.result-nav button{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:8px 12px}h1{font:600 30px/1.2 var(--sans);margin:0 0 10px}p{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-top:18px}.ok{border-color:var(--line);background:var(--tint)}
+a{color:var(--green)}${WEB_CSS}</style></head><body><main><nav class="result-nav" aria-label="页面导航"><a href="https://publy.jrtx.site/">Publy</a><button type="button" data-theme-switch aria-pressed="false">切换主题</button></nav><h1>${escapeHtml(title)}</h1><div class="card ${ok ? "ok" : ""}"><p>${escapeHtml(message)}</p></div>
+<div class="result-actions">${ok ? '<a class="result-primary" href="/setup">连接公众号</a><a class="result-secondary" href="/hosted">查看账户与权益</a>' : '<a class="result-primary" href="/hosted">查看账户与权益</a>'}<a class="result-secondary" href="https://publy.jrtx.site/start.html">使用指南</a></div></main><script>${WEB_JS}</script></body></html>`;
 }
 
 function hostedDirectPurchasePage(available: boolean): string {
@@ -390,13 +390,13 @@ button{border:0;border-radius:8px;background:var(--green);color:var(--on-accent)
 #msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
 .small{font-size:12px;color:var(--muted);margin-top:14px}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
 #direct-qr{max-width:100%;height:auto;background:#fff;padding:10px;border-radius:8px;margin:12px auto;display:block}input{min-height:44px;color:var(--ink)}
-.order-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}.order-summary .small{margin-top:4px}.amount{font-size:32px;font-weight:650;white-space:nowrap;line-height:1.2}.amount small{display:block;font-size:12px;font-weight:400;color:var(--muted);text-align:right}#pay{width:100%;min-height:48px}#direct-result{border-top:1px solid var(--line);margin-top:20px;padding-top:12px;text-align:center}#purchase-link{display:block;padding:12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600}#refresh{margin-top:0}.next-primary{display:block;background:var(--green);color:var(--on-accent);border-radius:8px;padding:12px;text-decoration:none;font-weight:650}#onboarding-next p{color:var(--muted)}
+.order-summary{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}.order-summary .small{margin-top:4px}.amount{font-size:32px;font-weight:650;white-space:nowrap;line-height:1.2}.amount small{display:block;font-size:12px;font-weight:400;color:var(--muted);text-align:right}#pay{width:100%;min-height:48px}#direct-result{border-top:1px solid var(--line);margin-top:20px;padding-top:12px;text-align:center}#purchase-link{display:block;padding:12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;font-weight:600}#refresh{margin-top:0}.checkout-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}.checkout-nav a{font-weight:650;text-decoration:none}.checkout-nav button{margin:0}.next-primary{display:block;background:var(--green);color:var(--on-accent);border-radius:8px;padding:12px;text-decoration:none;font-weight:650}#onboarding-next p{color:var(--muted)}
 @media(max-width:480px){.wrap{padding:24px 16px 48px}.card{padding:18px}.order-summary{gap:8px}.amount{font-size:28px}}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:3px}
 #copy-key,#refresh{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:500;min-height:44px}
 [hidden]{display:none!important}
 ${WEB_CSS}</style></head><body><div class="wrap">
-<a href="https://publy.jrtx.site/">← Publy</a>
+<nav class="checkout-nav" aria-label="页面导航"><a href="https://publy.jrtx.site/">← Publy</a><button class="secondary" type="button" data-theme-switch aria-pressed="false">切换主题</button></nav>
 <h1>开通 Publy Personal</h1>
 <p class="lead">完成支付宝付款，开始使用公众号草稿托管服务。</p>
 <form class="card" id="buy">
@@ -463,6 +463,7 @@ async function refresh() {
     active = result.status === 'active';
     next.hidden = !active; refreshButton.hidden = active; button.hidden = active;
     if (active) {
+      clearTimeout(timer);
       state.textContent = '已开通 Personal 月包，有效期至 ' + new Date(result.validUntil).toLocaleString() + '。有效期内无需再次购买。';
       say('请保存你的 API Key，用于 CLI、插件或换设备恢复账户。');
     } else {
@@ -505,7 +506,7 @@ if (form) form.addEventListener('submit', async function (event) {
       if (attempt !== revision) return;
       if (active) return;
       if (document.visibilityState === 'visible') await refresh();
-      if (++checks < 60 && !active) timer = setTimeout(poll, 10000);
+      if (attempt === revision && ++checks < 60 && !active) timer = setTimeout(poll, 10000);
     }
     if (attempt === revision && !active) timer = setTimeout(poll, 10000);
   } catch (error) { if (attempt === revision) say(error.message, true); }
