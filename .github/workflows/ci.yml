@@ -82,6 +82,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: pnpm -r test
+      - run: node scripts/build-workbench.mjs
       - run: node --test scripts/public-web-generation.test.mjs
       - run: node scripts/sync-public-web.mjs --check
       - run: node scripts/build-user-pages.mjs --check
