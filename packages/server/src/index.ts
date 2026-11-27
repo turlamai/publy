@@ -27,6 +27,7 @@ import { consultNowpayDirect, type NowpayDirectConfig } from "./nowpay-direct.js
 import QRCode from "qrcode";
 import { setupPage } from "./setup-page.js";
 import { adminPage } from "./admin-page.js";
+import { WORKBENCH_ORIGIN, workbenchCorsMethod, validWorkbenchPreflight } from "./workbench-cors.js";
 
 export interface ServerAccount {
   name: string;
@@ -707,6 +708,23 @@ export function buildApp(config: ServerConfig) {
 
   app.addHook("onRequest", async (req, reply) => {
     if (req.url.startsWith("/v1/")) reply.header("cache-control", "no-store");
+    const workbenchMethod = workbenchCorsMethod(req.url);
+    if (workbenchMethod) {
+      reply.header("vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+      if (req.method === "OPTIONS") {
+        if (req.headers.origin !== WORKBENCH_ORIGIN ||
+            !validWorkbenchPreflight(workbenchMethod, req.headers["access-control-request-method"], req.headers["access-control-request-headers"])) {
+          return reply.code(403).send({ code: "ORIGIN_NOT_ALLOWED" });
+        }
+        return reply.header("access-control-allow-origin", WORKBENCH_ORIGIN)
+          .header("access-control-allow-methods", workbenchMethod)
+          .header("access-control-allow-headers", "x-api-key, content-type")
+          .code(204).send();
+      }
+      if (req.method === workbenchMethod && req.headers.origin === WORKBENCH_ORIGIN) {
+        reply.header("access-control-allow-origin", WORKBENCH_ORIGIN);
+      }
+    }
     // the /admin page SHELL is public (it's just html); its data endpoints
     // (/v1/admin/*) still require the admin key
     if (req.url.split("?")[0] === "/setup" || req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
@@ -718,6 +736,11 @@ export function buildApp(config: ServerConfig) {
     }
     (req as unknown as { caller: Caller }).caller = caller;
   });
+
+  // Explicit routes ensure Fastify invokes the preflight hook for these paths.
+  for (const route of ["/v1/accounts", "/v1/publish", "/v1/publish-result/:key"]) {
+    app.options(route, async (_req, reply) => reply.code(403).send({ code: "ORIGIN_NOT_ALLOWED" }));
+  }
 
   // --- public storefront (no auth) -------------------------------------------
 
