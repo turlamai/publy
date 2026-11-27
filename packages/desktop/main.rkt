@@ -16,7 +16,8 @@
            #:app-id "site.jrtx.publy"
            #:window-state #t))
 (module+ test
-  (require rackunit (submod "hosted-transport.rkt" test))
+  (require rackunit (submod "hosted-transport.rkt" test)
+           (submod "recovery-journal.rkt" test))
   (define dir (make-temporary-file "publy-desktop~a" 'directory))
   (dynamic-wind void
     (lambda ()
