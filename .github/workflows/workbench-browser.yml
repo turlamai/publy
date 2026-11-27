@@ -1,0 +1,40 @@
+name: Workbench browser acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'packages/workbench/**'
+      - 'packages/core/**'
+      - 'scripts/build-workbench.mjs'
+      - '.github/workflows/workbench-browser.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/workbench/**'
+      - 'packages/core/**'
+      - 'scripts/build-workbench.mjs'
+      - '.github/workflows/workbench-browser.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-workbench.mjs
+      - name: Install isolated browser test driver
+        run: npm install --prefix "$RUNNER_TEMP/publy-browser" --no-save --package-lock=false playwright@1.51.1
+      - run: "$RUNNER_TEMP/publy-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Run real Chromium with synthetic API responses
+        run: NODE_PATH="$RUNNER_TEMP/publy-browser/node_modules" node packages/workbench/tests/browser-smoke.mjs
