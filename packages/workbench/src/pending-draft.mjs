@@ -11,3 +11,13 @@ export function pendingDraftStore(storage){
   clear(id){const raw=storage.getItem(KEY);if(raw===null)return;if(validate(JSON.parse(raw)).id!==id)throw Error("PENDING_DRAFT_CHANGED");storage.removeItem(KEY);}
  };
 }
+
+// Hold an origin-wide exclusive lock across persistence, submission and confirmation.
+// Never substitute a racy localStorage check when Web Locks is unavailable.
+export async function withDraftLock(locks, task) {
+ if(typeof locks?.request!=="function")throw Error("DRAFT_LOCK_UNAVAILABLE");
+ return locks.request("publy.draft.delivery.v1",{mode:"exclusive",ifAvailable:true},async lock=>{
+  if(!lock)throw Error("DRAFT_LOCK_BUSY");
+  return task();
+ });
+}
