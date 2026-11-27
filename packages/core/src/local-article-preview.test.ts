@@ -18,3 +18,12 @@ test("code remains literal and malformed private properties fail closed", () => 
   assert.match(result.html, /\[\[Note\]\]/);
   assert.throws(() => previewLocalArticle("---\nsecret: x", ""), /Unclosed/);
 });
+
+ test("only exact selected relative raster images are rendered", () => {
+ const data="data:image/png;base64,AAAA";
+ const media=new Map([["a/photo.png",data],["photo.png","data:image/svg+xml;base64,AAAA"]]);
+ const result=previewLocalArticle("![a](a/photo.png) ![b](photo.png) ![c](../a/photo.png) ![d](https://example.com/photo.png) ![[a/photo.png]]","",media);
+ assert.equal((result.html.match(/<img /g)??[]).length,2);
+ assert.doesNotMatch(result.html,/https:|image\/svg/);
+ assert.ok(result.warnings.length);
+ });
