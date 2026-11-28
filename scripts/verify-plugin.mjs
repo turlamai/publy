@@ -80,6 +80,12 @@ class Component {
   empty() { this.children = []; }
   createEl() { const el = new Component(); el.style = {}; el.setText = () => {}; return el; }
   appendChild() {}
+  // Real Obsidian elements carry classList and the addClass/removeClass
+  // helpers; settings-tab styling now goes through classes, so the stub must
+  // model them for display() to run.
+  classList = { add() {}, remove() {}, toggle() {}, contains() { return false; } };
+  addClass() {}
+  removeClass() {}
 }
 
 class ItemView {

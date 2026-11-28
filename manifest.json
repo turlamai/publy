@@ -1,8 +1,8 @@
 {
   "id": "publy",
   "name": "Publy",
-  "version": "0.8.8",
-  "minAppVersion": "1.5.0",
+  "version": "0.8.9",
+  "minAppVersion": "1.7.2",
   "description": "Preview Markdown notes and send them to your WeChat Official Account draft box.",
   "author": "turlamai",
   "isDesktopOnly": true,

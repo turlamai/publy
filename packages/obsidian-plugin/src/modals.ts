@@ -119,7 +119,7 @@ export class CoverPickerModal extends Modal {
         im.src = "data:image/png;base64," + png.toString("base64");
       } else {
         const d = box.createEl("div");
-        d.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8f6f0;color:#b75c3d;font-weight:600;font-size:12px;text-align:center;padding:4px;line-height:1.4";
+        d.classList.add("publy-cover-fallback");
         d.setText(this.title);
       }
     }, t("coverAutoTile"));
@@ -129,7 +129,7 @@ export class CoverPickerModal extends Modal {
     // deserve a real cover. Content-addressed keys (local-<hash>) live in the
     // session registry; electron.remote is banned by Obsidian review rules.
     const browseRow = this.contentEl.createEl("div");
-    browseRow.style.cssText = "margin-top:8px";
+    browseRow.classList.add("publy-dialog-row");
     const browse = browseRow.createEl("button");
     browse.addClass("publy-btn");
     browse.textContent = t("browseLocal");

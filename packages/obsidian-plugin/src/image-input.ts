@@ -31,7 +31,7 @@ export function pickLocalImageFiles(): Promise<File[]> {
     input.type = "file";
     input.accept = "image/png,image/jpeg,image/webp,image/gif";
     input.multiple = true;
-    input.style.display = "none";
+    input.classList.add("publy-hidden-input");
     let settled = false;
     const done = (files: File[]) => {
       if (settled) return;

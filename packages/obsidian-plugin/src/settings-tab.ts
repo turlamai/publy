@@ -40,8 +40,7 @@ export class PublySettingTab extends PluginSettingTab {
 
     // setup guide — the first thing a new user sees
     const intro = containerEl.createEl("div");
-    intro.style.cssText =
-      "background:var(--background-secondary);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;line-height:1.9";
+    intro.classList.add("publy-settings-intro");
     intro.createEl("div").setText(t("intro"));
     const links = intro.createEl("div");
     const mkLink = (text: string, url: string) => {
@@ -51,7 +50,7 @@ export class PublySettingTab extends PluginSettingTab {
       a.target = "_blank";
     };
     mkLink(t("guideLink"), "https://publy.jrtx.site/wechat.html");
-    links.style.marginTop = "4px";
+    links.classList.add("publy-settings-intro-links");
 
     new Setting(containerEl).setName(t("setServer")).setDesc(t("setServerDesc")).addText((text) =>
       text.setPlaceholder("https://…").setValue(this.plugin.settings.server).onChange(async (v) => {
@@ -115,7 +114,7 @@ export class PublySettingTab extends PluginSettingTab {
         });
     });
     const connResult = containerEl.createEl("div");
-    connResult.style.cssText = "font-size:13px;padding:2px 0 10px";
+    connResult.classList.add("publy-conn-result");
     new Setting(containerEl)
       .setName(t("setConn"))
       .setDesc(t("setConnDesc"))

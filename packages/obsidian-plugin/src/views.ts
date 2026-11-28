@@ -209,8 +209,8 @@ export class PublyPreviewView extends ItemView {
     page.addClass("publy-paper");
     if ((this.plugin.settings.previewWidth ?? "desktop") === "mobile") page.addClass("is-mobile");
     // WeChat-article header: title, then account/author meta, hairline, body —
-    // system font stack shared with the product's web pages
-    page.style.fontFamily = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+    // the .publy-paper class carries the system font stack shared with the
+    // product's web pages
     if (meta?.title || meta?.account) {
       const title = page.createEl("h1");
       title.addClass("publy-title");
