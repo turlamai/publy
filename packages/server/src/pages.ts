@@ -171,7 +171,7 @@ export function purchasePage(publicIp = "你的服务器公网 IP"): string {
   </div>
 
   <div style="text-align:center;margin-top:28px;font-size:12px;color:var(--text-3);line-height:2">
-    CLI / 自托管全功能免费 · 公开托管开售前，本页仅用于内部与试点结算<br>
+    本地排版永久免费、无需注册 · 草稿投递：托管 ¥29/月，或自托管（软件免费，需自备带固定公网 IP 的服务器）<br>
     仅走微信公众号官方 API · AppSecret 加密存储永不下发<br>
     <a href="https://github.com/turlamai/publy">GitHub</a> · <a href="https://themes.publy.jrtx.site">主题画廊</a> · <a href="https://publy.jrtx.site">publy.jrtx.site</a>
   </div>
@@ -311,7 +311,7 @@ ${WEB_CSS}</style>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
 <ol class="steps"><li>填写联系方式，点下方按钮开户</li><li>支付宝扫码支付 ¥29，当月自动生效</li><li>按教程把 API Key 填进插件、绑定公众号，发出第一篇草稿</li></ol>
 ${available ? `<div class="notice ok">支付通道已配置。付款成功后，服务权益由 Commerce/Permit 确认；支付返回页本身不代表已开通。</div>` :
-  `<div class="notice">支付通道正在接入，暂不可购买。当前可以先使用免费的自托管路径：<a href="https://publy.jrtx.site/start.html">开始使用</a>。</div>`}
+  `<div class="notice">支付通道正在接入，暂不可购买。本地排版/复制免费且无需注册；草稿投递可自托管——软件免费，但需自备带固定公网 IP 的服务器：<a href="https://publy.jrtx.site/start.html">开始使用</a>。</div>`}
 ${available ? `<form class="card" id="buy" >
   <div class="plans">${offers}</div>
   <label class="field">联系方式（邮箱或手机号）——开户、对账，以及日后找回 API Key 的唯一凭据，请务必真实有效
