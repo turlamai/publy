@@ -1,5 +1,12 @@
 # Changelog
 
+## Server 0.2.5 — 2026-11-28
+
+- Hosted checkout page joins the family site-kit: kit navigation with the brand mark, family tokens for buttons/plans/focus rings, serif display headline, theme toggle and dark-mode init — the whole purchase flow now matches publy.jrtx.site.
+- Lost-key flow: new public `GET /v1/account-status` (rate limited, masked key tail only) with a「忘了 API Key？」self-check card on the checkout page; reset instructions render the new optional `supportContact` from `server.json` (issue-link fallback when unset). Rotation stays operator-verified in the admin console; SOP documented in the operator guide.
+- Honest free-tier copy: the checkout footer drops the stale "before public hosting opens" line and states that local formatting is free without signup while draft delivery needs hosting or a self-hosted server.
+- Filled buttons, pressed pills and focus rings across every embedded public page now use the family accent instead of the deep legacy shade.
+
 ## [0.8.9] — 2026-11-28
 
 - Clear the Obsidian Community Directory automated scan errors: all seven direct style assignments (`obsidianmd/no-static-styles-assignment`) moved to classes in `styles.css` — hidden file input, cover fallback tile, dialog row, settings intro card, intro link row, connection result line, and the preview paper font stack.
