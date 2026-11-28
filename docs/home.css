@@ -3,7 +3,6 @@
 .publy-web .compact-hero h1 { max-width: 900px; margin: 0 auto; font-size: clamp(2rem, 5vw, 3.8rem); line-height:1.18; letter-spacing:-.035em; }
 .publy-web .compact-hero .kit-lead { max-width: 44rem; margin: 18px auto 0; font-size: clamp(1rem, 2vw, 1.15rem); }
 .publy-web .compact-hero .kit-btn-row { justify-content:center; margin-top:24px; }
-.publy-web .compact-hero .kit-btn--primary { --kit-accent:var(--green); --kit-accent-hover:var(--green-dark); }
 .publy-web .hero-account { margin-top:14px; font-size:14px; }
 .publy-web .compact-plans { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; max-width:840px; padding-block: 20px 30px; }
 .publy-web .compact-plan { border:1px solid var(--kit-border); background:var(--kit-bg-elevated); border-radius:var(--kit-radius-m, 14px); padding:24px; }

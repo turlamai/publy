@@ -5,22 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publy HTTP API · API 指南</title>
 <meta name="description" content="Publy Protocol v1: authenticated draft creation, result reconciliation, jobs and quota.">
-<link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
+<link rel="stylesheet" href="family.css"><style>
+.publy-web body{background:var(--kit-bg)}
+.publy-web .kit-brand,.publy-web .kit-brand span{color:var(--kit-text)}
+.publy-web .kit-nav-links a{color:var(--kit-text-2)}
+.publy-web .kit-nav-links a:hover{color:var(--kit-text);text-decoration:none}
+.publy-web .kit-nav .pw-actions{margin:0}
+.publy-web .kit-nav-actions .theme-toggle{width:42px;min-height:42px;padding:0;border-radius:999px;margin-top:0}
+.publy-web h1{font-family:var(--kit-font-display);font-weight:600;letter-spacing:-0.01em}
+</style><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="web.css">
 <meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head>
 <body>
-<header><nav class="wrap nav" aria-label="Main">
-  <a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a>
-  <div class="nav-right">
-    <div class="navlinks">
+<header class="kit-nav"><div class="kit-container kit-nav-inner"><a class="kit-brand" href="index.html"><svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#D97757"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Publy</span></a><nav class="kit-nav-links">
       <a href="index.html"><span data-lang="en">Product</span><span data-lang="zh">产品</span></a>
       <a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a>
       <a href="api.html" aria-current="page">API</a>
       <a href="hosted.html"><span data-lang="en">Pricing</span><span data-lang="zh">购买</span></a>
       <a href="https://github.com/turlamai/publy">GitHub</a>
-    </div>
-    <button class="secondary theme-toggle" type="button" data-theme-switch aria-pressed="false" title="切换亮暗主题" aria-label="切换亮暗主题"></button><div class="langs" aria-label="Language"><button data-switch="en" aria-pressed="true">EN</button><button data-switch="zh" aria-pressed="false">中文</button></div>
-  </div>
-</nav></header>
+    </nav><div class="kit-nav-actions"><div class="pw-actions"><button class="secondary" data-switch="en">EN</button><button class="secondary" data-switch="zh">中文</button><button class="secondary theme-toggle" type="button" data-theme-switch aria-pressed="false" title="切换亮暗主题" aria-label="切换亮暗主题"></button></div></div></div></header>
 
 <main>
 <section class="wrap hero">
@@ -122,10 +124,7 @@ content-type: application/json
 </section>
 </main>
 
-<footer><div class="wrap inner">
-  <div><a class="brand" href="index.html"><span class="brand-mark">↑</span>Publy</a><div style="margin-top:6px"><span data-lang="en">Draft delivery, not public posting.</span><span data-lang="zh">只投递草稿，不做公开发布。</span></div></div>
-  <div><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a><a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a><a href="api.html">API</a><a href="hosted.html"><span data-lang="en">Pricing</span><span data-lang="zh">购买</span></a><a href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Protocol</span><span data-lang="zh">协议</span></a><a href="https://github.com/turlamai/publy">GitHub</a></div>
-</div></footer>
+<footer class="kit-footer"><div class="kit-container"><p style="margin:0"><a href="start.html"><span data-lang="en">Start</span><span data-lang="zh">开始使用</span></a> · <a href="wechat.html"><span data-lang="en">Connect WeChat</span><span data-lang="zh">连接公众号</span></a> · <a href="api.html">API</a> · <a href="hosted.html"><span data-lang="en">Pricing</span><span data-lang="zh">购买</span></a> · <a href="https://github.com/turlamai/publy/blob/main/docs/design.md"><span data-lang="en">Protocol</span><span data-lang="zh">协议</span></a> · <a href="https://github.com/turlamai/publy">GitHub</a></p></div></footer>
 <script src="site.js"></script>
 </body>
 </html>
