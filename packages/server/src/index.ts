@@ -46,6 +46,10 @@ export interface ServerConfig {
   dataDir?: string;
   /** public base url used for payment callbacks, e.g. https://publy-api.jrtx.site */
   publicUrl?: string;
+  /** operator support contact (email/WeChat id) shown to customers who lost
+   *  their API key; key reset stays operator-verified while contacts are
+   *  unverified strings */
+  supportContact?: string;
   /** this server's egress IP — shown to customers for the WeChat IP whitelist.
    *  When absent it is auto-detected at boot (myip.ipip.net → api.ipify.org). */
   publicIp?: string;
@@ -157,6 +161,7 @@ export function loadServerConfig(configPath?: string): ServerConfig {
     accounts: raw.accounts,
     dataDir: raw.dataDir ?? path.join(path.dirname(file), "server-data"),
     publicUrl: raw.publicUrl,
+    supportContact: typeof raw.supportContact === "string" && raw.supportContact.trim() ? raw.supportContact.trim() : undefined,
     publicIp: raw.publicIp,
     secretKey: raw.secretKey,
     payments: raw.payments,
@@ -728,7 +733,7 @@ export function buildApp(config: ServerConfig) {
     // the /admin page SHELL is public (it's just html); its data endpoints
     // (/v1/admin/*) still require the admin key
     if (req.url.split("?")[0] === "/setup" || req.url === "/health" || req.url === "/" || req.url === "/admin" || req.url === "/hosted" ||
-        req.url === "/v1/signup" || req.url.startsWith("/hosted") || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
+        req.url === "/v1/signup" || req.url.split("?")[0] === "/v1/account-status" || req.url.startsWith("/hosted") || req.url.startsWith("/purchase") || req.url.startsWith("/order/") || req.url.startsWith("/lookup") || req.url.startsWith("/pay/")) return;
     const caller = auth(req.headers["x-api-key"] as string | undefined);
     if (!caller) {
       await reply.code(401).send({ code: "UNAUTHORIZED", message: "Invalid API key" });
@@ -769,7 +774,7 @@ export function buildApp(config: ServerConfig) {
   app.get("/admin", async (_req, reply) => reply.type("text/html").send(adminPage()));
   app.get("/hosted", async (_req, reply) => {
     reply.header("cache-control", "no-store");
-    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl, Boolean(config.hostedDirect)));
+    return reply.type("text/html").send(hostedPurchasePage(hostedPurchaseEnabled, config.publicUrl, Boolean(config.hostedDirect), config.supportContact));
   });
   app.get("/hosted/return", async (req, reply) => {
     reply.header("cache-control", "no-store");
@@ -926,6 +931,31 @@ export function buildApp(config: ServerConfig) {
     audit({ event: "hosted-signup", userId: user.id });
     reply.header("cache-control", "no-store");
     return { userId: user.id, apiKey: user.apiKey, subject };
+  });
+
+  // Self-service account status for lost API keys: masked tail only. Reset
+  // stays operator-verified (contacts are unverified strings; self-service
+  // rotation would let anyone who knows a contact take over that account).
+  const statusAttempts = new Map<string, number[]>();
+  app.get("/v1/account-status", async (req, reply) => {
+    reply.header("cache-control", "no-store");
+    const contact = (req.query as { contact?: string }).contact ?? "";
+    if (!/^\S{3,120}$/.test(contact)) return reply.code(400).send({ code: "BAD_CONTACT" });
+    const now = Date.now();
+    const ip = req.ip || "unknown";
+    const attempts = (statusAttempts.get(ip) ?? []).filter((t) => now - t < 3600_000);
+    if (attempts.length >= 10) return reply.code(429).send({ code: "RATE_LIMITED" });
+    attempts.push(now);
+    statusAttempts.set(ip, attempts);
+    const user = store.findUserByContact(contact);
+    if (!user || user.disabledAt) return { exists: false };
+    return {
+      exists: true,
+      plan: user.plan,
+      expiresAt: user.expiresAt,
+      keyTail: user.apiKey.slice(-4),
+      disabled: Boolean(user.disabledAt),
+    };
   });
 
   app.post("/v1/hosted/session", async (req, reply) => {

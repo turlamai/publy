@@ -265,7 +265,7 @@ async function bindAccount() {
 /** Hosted purchase page. It is intentionally usable only when a Commerce
  * checkout is configured; the disabled state is explicit, never a fake pay
  * button. Payment confirmation still happens through Commerce/Permit. */
-export function hostedPurchasePage(available: boolean, publicUrl?: string, direct = false): string {
+export function hostedPurchasePage(available: boolean, publicUrl?: string, direct = false, supportContact?: string): string {
   if (direct) return hostedDirectPurchasePage(available);
   const offers = (Object.entries(HOSTED_OFFERS) as Array<[HostedOfferId, (typeof HOSTED_OFFERS)[HostedOfferId]]>)
     .map(([id, offer], index) => `
@@ -333,10 +333,46 @@ ${available ? `<form class="card" id="buy" >
     <li>开户后会生成 API key（付款前即可拿到）；请像密码一样保管，不要发到公开渠道。</li>
   </ul>
 </div>
+<div class="card">
+  <strong>忘了 API Key？</strong>
+  <p class="small" style="margin-top:8px">输入开户时的联系方式核对账户（只显示 Key 末 4 位和有效期，不会泄露完整 Key）：</p>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <input type="text" id="lk-contact" placeholder="开户时的邮箱 / 手机号" style="margin-top:0">
+    <button type="button" id="lookup-status" style="margin-top:0;white-space:nowrap">核对账户</button>
+  </div>
+  <div id="lk-out" class="small" role="status" aria-live="polite" style="margin-top:10px"></div>
+  <p class="small" style="margin-top:12px;color:var(--kit-text-2)">${supportContact
+    ? `完整 Key 丢失后无法自助取回：用上面的联系方式<a href="mailto:${supportContact}">联系运营者</a>，核验后运营者会重置 Key（旧 Key 立即失效）并把新 Key 发给你。`
+    : `完整 Key 丢失后无法自助取回：重置 Key 需运营者核验后重置（旧 Key 立即失效）。请在 <a href="https://github.com/turlamai/publy/issues">GitHub 仓库提 issue</a> 或通过运营者公布的渠道申请。`}</p>
+</div>
 <p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
 </main>
 <script>
 try { sessionStorage.removeItem('publy_hosted_api_key'); } catch (_) {}
+// lost-key account status check: masked tail only, never the full key
+(function () {
+  var b = document.getElementById('lookup-status');
+  if (!b) return;
+  b.addEventListener('click', async function () {
+    var out = document.getElementById('lk-out');
+    var c = document.getElementById('lk-contact').value.trim();
+    if (!c) { out.textContent = '请输入开户时的联系方式。'; return; }
+    b.disabled = true; out.textContent = '查询中…';
+    try {
+      var r = await fetch('/v1/account-status?contact=' + encodeURIComponent(c));
+      var d = await r.json();
+      if (d && d.exists) {
+        var exp = d.expiresAt ? new Date(d.expiresAt).toISOString().slice(0, 10) : '未知';
+        out.textContent = '找到账户：套餐 ' + d.plan + ' · 有效期至 ' + exp + ' · Key 末 4 位 ' + d.keyTail + '。若末 4 位与你保存的不符或需重置，请按下方说明联系运营者。';
+      } else if (d && d.exists === false) {
+        out.textContent = '未找到该联系方式的账户；确认联系方式无误后，可直接在上方重新开户。';
+      } else {
+        out.textContent = (d && d.message) || '查询失败，请稍后再试。';
+      }
+    } catch (e) { out.textContent = '网络错误，请稍后再试。'; }
+    b.disabled = false;
+  });
+})();
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
 function say(text, bad) { msg.textContent = text; msg.className = bad ? 'err' : ''; }
 function post(url, body, apiKey) {

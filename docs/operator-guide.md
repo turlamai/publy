@@ -97,6 +97,29 @@ stays blocked instead of guessing. An old backup can also be missing later
 deliveries. See [recovery and backup](operations.md)
 before restarting or restoring a service.
 
+## Lost API keys: verify, then rotate
+
+Customers lose their key; the contact they registered is the identity anchor.
+Two steps — never skip the verification:
+
+1. **The customer self-checks** on the hosted page ("忘了 API Key？" card): they
+   enter their contact and see the plan, expiry and the key's last four
+   characters (`/v1/account-status` — masked by design; the full key is never
+   returned by any endpoint).
+2. **You rotate after verifying the requester**: in the admin console's Users
+   tab, search the contact, confirm identity through the contact channel
+   published in your terms/support page (a reply from that registered contact
+   counts as verification), then click **rotate-key**. The old key dies
+   instantly, the new key is shown once in the response — hand it to the
+   customer over the verified channel. Every rotation is audit-logged as
+   `key-rotated`.
+
+Never email or paste a full key into public channels, and never rotate on a
+request whose contact you cannot tie back to the registered customer: contacts
+are unverified strings, so a self-service reset would let anyone who knows a
+contact take over the account. Configure `supportContact` in `server.json` so
+the hosted page shows customers your real recovery channel.
+
 ## Care for the service
 
 - Back up the configured data directory and server configuration together,
