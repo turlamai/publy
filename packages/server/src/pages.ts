@@ -300,12 +300,13 @@ ${available ? `<div class="notice ok">支付通道已配置。付款成功后，
   `<div class="notice">支付通道正在接入，暂不可购买。当前可以先使用免费的自托管路径：<a href="https://publy.jrtx.site/start.html">开始使用</a>。</div>`}
 ${available ? `<form class="card" id="buy" >
   <div class="plans">${offers}</div>
-  <label class="field">联系方式（邮箱或手机号，用于开户与对账）
+  <label class="field">联系方式（邮箱或手机号）——开户、对账，以及日后找回 API Key 的唯一凭据，请务必真实有效
     <input type="text" id="contact" name="contact" autocomplete="email" placeholder="you@example.com" required>
   </label>
-  <label class="field">已有账户 API Key
-    <input type="password" id="legacy-key" autocomplete="off">
+  <label class="field">已有账户 API Key（仅续费/补购的老用户填写；首次开通请留空，付款前会自动开户并发给你新 Key）
+    <input type="password" id="legacy-key" autocomplete="off" placeholder="首次开通无需填写">
   </label>
+  <div class="small" style="color:var(--text-3);margin:-6px 0 10px">API Key 只在开户时完整显示一次；丢失后凭开户时的联系方式联系运营者找回。首次开通请勿填写上方 Key。</div>
   <button type="submit" id="pay">去支付宝付款</button>
   <div id="msg" role="status" aria-live="polite"></div>
 </form>` : ""}
@@ -338,11 +339,13 @@ if (form) form.addEventListener('submit', async function (event) {
     if (!apiKey) {
       var signup = await post('/v1/signup', { contact: contact });
       var account = await signup.json();
-      if (signup.status === 409) throw new Error('该联系方式已开户；如已购买，请联系运营者找回 key。');
+      if (signup.status === 409) throw new Error('该联系方式已开户。续费请在上方「已有账户 API Key」填入原有 Key；Key 已丢失时，凭开户联系方式联系运营者找回。');
       if (!signup.ok) throw new Error(account.message || account.code || '开户失败');
+      keyInput.type = 'text';
+      keyInput.readOnly = true;
       keyInput.value = account.apiKey;
       button.disabled = false;
-      say('请先复制并保存上方的 API Key，然后继续付款。');
+      say('已为你开户并生成 API Key（上方输入框已明文显示）。请立即复制保存——丢失后需凭联系方式联系运营者找回；然后再点击付款。');
       return;
     }
     var offer = form.querySelector('input[name=offer]:checked').value;
