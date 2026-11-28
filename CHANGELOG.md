@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.9] — 2026-11-28
+
+- Clear the Obsidian Community Directory automated scan errors: all seven direct style assignments (`obsidianmd/no-static-styles-assignment`) moved to classes in `styles.css` — hidden file input, cover fallback tile, dialog row, settings intro card, intro link row, connection result line, and the preview paper font stack.
+- `minAppVersion` raised 1.5.0 → 1.7.2 so the public `Workspace.revealLeaf` API (since 1.7.2) sits inside the declared floor, fixing `obsidianmd/no-unsupported-api`.
+- `verify-plugin.mjs`'s DOM stub models `classList` and `addClass` now that settings styling goes through classes.
+
 ## Unreleased
 
 - Server 0.2.4: the hosted checkout page states the whole journey up front (open account → scan & pay ¥29 → connect via tutorial), labels the primary button honestly ("开户并扫码支付 ¥29"), and — once a month is active — links the next steps (paste the API key into the plugin/CLI, connect the Official Account via /setup with the whitelist walkthrough) instead of stopping at the entitlement confirmation.
