@@ -46,3 +46,15 @@
 > Publy previews Markdown articles and image-post cards for WeChat Official Accounts. Local preview and rich-text copy do not require a hosted account. Optional delivery uses the user's configured Publy server and official WeChat APIs to create **drafts**, not to automatically mass-send or publicly post articles. The Obsidian plugin is desktop-only; hosted commercial subscriptions are not yet offered.
 
 不要声称官方目录已通过、付费已经开放，或特定安全测试已完成。
+
+## 6. 提交时可粘贴的审核说明（2026-11-28 预检已全部通过）
+
+提交表单与 Request review 的备注可直接使用以下内容：
+
+**Short description（表单）**：Preview Markdown and render WeChat-ready articles, image posts and cards offline; optionally deliver drafts to your own WeChat Official Account via your configured Publy server.
+
+**关于包体积（预期会被问）**：`main.js` is ~22 MB because the resvg WASM renderer, MathJax, and the two licensed Noto Sans SC subset fonts are embedded on purpose: the Community Directory install receives exactly three files, and the plugin must keep offline preview, copy, card rasterization and math rendering fully working with no runtime downloads or sidecar files. Evidence: clean-vault acceptance on macOS / Windows 11 / Ubuntu 26.04 with the published 0.8.8 assets (issue #12, three-platform screenshots), plus `verify-plugin.mjs --community-only` in CI. No remote code loading, no telemetry; network is used only when the user explicitly sends a draft to their configured server.
+
+**Payment label**：托管服务尚未开售（PRICING 与 issue #8 门禁），当前按 **Free** 提交并在描述中披露 optional hosted delivery；待 #17 托管权益开售后，按后台官方分类解释改选对应标签并更新描述，不得把付费服务包装成永久免费。
+
+**测试说明（供审核者复现）**：clean vault → copy only `main.js` / `manifest.json` / `styles.css` from the 0.8.8 release → enable → run "Preview current options" on a note with `$E=mc^2$` and a `## cover` card section; math renders as images and cards rasterize 1080×1440 offline. Disconnect from the network and repeat to confirm no runtime fetches.
