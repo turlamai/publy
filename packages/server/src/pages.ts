@@ -1,4 +1,4 @@
-import { WEB_CSS, WEB_JS } from "./web-assets.js";
+import { WEB_CSS, WEB_JS, FAMILY_CSS } from "./web-assets.js";
 import { escapeHtml } from "./setup-page.js";
 // Storefront (purchase) + admin console pages.
 import { HOSTED_OFFERS, formatFen, type HostedOfferId } from "./hosted-offers.js";
@@ -278,21 +278,35 @@ export function hostedPurchasePage(available: boolean, publicUrl?: string, direc
   return `<!doctype html><html lang="zh-CN" class="publy-web"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Publy 托管投递 · 开通</title>
+<style>${FAMILY_CSS}</style>
 <style>
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
-.wrap{max-width:860px;margin:0 auto;padding:40px 22px 70px}a{color:var(--green)}h1{font:600 34px/1.2 var(--sans);margin:8px 0 10px}
-.lead{color:var(--muted);max-width:600px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:22px}
-.notice{border:1px solid #ecd6a6;background:var(--amber-tint);color:var(--amber);border-radius:12px;padding:14px 16px;font-size:13px;margin-top:20px}
+*{box-sizing:border-box}body{margin:0;background:var(--kit-bg);color:var(--kit-text);font:15px/1.7 var(--kit-font-sans)}
+.publy-web .kit-brand,.publy-web .kit-brand span{color:var(--kit-text)}.publy-web .kit-nav-links a{color:var(--kit-text-2)}.publy-web .kit-nav-links a:hover{color:var(--kit-text);text-decoration:none}
+.kit-nav-actions .theme-toggle{width:42px;min-height:42px;padding:0;border-radius:999px;margin-top:0;display:inline-flex;align-items:center;justify-content:center}
+.wrap{max-width:860px;margin:0 auto;padding:36px 22px 70px}a{color:var(--kit-accent-strong)}
+h1{font:600 34px/1.25 var(--kit-font-display);margin:14px 0 10px;letter-spacing:-0.01em}
+.lead{color:var(--kit-text-2);max-width:600px}.card{background:var(--kit-bg-elevated);border:1px solid var(--kit-border);border-radius:var(--kit-radius-l);padding:24px;margin-top:22px}
+.notice{border:1px solid #ecd6a6;background:var(--amber-tint);color:var(--amber);border-radius:var(--kit-radius-m);padding:14px 16px;font-size:13px;margin-top:20px}
 .notice.ok{border-color:#cfe3cd;background:var(--tint);color:var(--green)}
-.plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
-.plan input{margin:0}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--muted);font-size:12px}
-label.field{display:block;margin-top:16px;font-size:12px;color:var(--muted)}input[type=text],input[type=password]{color:var(--ink);width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
-button{border:0;border-radius:10px;background:var(--green);color:#fff;font:inherit;font-weight:650;padding:11px 18px;cursor:pointer;margin-top:18px}button:disabled{opacity:.55;cursor:not-allowed}
-#msg{font-size:13px;margin-top:12px;color:var(--muted)}#msg.err{color:var(--danger)}
-.small{font-size:12px;color:var(--muted);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--green)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--muted)}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}.plan{border:1px solid var(--kit-border);border-radius:var(--kit-radius-m);padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;cursor:pointer;transition:border-color .15s}
+.plan:hover{border-color:var(--kit-border-strong)}.plan:has(input:checked){border-color:var(--kit-accent);background:var(--kit-accent-soft)}
+.plan input{margin:0;accent-color:var(--kit-accent)}.plan-name{font-weight:650;font-size:13px}.plan-price{font-weight:750;font-size:15px}.plan-meta{grid-column:2 / 4;color:var(--kit-text-2);font-size:12px}
+label.field{display:block;margin-top:16px;font-size:12px;color:var(--kit-text-2)}input[type=text],input[type=password]{color:var(--kit-text);width:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--kit-border);border-radius:var(--kit-radius-s);font:inherit;background:var(--kit-bg-elevated)}
+input:focus-visible{outline:2px solid var(--kit-accent);outline-offset:1px}
+button{border:0;border-radius:999px;background:var(--kit-accent);color:var(--kit-on-accent);font:inherit;font-weight:650;padding:11px 20px;cursor:pointer;margin-top:18px;transition:background .15s}
+button:hover{background:var(--kit-accent-hover)}button:disabled{opacity:.55;cursor:not-allowed}
+#msg{font-size:13px;margin-top:12px;color:var(--kit-text-2)}#msg.err{color:var(--danger)}
+.small{font-size:12px;color:var(--kit-text-3);margin-top:16px}.steps{margin:12px 0 0;padding-left:20px;color:var(--kit-text-2);font-size:13px}.steps li{margin:2px 0}.steps a{color:var(--kit-accent-strong)}.small li{margin:4px 0}.foot{margin-top:28px;font-size:12px;color:var(--kit-text-3)}
 @media(max-width:560px){.plans{grid-template-columns:1fr}h1{font-size:27px}}
-${WEB_CSS}</style><meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body><div class="wrap">
-<a href="https://publy.jrtx.site/">← Publy</a>
+${WEB_CSS}</style>
+<script>(function(){var t=null;try{t=localStorage.getItem('publy-theme')}catch(_){}if(t!=='dark'&&t!=='light'){t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.dataset.theme=t})();</script>
+<meta name="theme-color" content="#D97757"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2217%22%20fill%3D%22%23D97757%22%2F%3E%3Cpath%20d%3D%22M32%2048V18M20%2029l12-12%2012%2012%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E"></head><body>
+<header class="kit-nav"><div class="kit-container kit-nav-inner">
+<a class="kit-brand" href="https://publy.jrtx.site/"><svg class="kit-brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="17" fill="#D97757"/><path d="M32 48V18M20 29l12-12 12 12" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Publy</span></a>
+<nav class="kit-nav-links"><a href="https://publy.jrtx.site/start.html">开始使用</a><a href="/setup">配置公众号</a></nav>
+<div class="kit-nav-actions"><button class="secondary theme-toggle" type="button" data-theme-switch aria-pressed="false" title="切换亮暗主题" aria-label="切换亮暗主题"></button></div>
+</div></header>
+<main class="wrap">
 <h1>托管投递，按需开通。</h1>
 <p class="lead">Publy 只把 Markdown 变成你公众号里的草稿，不群发、不公开发布。托管版负责稳定出口、凭据保管、排程和未知结果恢复。</p>
 <ol class="steps"><li>填写联系方式，点下方按钮开户</li><li>支付宝扫码支付 ¥29，当月自动生效</li><li>按教程把 API Key 填进插件、绑定公众号，发出第一篇草稿</li></ol>
@@ -320,7 +334,7 @@ ${available ? `<form class="card" id="buy" >
   </ul>
 </div>
 <p class="foot"><a href="/setup">连接公众号</a> · <a href="https://publy.jrtx.site/wechat.html?lang=zh">首次使用与恢复</a> · 运营者：Publy · <a href="https://github.com/turlamai/publy/blob/main/PRICING.md">定价与服务说明</a> · <a href="https://publy.jrtx.site/terms.html?lang=zh">服务条款</a> · <a href="https://publy.jrtx.site/privacy.html?lang=zh">隐私说明</a></p>
-</div>
+</main>
 <script>
 try { sessionStorage.removeItem('publy_hosted_api_key'); } catch (_) {}
 var form = document.getElementById('buy'), msg = document.getElementById('msg'), button = document.getElementById('pay');
